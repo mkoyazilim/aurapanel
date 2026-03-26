@@ -1,0 +1,15 @@
+{
+  "menu": {
+    "dashboard": "Ana Sayfa",
+    "websites": "Web Siteleri",
+    "packages": "Paket Yönetimi",
+    "users": "Kullanıcılar",
+    "databases": "Veritabanları",
+    "emails": "E-Posta Hesapları",
+    "dns": "DNS Merkezi"
+  },
+  "websites": {
+    "title": "Web Siteleri",
+    "add_new": "Yeni Site Ekle"
+  }
+}

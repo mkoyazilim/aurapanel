@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-panel-darker text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white;
+  }
+}
+
+@layer components {
+  /* AuraPanel Premium Card Style */
+  .aura-card {
+    @apply bg-panel-card border border-panel-border rounded-xl shadow-lg ring-1 ring-white/5 backdrop-blur-sm p-6 transition-all duration-300;
+  }
+  
+  .aura-card:hover {
+    @apply border-brand-500/50 shadow-brand-500/10;
+  }
+  
+  /* Primary Button */
+  .btn-primary {
+    @apply px-4 py-2 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-400 hover:to-brand-500 text-white font-medium rounded-lg shadow-lg shadow-brand-500/30 transition-all duration-300 transform active:scale-95 flex items-center gap-2;
+  }
+  
+  /* Secondary Button */
+  .btn-secondary {
+    @apply px-4 py-2 bg-panel-dark border border-panel-border hover:border-brand-500/50 hover:bg-panel-card text-gray-300 hover:text-white font-medium rounded-lg transition-all duration-300 flex items-center gap-2;
+  }
+
+  /* Dangerous Button */
+  .btn-danger {
+    @apply px-4 py-2 bg-red-500/10 border border-red-500/20 hover:bg-red-500 hover:border-red-500 text-red-400 hover:text-white font-medium rounded-lg transition-all duration-300 flex items-center gap-2;
+  }
+
+  /* Form Input */
+  .aura-input {
+    @apply w-full bg-panel-dark border border-panel-border rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all duration-300;
+  }
+}
+
+/* Glassmorphism scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-panel-darker;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-panel-border rounded-full hover:bg-brand-500/50 transition-colors;
+}

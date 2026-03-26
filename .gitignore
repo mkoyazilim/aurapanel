@@ -1,0 +1,25 @@
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Go
+api-gateway.exe
+*.exe
+
+# Rust
+target/
+Cargo.lock
+
+# Environment
+.env.local
+.env.*.local
+.env
+
+# MacOS/Windows
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "websites": "Websites",
+    "packages": "Packages",
+    "users": "Users",
+    "databases": "Databases",
+    "emails": "Emails",
+    "dns": "DNS Management"
+  },
+  "websites": {
+    "title": "Websites",
+    "add_new": "Add Website"
+  }
+}
