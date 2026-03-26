@@ -2,8 +2,12 @@ import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
 // API Gateway Base URL
+const defaultBaseUrl = typeof window !== 'undefined'
+  ? '/api/v1'
+  : 'http://127.0.0.1:8090/api/v1'
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || defaultBaseUrl,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

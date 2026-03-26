@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/aurapanel/api-gateway/controllers"
 	"github.com/aurapanel/api-gateway/handlers"
@@ -14,6 +16,14 @@ import (
 type Response struct {
 	Message string `json:"message"`
 	Status  string `json:"status"`
+}
+
+func gatewayAddr() string {
+	addr := strings.TrimSpace(os.Getenv("AURAPANEL_GATEWAY_ADDR"))
+	if addr == "" {
+		return ":8090"
+	}
+	return addr
 }
 
 func main() {
@@ -88,7 +98,9 @@ func main() {
 	mainRouter.Handle("/api/system/", protectedHandler)
 	mainRouter.Handle("/api/websites", protectedHandler)
 	mainRouter.Handle("/api/v1/", protectedHandler)
+	mainRouter.Handle("/", middleware.Logger(controllers.PanelStaticHandler()))
 
-	fmt.Println("API Gateway listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", mainRouter))
+	listenAddr := gatewayAddr()
+	fmt.Printf("API Gateway listening on %s\n", listenAddr)
+	log.Fatal(http.ListenAndServe(listenAddr, mainRouter))
 }

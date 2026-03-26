@@ -244,6 +244,8 @@ pub fn routes() -> Router {
         .route("/status/services", get(status_services_handler))
         .route("/status/processes", get(status_processes_handler))
         .route("/status/service/control", post(status_service_control_handler))
+        .route("/status/panel-port", get(status_panel_port_handler))
+        .route("/status/panel-port", post(status_panel_port_update_handler))
 }
 
 async fn health_check() -> Json<StatusResponse> {
@@ -1719,6 +1721,39 @@ async fn status_service_control_handler(Json(payload): Json<ServiceControlPayloa
     }
 }
 
+#[derive(Deserialize)]
+struct PanelPortUpdatePayload {
+    port: u16,
+    open_firewall: Option<bool>,
+}
+
+async fn status_panel_port_handler() -> Json<serde_json::Value> {
+    match StatusManager::get_panel_port() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn status_panel_port_update_handler(
+    Json(payload): Json<PanelPortUpdatePayload>,
+) -> Json<serde_json::Value> {
+    if payload.port == 0 {
+        return Json(json!({
+            "status": "error",
+            "message": "Port araligi 1-65535 olmalidir."
+        }));
+    }
+
+    match StatusManager::update_panel_port(payload.port, payload.open_firewall.unwrap_or(true)) {
+        Ok(data) => Json(json!({
+            "status": "success",
+            "message": format!("Panel portu {} olarak guncellendi.", payload.port),
+            "data": data
+        })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
 // ─── VHost / Sites Handlers ──────────────────────────────────────────────────
 
 #[derive(Deserialize, Default)]
@@ -2575,6 +2610,23 @@ mod tests {
                 Request::builder()
                     .method(Method::GET)
                     .uri("/status/services")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn status_panel_port_route_is_reachable() {
+        let app = routes();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/status/panel-port")
                     .body(Body::empty())
                     .expect("request"),
             )

@@ -70,6 +70,11 @@
           <span>Server Status</span>
         </router-link>
 
+        <router-link to="/panel-port" class="sidebar-link" active-class="sidebar-link-active">
+          <Settings2 class="w-5 h-5 mr-3" />
+          <span>Panel Port</span>
+        </router-link>
+
         <router-link to="/app-runtime" class="sidebar-link" active-class="sidebar-link-active">
           <TerminalSquare class="w-5 h-5 mr-3" />
           <span>App Runtime</span>
@@ -281,7 +286,8 @@ import {
   Clock3,
   ScrollText
   ,
-  Table2
+  Table2,
+  Settings2
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -312,6 +318,7 @@ const commandItems = [
   { label: 'File Manager', path: '/filemanager' },
   { label: 'PHP', path: '/php' },
   { label: 'Server Status', path: '/server-status' },
+  { label: 'Panel Port', path: '/panel-port' },
   { label: 'Docker Images', path: '/docker/images' },
   { label: 'Docker Containers', path: '/docker/containers' },
   { label: 'Docker App Store', path: '/docker/apps' }

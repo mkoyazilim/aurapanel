@@ -43,12 +43,12 @@ cPanel/Plesk gibi kapalı kaynak panellere alternatif olarak, tamamen özgür ya
 └──────────────┬───────────────────────────┘
                │ HTTPS / JWT
 ┌──────────────▼───────────────────────────┐
-│          Go API Gateway (:8080)          │
+│          Go API Gateway (:8090)          │
 │     (Auth, CORS, Rate Limit, Proxy)      │
 └──────────────┬───────────────────────────┘
                │ HTTP / Internal
 ┌──────────────▼───────────────────────────┐
-│        Rust Micro-Core (:3000)           │
+│   Rust Micro-Core (127.0.0.1:8000)       │
 │  ┌─────────┬──────────┬────────────┐     │
 │  │ Nitro   │ PowerDNS │ AuraDB     │     │
 │  │ Engine  │ Manager  │ Explorer   │     │
@@ -72,7 +72,7 @@ cPanel/Plesk gibi kapalı kaynak panellere alternatif olarak, tamamen özgür ya
 ### Tek Satırda Kurulum
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
 ### Manuel Derleme

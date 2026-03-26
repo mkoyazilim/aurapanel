@@ -153,6 +153,11 @@ const routes = [
         path: 'server-status',
         name: 'ServerStatus',
         component: () => import('../views/ServerStatus.vue')
+      },
+      {
+        path: 'panel-port',
+        name: 'PanelPort',
+        component: () => import('../views/PanelPort.vue')
       }
     ]
   }
