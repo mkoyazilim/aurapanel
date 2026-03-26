@@ -9,7 +9,7 @@ use serde_json::json;
 
 use crate::services::nitro::{NitroEngine, VHostConfig};
 use crate::services::dns::{PowerDnsManager, DnsZoneConfig};
-use crate::services::db::{DbManager, DbConfig};
+use crate::services::db::{DbConfig, MariaDbManager, PostgresManager};
 use crate::services::mail::{MailManager, MailboxConfig};
 use crate::services::perf::{PerfManager, RedisConfig};
 use crate::services::security::{SecurityManager, FirewallRule};
@@ -35,7 +35,14 @@ pub fn routes() -> Router {
         .route("/health", get(health_check))
         .route("/vhost", post(create_vhost_handler))
         .route("/dns/zone", post(create_dns_zone_handler))
-        .route("/db/create", post(create_database_handler))
+        .route("/db/mariadb/list", get(mariadb_list_handler))
+        .route("/db/mariadb/create", post(mariadb_create_handler))
+        .route("/db/mariadb/drop", post(mariadb_drop_handler))
+        .route("/db/mariadb/users", get(mariadb_users_handler))
+        .route("/db/postgres/list", get(postgres_list_handler))
+        .route("/db/postgres/create", post(postgres_create_handler))
+        .route("/db/postgres/drop", post(postgres_drop_handler))
+        .route("/db/postgres/users", get(postgres_users_handler))
         .route("/mail/create", post(create_mailbox_handler))
         .route("/perf/redis", post(create_redis_handler))
         .route("/security/firewall", post(firewall_rule_handler))
@@ -160,19 +167,68 @@ async fn create_mailbox_handler(
     }
 }
 
-// Handler for creating a new database
-async fn create_database_handler(
-    Json(payload): Json<DbConfig>,
-) -> Json<serde_json::Value> {
-    match DbManager::create_database(&payload).await {
-        Ok(_) => Json(json!({
-            "status": "success",
-            "message": format!("Database {} created and user {} bound.", payload.db_name, payload.db_user),
-        })),
-        Err(e) => Json(json!({
-            "status": "error",
-            "message": e,
-        })),
+// ─── MariaDB Handlers ─────────────────────────────────────────
+
+async fn mariadb_list_handler() -> Json<serde_json::Value> {
+    match MariaDbManager::list_databases() {
+        Ok(dbs) => Json(json!({ "status": "success", "data": dbs })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn mariadb_create_handler(Json(payload): Json<DbConfig>) -> Json<serde_json::Value> {
+    match MariaDbManager::create_database(&payload) {
+        Ok(msg) => Json(json!({ "status": "success", "message": msg })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct DropDbRequest {
+    name: String,
+}
+
+async fn mariadb_drop_handler(Json(payload): Json<DropDbRequest>) -> Json<serde_json::Value> {
+    match MariaDbManager::drop_database(&payload.name) {
+        Ok(msg) => Json(json!({ "status": "success", "message": msg })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn mariadb_users_handler() -> Json<serde_json::Value> {
+    match MariaDbManager::list_users() {
+        Ok(users) => Json(json!({ "status": "success", "data": users })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+// ─── PostgreSQL Handlers ──────────────────────────────────────
+
+async fn postgres_list_handler() -> Json<serde_json::Value> {
+    match PostgresManager::list_databases() {
+        Ok(dbs) => Json(json!({ "status": "success", "data": dbs })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn postgres_create_handler(Json(payload): Json<DbConfig>) -> Json<serde_json::Value> {
+    match PostgresManager::create_database(&payload) {
+        Ok(msg) => Json(json!({ "status": "success", "message": msg })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn postgres_drop_handler(Json(payload): Json<DropDbRequest>) -> Json<serde_json::Value> {
+    match PostgresManager::drop_database(&payload.name) {
+        Ok(msg) => Json(json!({ "status": "success", "message": msg })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn postgres_users_handler() -> Json<serde_json::Value> {
+    match PostgresManager::list_users() {
+        Ok(users) => Json(json!({ "status": "success", "data": users })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
     }
 }
 
