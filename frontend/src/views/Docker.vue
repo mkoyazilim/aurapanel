@@ -205,9 +205,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '../services/api'
 
-const activeTab = ref('containers')
+const route = useRoute()
+const activeTab = ref(route.meta.dockerTab || 'containers')
 const containers = ref([])
 const images = ref([])
 const pullImageName = ref('')

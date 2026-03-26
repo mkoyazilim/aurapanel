@@ -9,7 +9,7 @@
         </div>
       </div>
       
-      <nav class="flex-1 px-4 py-6 space-y-1">
+      <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         <router-link to="/" class="sidebar-link" exact-active-class="sidebar-link-active">
           <LayoutDashboard class="w-5 h-5 mr-3" />
           <span>{{ t('menu.dashboard') }}</span>
@@ -45,10 +45,48 @@
           <span>{{ t('menu.dns') }}</span>
         </router-link>
 
-        <router-link to="/docker" class="sidebar-link" active-class="sidebar-link-active">
-          <Container class="w-5 h-5 mr-3" />
-          <span>{{ t('menu.docker') }}</span>
-        </router-link>
+        <!-- Docker Accordion Menu -->
+        <div class="mt-2">
+          <button @click="dockerMenuOpen = !dockerMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isDockerRoute }">
+            <div class="flex items-center">
+              <Container class="w-5 h-5 mr-3" />
+              <span>Docker</span>
+            </div>
+            <ChevronDown class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': dockerMenuOpen }" />
+          </button>
+
+          <transition name="accordion">
+            <div v-show="dockerMenuOpen" class="ml-4 mt-1 space-y-0.5 border-l border-panel-border/50 pl-3">
+              <!-- Docker Manager Sub-group -->
+              <div class="pt-1 pb-1">
+                <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold px-2">Manager</span>
+              </div>
+              <router-link to="/docker/images" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>Manage Images</span>
+              </router-link>
+              <router-link to="/docker/containers" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>Manage Containers</span>
+              </router-link>
+              <router-link to="/docker/create" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>Create Container</span>
+              </router-link>
+
+              <!-- Docker Apps Sub-group -->
+              <div class="pt-2 pb-1">
+                <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold px-2">Apps</span>
+              </div>
+              <router-link to="/docker/apps" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>App Store</span>
+              </router-link>
+              <router-link to="/docker/apps/installed" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>Installed Apps</span>
+              </router-link>
+              <router-link to="/docker/apps/packages" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>Docker Packages</span>
+              </router-link>
+            </div>
+          </transition>
+        </div>
       </nav>
 
       <div class="p-4 border-t border-panel-border text-sm text-gray-400">
@@ -107,9 +145,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { 
   Activity, 
@@ -128,8 +166,17 @@ import {
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const toggleMenu = ref(false)
+const dockerMenuOpen = ref(false)
+
+const isDockerRoute = computed(() => route.path.startsWith('/docker'))
+
+// Auto-open docker menu if on a docker route
+if (route.path.startsWith('/docker')) {
+  dockerMenuOpen.value = true
+}
 
 const handleLogout = () => {
   authStore.logout()
@@ -144,6 +191,27 @@ const handleLogout = () => {
 
 .sidebar-link-active {
   @apply bg-brand-500/10 text-brand-400 hover:bg-brand-500/10 hover:text-brand-400 border border-brand-500/20 shadow-[inset_0_0_12px_rgba(16,185,129,0.1)];
+}
+
+.sidebar-sub-link {
+  @apply flex items-center px-2 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-white hover:bg-panel-hover/50 transition-all duration-150;
+}
+
+.sidebar-sub-link-active {
+  @apply text-blue-400 bg-blue-500/10 hover:text-blue-400;
+}
+
+.accordion-enter-active,
+.accordion-leave-active {
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.accordion-enter-from,
+.accordion-leave-to {
+  max-height: 0;
+  opacity: 0;
 }
 
 .fade-enter-active,

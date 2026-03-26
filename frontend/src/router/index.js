@@ -52,10 +52,43 @@ const routes = [
         name: 'DNS',
         component: () => import('../views/DNS.vue')
       },
+      // Docker Manager routes
       {
-        path: 'docker',
-        name: 'Docker',
-        component: () => import('../views/Docker.vue')
+        path: 'docker/images',
+        name: 'Docker Images',
+        component: () => import('../views/Docker.vue'),
+        meta: { dockerTab: 'images' }
+      },
+      {
+        path: 'docker/containers',
+        name: 'Docker Containers',
+        component: () => import('../views/Docker.vue'),
+        meta: { dockerTab: 'containers' }
+      },
+      {
+        path: 'docker/create',
+        name: 'Docker Create',
+        component: () => import('../views/Docker.vue'),
+        meta: { dockerTab: 'create' }
+      },
+      // Docker Apps routes
+      {
+        path: 'docker/apps',
+        name: 'Docker App Store',
+        component: () => import('../views/DockerApps.vue'),
+        meta: { dockerAppsTab: 'templates' }
+      },
+      {
+        path: 'docker/apps/installed',
+        name: 'Docker Installed Apps',
+        component: () => import('../views/DockerApps.vue'),
+        meta: { dockerAppsTab: 'installed' }
+      },
+      {
+        path: 'docker/apps/packages',
+        name: 'Docker Packages',
+        component: () => import('../views/DockerApps.vue'),
+        meta: { dockerAppsTab: 'packages' }
       }
     ]
   }
