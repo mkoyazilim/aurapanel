@@ -194,7 +194,7 @@ const handleLogout = () => {
 }
 
 .sidebar-sub-link {
-  @apply flex items-center px-2 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-white hover:bg-panel-hover/50 transition-all duration-150;
+  @apply flex items-center px-2 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-all duration-150;
 }
 
 .sidebar-sub-link-active {
