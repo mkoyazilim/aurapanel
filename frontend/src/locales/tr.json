@@ -6,7 +6,8 @@
     "users": "Kullanıcılar",
     "databases": "Veritabanları",
     "emails": "E-Posta Hesapları",
-    "dns": "DNS Merkezi"
+    "dns": "DNS Merkezi",
+    "docker": "Docker Manager"
   },
   "websites": {
     "title": "Web Siteleri",

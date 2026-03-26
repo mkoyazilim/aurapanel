@@ -12,5 +12,6 @@ pub mod security;
 pub mod monitor;
 pub mod users;
 pub mod federated;
+pub mod docker;
 
 pub use manager::ServiceManager;

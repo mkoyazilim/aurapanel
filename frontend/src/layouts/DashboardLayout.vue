@@ -44,6 +44,11 @@
           <Network class="w-5 h-5 mr-3" />
           <span>{{ t('menu.dns') }}</span>
         </router-link>
+
+        <router-link to="/docker" class="sidebar-link" active-class="sidebar-link-active">
+          <Container class="w-5 h-5 mr-3" />
+          <span>{{ t('menu.docker') }}</span>
+        </router-link>
       </nav>
 
       <div class="p-4 border-t border-panel-border text-sm text-gray-400">
@@ -115,6 +120,7 @@ import {
   Users, 
   Box,
   Network,
+  Container,
   Bell, 
   ChevronDown,
   ShieldAlert

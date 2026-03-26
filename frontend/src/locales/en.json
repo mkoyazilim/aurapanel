@@ -6,7 +6,8 @@
     "users": "Users",
     "databases": "Databases",
     "emails": "Emails",
-    "dns": "DNS Management"
+    "dns": "DNS Management",
+    "docker": "Docker Manager"
   },
   "websites": {
     "title": "Websites",

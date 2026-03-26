@@ -51,6 +51,11 @@ const routes = [
         path: 'dns',
         name: 'DNS',
         component: () => import('../views/DNS.vue')
+      },
+      {
+        path: 'docker',
+        name: 'Docker',
+        component: () => import('../views/Docker.vue')
       }
     ]
   }

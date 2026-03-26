@@ -21,6 +21,7 @@ use crate::services::ssl::{SslManager, SslConfig};
 use crate::services::secure_connect::{SecureConnectManager, SftpUserConfig};
 use crate::services::storage::{BackupManager, BackupConfig};
 use crate::services::monitor::gitops::{GitOpsManager, GitOpsConfig};
+use crate::services::docker::{DockerManager, docker::{CreateContainerConfig, PullImageConfig}};
 
 #[derive(Serialize)]
 struct StatusResponse {
@@ -46,6 +47,15 @@ pub fn routes() -> Router {
         .route("/sftp/create", post(create_sftp_handler))
         .route("/backup/create", post(create_backup_handler))
         .route("/gitops/deploy", post(gitops_deploy_handler))
+        // Docker Manager
+        .route("/docker/containers", get(docker_list_containers))
+        .route("/docker/containers/create", post(docker_create_container))
+        .route("/docker/containers/start", post(docker_action_handler))
+        .route("/docker/containers/stop", post(docker_action_handler))
+        .route("/docker/containers/restart", post(docker_action_handler))
+        .route("/docker/containers/remove", post(docker_action_handler))
+        .route("/docker/images", get(docker_list_images))
+        .route("/docker/images/pull", post(docker_pull_image))
 }
 
 async fn health_check() -> Json<StatusResponse> {
@@ -276,3 +286,60 @@ async fn gitops_deploy_handler(
     }
 }
 
+// ─── Docker Handlers ────────────────────────────────────────
+
+async fn docker_list_containers() -> Json<serde_json::Value> {
+    match DockerManager::list_containers() {
+        Ok(containers) => Json(json!({ "status": "success", "data": containers })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn docker_create_container(
+    Json(payload): Json<CreateContainerConfig>,
+) -> Json<serde_json::Value> {
+    match DockerManager::create_container(&payload) {
+        Ok(id) => Json(json!({ "status": "success", "container_id": id })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct DockerActionPayload {
+    id: String,
+    action: String, // start, stop, restart, remove
+    force: Option<bool>,
+}
+
+async fn docker_action_handler(
+    Json(payload): Json<DockerActionPayload>,
+) -> Json<serde_json::Value> {
+    let result = match payload.action.as_str() {
+        "start" => DockerManager::start_container(&payload.id),
+        "stop" => DockerManager::stop_container(&payload.id),
+        "restart" => DockerManager::restart_container(&payload.id),
+        "remove" => DockerManager::remove_container(&payload.id, payload.force.unwrap_or(false)),
+        _ => Err("Bilinmeyen eylem".to_string()),
+    };
+
+    match result {
+        Ok(_) => Json(json!({ "status": "success", "message": format!("{} -> {}", payload.action, payload.id) })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn docker_list_images() -> Json<serde_json::Value> {
+    match DockerManager::list_images() {
+        Ok(images) => Json(json!({ "status": "success", "data": images })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn docker_pull_image(
+    Json(payload): Json<PullImageConfig>,
+) -> Json<serde_json::Value> {
+    match DockerManager::pull_image(&payload) {
+        Ok(_) => Json(json!({ "status": "success", "message": format!("Image {} pulled.", payload.image) })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
