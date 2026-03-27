@@ -150,9 +150,9 @@ Bu proje **MIT** lisansı altında dağıtılmaktadır. Detaylar için [LICENSE]
   <b>AuraPanel</b> — Sunucu yönetiminin geleceği. 🌌
 </p>
 
-## Proje Ilerleme Grafigi
+## Proje İlerleme Grafigi
 
-**Genel Ilerleme:** `78%`
+**Genel İlerleme:** `78%`
 
 ```
 [###############################---------] 78%
