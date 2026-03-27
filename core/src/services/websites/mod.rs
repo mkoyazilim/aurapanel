@@ -291,6 +291,98 @@ impl WebsitesManager {
         Self::with_original_trailing_newline(content, &lines)
     }
 
+    fn parse_named_block_header(trimmed: &str, keyword: &str) -> Option<String> {
+        if !trimmed.starts_with(keyword) {
+            return None;
+        }
+        let rest = trimmed.trim_start_matches(keyword).trim_start();
+        let open_idx = rest.find('{')?;
+        Some(rest[..open_idx].trim().to_string())
+    }
+
+    fn find_block_range(lines: &[String], keyword: &str, name: &str) -> Option<(usize, usize)> {
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            let Some(found) = Self::parse_named_block_header(trimmed, keyword) else {
+                continue;
+            };
+            if found != name {
+                continue;
+            }
+
+            let mut depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            let mut end = idx;
+            let mut cursor = idx + 1;
+            while cursor < lines.len() {
+                depth += lines[cursor].matches('{').count() as i32;
+                depth -= lines[cursor].matches('}').count() as i32;
+                if depth <= 0 {
+                    end = cursor;
+                    break;
+                }
+                cursor += 1;
+            }
+            return Some((idx, end));
+        }
+        None
+    }
+
+    fn upsert_listener_map(content: &str, listener: &str, vhost: &str, hosts: &str) -> String {
+        let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+        let Some((start, end)) = Self::find_block_range(&lines, "listener", listener) else {
+            return Self::with_original_trailing_newline(content, &lines);
+        };
+
+        let map_line = format!("    map                      {} {}", vhost, hosts);
+        let mut existing_idx = None;
+        for idx in (start + 1)..end {
+            let trimmed = lines[idx].trim();
+            if !trimmed.starts_with("map") {
+                continue;
+            }
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() >= 3 && parts[1] == vhost {
+                existing_idx = Some(idx);
+                break;
+            }
+        }
+
+        if let Some(idx) = existing_idx {
+            lines[idx] = map_line;
+        } else {
+            lines.insert(end, map_line);
+        }
+
+        Self::with_original_trailing_newline(content, &lines)
+    }
+
+    fn apply_listener_map_aliases(domain: &str, aliases: &[String]) -> Result<(), String> {
+        let httpd = PathBuf::from("/usr/local/lsws/conf/httpd_config.conf");
+        if !httpd.exists() {
+            return Ok(());
+        }
+
+        let mut hosts = vec![domain.to_string(), format!("www.{}", domain)];
+        for alias in aliases {
+            let alias = Self::sanitize_domain(alias);
+            if alias.is_empty() || hosts.iter().any(|x| x == &alias) {
+                continue;
+            }
+            hosts.push(alias);
+        }
+
+        let raw =
+            fs::read_to_string(&httpd).map_err(|e| format!("OLS ana config okunamadi: {}", e))?;
+        let host_line = hosts.join(",");
+        let updated = Self::upsert_listener_map(
+            &Self::upsert_listener_map(&raw, "Default", domain, &host_line),
+            "AuraPanelSSL",
+            domain,
+            &host_line,
+        );
+        fs::write(&httpd, updated).map_err(|e| format!("OLS ana config yazilamadi: {}", e))
+    }
+
     fn upsert_open_basedir_marker(content: &str, enabled: bool) -> String {
         let marker_prefix = "# AURAPANEL_OPEN_BASEDIR=";
         let new_marker = format!("{}{}", marker_prefix, if enabled { "1" } else { "0" });
@@ -434,6 +526,7 @@ impl WebsitesManager {
             .filter(|x| x.domain == domain)
             .map(|x| x.alias.clone())
             .collect();
+        Self::apply_listener_map_aliases(domain, &aliases)?;
         let content =
             fs::read_to_string(&path).map_err(|e| format!("VHost config okunamadi: {}", e))?;
         let updated = Self::upsert_vh_aliases(&content, domain, &aliases);

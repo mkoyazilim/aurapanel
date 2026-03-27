@@ -313,6 +313,181 @@ fn update_vhconf_content(content: &str, php_version: &str, email: &str) -> Resul
     Ok(output)
 }
 
+fn httpd_config_file() -> PathBuf {
+    PathBuf::from("/usr/local/lsws/conf/httpd_config.conf")
+}
+
+fn with_trailing_newline(mut content: String) -> String {
+    if !content.ends_with('\n') {
+        content.push('\n');
+    }
+    content
+}
+
+fn parse_named_block_header(trimmed: &str, keyword: &str) -> Option<String> {
+    if !trimmed.starts_with(keyword) {
+        return None;
+    }
+    let rest = trimmed.trim_start_matches(keyword).trim_start();
+    let open_idx = rest.find('{')?;
+    Some(rest[..open_idx].trim().to_string())
+}
+
+fn find_block_range(lines: &[String], keyword: &str, name: &str) -> Option<(usize, usize)> {
+    for (idx, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        let Some(found) = parse_named_block_header(trimmed, keyword) else {
+            continue;
+        };
+        if found != name {
+            continue;
+        }
+
+        let mut depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+        let mut end = idx;
+        let mut cursor = idx + 1;
+        while cursor < lines.len() {
+            depth += lines[cursor].matches('{').count() as i32;
+            depth -= lines[cursor].matches('}').count() as i32;
+            if depth <= 0 {
+                end = cursor;
+                break;
+            }
+            cursor += 1;
+        }
+        return Some((idx, end));
+    }
+    None
+}
+
+fn upsert_listener_map(content: &str, listener: &str, vhost: &str, hosts: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+    let Some((start, end)) = find_block_range(&lines, "listener", listener) else {
+        return with_trailing_newline(lines.join("\n"));
+    };
+
+    let map_line = format!("    map                      {} {}", vhost, hosts);
+    let mut existing_idx = None;
+    for idx in (start + 1)..end {
+        let trimmed = lines[idx].trim();
+        if !trimmed.starts_with("map") {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() >= 3 && parts[1] == vhost {
+            existing_idx = Some(idx);
+            break;
+        }
+    }
+
+    if let Some(idx) = existing_idx {
+        lines[idx] = map_line;
+    } else {
+        lines.insert(end, map_line);
+    }
+
+    with_trailing_newline(lines.join("\n"))
+}
+
+fn remove_listener_map(content: &str, listener: &str, vhost: &str) -> String {
+    let lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+    let Some((start, end)) = find_block_range(&lines, "listener", listener) else {
+        return with_trailing_newline(lines.join("\n"));
+    };
+
+    let mut filtered = Vec::new();
+    for (idx, line) in lines.iter().enumerate() {
+        if idx > start && idx < end {
+            let trimmed = line.trim();
+            if trimmed.starts_with("map") {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 3 && parts[1] == vhost {
+                    continue;
+                }
+            }
+        }
+        filtered.push(line.clone());
+    }
+
+    with_trailing_newline(filtered.join("\n"))
+}
+
+fn upsert_virtualhost_block(content: &str, domain: &str, owner: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+    let block_lines = vec![
+        format!("virtualHost {}{{", domain),
+        format!("    vhRoot                   /home/{}/", owner),
+        "    allowSymbolLink          1 ".to_string(),
+        "    enableScript             1 ".to_string(),
+        "    restrained               1 ".to_string(),
+        "    setUIDMode               0 ".to_string(),
+        "    chrootMode               0 ".to_string(),
+        format!(
+            "    configFile               /usr/local/lsws/conf/vhosts/{}/vhconf.conf",
+            domain
+        ),
+        "}".to_string(),
+    ];
+
+    if let Some((start, end)) = find_block_range(&lines, "virtualHost", domain) {
+        lines.splice(start..=end, block_lines);
+    } else {
+        if !lines.is_empty() && !lines.last().map(|x| x.trim().is_empty()).unwrap_or(false) {
+            lines.push(String::new());
+        }
+        lines.extend(block_lines);
+    }
+
+    with_trailing_newline(lines.join("\n"))
+}
+
+fn remove_virtualhost_block(content: &str, domain: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+    if let Some((start, end)) = find_block_range(&lines, "virtualHost", domain) {
+        lines.drain(start..=end);
+    }
+    with_trailing_newline(lines.join("\n"))
+}
+
+fn upsert_httpd_registration(domain: &str, owner: &str) -> Result<(), String> {
+    let path = httpd_config_file();
+    if !path.exists() {
+        return Err(format!("OLS ana config bulunamadi: {}", path.display()));
+    }
+
+    let raw = fs::read_to_string(&path).map_err(|e| format!("OLS ana config okunamadi: {}", e))?;
+    let hosts = format!("{},www.{}", domain, domain);
+    let updated = upsert_listener_map(
+        &upsert_listener_map(
+            &upsert_virtualhost_block(&raw, domain, owner),
+            "Default",
+            domain,
+            &hosts,
+        ),
+        "AuraPanelSSL",
+        domain,
+        &hosts,
+    );
+
+    fs::write(&path, updated).map_err(|e| format!("OLS ana config yazilamadi: {}", e))
+}
+
+fn remove_httpd_registration(domain: &str) -> Result<(), String> {
+    let path = httpd_config_file();
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let raw = fs::read_to_string(&path).map_err(|e| format!("OLS ana config okunamadi: {}", e))?;
+    let updated = remove_listener_map(
+        &remove_listener_map(&remove_virtualhost_block(&raw, domain), "Default", domain),
+        "AuraPanelSSL",
+        domain,
+    );
+
+    fs::write(&path, updated).map_err(|e| format!("OLS ana config yazilamadi: {}", e))
+}
+
 pub struct NitroEngine;
 
 impl NitroEngine {
@@ -390,17 +565,19 @@ extprocessor {domain}_php {{
 
         if let Err(err) = upsert_vhost_metadata(VHostMetadata {
             domain: domain.clone(),
-            owner,
+            owner: owner.clone(),
             php_version,
             package: "default".to_string(),
             email: format!("webmaster@{}", domain),
             updated_at: now_ts(),
-        }) {
+            }) {
             eprintln!(
                 "[WARN] VHost metadata update failed for {}: {}",
                 domain, err
             );
         }
+
+        upsert_httpd_registration(&domain, &owner)?;
 
         // 3. Reload OpenLiteSpeed gracefully
         Self::reload_ols()?;
@@ -539,6 +716,8 @@ extprocessor {domain}_php {{
             }
         }
 
+        remove_httpd_registration(&domain)?;
+
         Self::reload_ols()?;
 
         let mut suspended = load_suspended_vhosts();
@@ -637,6 +816,7 @@ extprocessor {domain}_php {{
             let updated_content = update_vhconf_content(content, &php_version, &email)?;
             fs::write(&conf_file, updated_content)
                 .map_err(|e| format!("vhconf yazilamadi: {}", e))?;
+            upsert_httpd_registration(&domain, &owner)?;
             Self::reload_ols()?;
         }
 
