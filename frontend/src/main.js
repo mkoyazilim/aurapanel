@@ -21,4 +21,7 @@ async function bootstrap() {
   app.mount('#app')
 }
 
-bootstrap()
+bootstrap().catch((error) => {
+  console.error('AuraPanel bootstrap failed, mounting fallback shell.', error)
+  app.mount('#app')
+})

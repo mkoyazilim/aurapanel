@@ -28,20 +28,52 @@ function isTokenExpired(token) {
 }
 
 function clearStoredAuth() {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
-  localStorage.removeItem(PERSIST_KEY)
-  sessionStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(USER_KEY)
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(PERSIST_KEY)
+  } catch {
+    // no-op
+  }
+  try {
+    sessionStorage.removeItem(TOKEN_KEY)
+    sessionStorage.removeItem(USER_KEY)
+  } catch {
+    // no-op
+  }
 }
 
 function getInitialAuth() {
-  const localToken = localStorage.getItem(TOKEN_KEY)
-  const sessionToken = sessionStorage.getItem(TOKEN_KEY)
+  let localToken = null
+  let sessionToken = null
+  let userRaw = null
+  let persistent = false
+
+  try {
+    localToken = localStorage.getItem(TOKEN_KEY)
+    userRaw = localStorage.getItem(USER_KEY) || userRaw
+    persistent = localStorage.getItem(PERSIST_KEY) === '1'
+  } catch {
+    // no-op
+  }
+
+  try {
+    sessionToken = sessionStorage.getItem(TOKEN_KEY)
+    userRaw = userRaw || sessionStorage.getItem(USER_KEY)
+  } catch {
+    // no-op
+  }
+
   const token = localToken || sessionToken || null
-  const userRaw = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY)
-  const user = userRaw ? JSON.parse(userRaw) : null
-  const persistent = localStorage.getItem(PERSIST_KEY) === '1'
+  let user = null
+  if (userRaw) {
+    try {
+      user = JSON.parse(userRaw)
+    } catch {
+      clearStoredAuth()
+      return { token: null, user: null, persistent: false }
+    }
+  }
 
   if (token && isTokenExpired(token)) {
     clearStoredAuth()
