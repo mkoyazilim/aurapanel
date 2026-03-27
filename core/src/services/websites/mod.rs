@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -120,6 +121,19 @@ struct WebsiteWorkflowStore {
 pub struct WebsitesManager;
 
 impl WebsitesManager {
+    fn reload_ols() -> Result<(), String> {
+        let output = Command::new("/usr/local/lsws/bin/lswsctrl")
+            .arg("restart")
+            .output()
+            .map_err(|e| format!("OLS reload failed: {}", e))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+        }
+    }
+
     fn storage_path() -> PathBuf {
         let prod_dir = Path::new("/var/lib/aurapanel");
         if prod_dir.exists() {
@@ -229,6 +243,221 @@ impl WebsitesManager {
         PathBuf::from("/usr/local/lsws/conf/vhosts")
             .join(domain)
             .join("vhconf.conf")
+    }
+
+    fn custom_ssl_root(domain: &str) -> PathBuf {
+        PathBuf::from("/etc/aurapanel/custom-ssl").join(domain)
+    }
+
+    fn with_original_trailing_newline(original: &str, lines: &[String]) -> String {
+        let mut output = lines.join("\n");
+        if original.ends_with('\n') || !output.ends_with('\n') {
+            output.push('\n');
+        }
+        output
+    }
+
+    fn upsert_vh_aliases(content: &str, domain: &str, aliases: &[String]) -> String {
+        let mut deduped = Vec::new();
+        deduped.push(format!("www.{}", domain));
+        for alias in aliases {
+            let alias = Self::sanitize_domain(alias);
+            if alias.is_empty() || alias == domain || deduped.iter().any(|x| x == &alias) {
+                continue;
+            }
+            deduped.push(alias);
+        }
+        let alias_line = format!("vhAliases                 {}", deduped.join(" "));
+
+        let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+        let mut replaced = false;
+        for line in &mut lines {
+            if line.trim_start().starts_with("vhAliases") {
+                *line = alias_line.clone();
+                replaced = true;
+                break;
+            }
+        }
+
+        if !replaced {
+            let insert_at = lines
+                .iter()
+                .position(|line| line.trim_start().starts_with("vhDomain"))
+                .map(|idx| idx + 1)
+                .unwrap_or(0);
+            lines.insert(insert_at, alias_line);
+        }
+
+        Self::with_original_trailing_newline(content, &lines)
+    }
+
+    fn upsert_open_basedir_marker(content: &str, enabled: bool) -> String {
+        let marker_prefix = "# AURAPANEL_OPEN_BASEDIR=";
+        let new_marker = format!("{}{}", marker_prefix, if enabled { "1" } else { "0" });
+        let mut lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+        let mut marker_idx = None;
+        for (idx, line) in lines.iter().enumerate() {
+            if line.trim_start().starts_with(marker_prefix) {
+                marker_idx = Some(idx);
+                break;
+            }
+        }
+
+        if let Some(idx) = marker_idx {
+            lines[idx] = new_marker;
+        } else {
+            lines.insert(0, new_marker);
+        }
+
+        Self::with_original_trailing_newline(content, &lines)
+    }
+
+    fn upsert_open_basedir_env(content: &str, open_basedir_value: Option<&str>) -> String {
+        let mut lines: Vec<String> = content
+            .lines()
+            .filter(|line| {
+                let trimmed = line.trim_start();
+                !(trimmed.starts_with("env") && trimmed.contains("PHP_ADMIN_VALUE=open_basedir="))
+            })
+            .map(|line| line.to_string())
+            .collect();
+
+        let Some(value) = open_basedir_value else {
+            return Self::with_original_trailing_newline(content, &lines);
+        };
+
+        let mut inserted = false;
+        for idx in 0..lines.len() {
+            let start_line = lines[idx].trim_start();
+            if !(start_line.starts_with("extprocessor ") && start_line.contains('{')) {
+                continue;
+            }
+
+            let mut depth = lines[idx].matches('{').count() as i32 - lines[idx].matches('}').count() as i32;
+            let mut insert_at = idx + 1;
+            let mut close_idx = None;
+            let mut j = idx + 1;
+
+            while j < lines.len() {
+                let line = lines[j].trim_start();
+                if line.starts_with("env") && line.contains("PHP_LSAPI_CHILDREN") {
+                    insert_at = j + 1;
+                }
+
+                depth += lines[j].matches('{').count() as i32;
+                depth -= lines[j].matches('}').count() as i32;
+                if depth <= 0 {
+                    close_idx = Some(j);
+                    break;
+                }
+                j += 1;
+            }
+
+            let final_insert_at = close_idx.map(|close| insert_at.min(close)).unwrap_or(insert_at);
+            lines.insert(
+                final_insert_at,
+                format!("  env                     PHP_ADMIN_VALUE=open_basedir={}", value),
+            );
+            inserted = true;
+            break;
+        }
+
+        if !inserted {
+            lines.push(format!("env                     PHP_ADMIN_VALUE=open_basedir={}", value));
+        }
+
+        Self::with_original_trailing_newline(content, &lines)
+    }
+
+    fn strip_vhssl_blocks(content: &str) -> String {
+        let mut result = Vec::new();
+        let mut skipping = false;
+        let mut depth = 0i32;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if !skipping && trimmed.starts_with("vhssl") && trimmed.contains('{') {
+                skipping = true;
+                depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+                continue;
+            }
+
+            if skipping {
+                depth += line.matches('{').count() as i32;
+                depth -= line.matches('}').count() as i32;
+                if depth <= 0 {
+                    skipping = false;
+                }
+                continue;
+            }
+
+            result.push(line.to_string());
+        }
+
+        Self::with_original_trailing_newline(content, &result)
+    }
+
+    fn write_custom_ssl_files(
+        domain: &str,
+        cert_pem: &str,
+        key_pem: &str,
+    ) -> Result<(PathBuf, PathBuf), String> {
+        let root = Self::custom_ssl_root(domain);
+        fs::create_dir_all(&root).map_err(|e| format!("Custom SSL dizini olusturulamadi: {}", e))?;
+
+        let cert_path = root.join("fullchain.pem");
+        let key_path = root.join("privkey.pem");
+        fs::write(&cert_path, cert_pem).map_err(|e| format!("Certificate yazilamadi: {}", e))?;
+        fs::write(&key_path, key_pem).map_err(|e| format!("Private key yazilamadi: {}", e))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&cert_path, fs::Permissions::from_mode(0o644))
+                .map_err(|e| format!("Certificate permission ayarlanamadi: {}", e))?;
+            fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
+                .map_err(|e| format!("Private key permission ayarlanamadi: {}", e))?;
+        }
+
+        Ok((cert_path, key_path))
+    }
+
+    fn apply_aliases_to_vhost(store: &WebsiteWorkflowStore, domain: &str) -> Result<(), String> {
+        let path = Self::vhost_conf_path(domain);
+        if !path.exists() {
+            return Err(format!("VHost config bulunamadi: {}", path.display()));
+        }
+
+        let aliases: Vec<String> = store
+            .aliases
+            .iter()
+            .filter(|x| x.domain == domain)
+            .map(|x| x.alias.clone())
+            .collect();
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("VHost config okunamadi: {}", e))?;
+        let updated = Self::upsert_vh_aliases(&content, domain, &aliases);
+        fs::write(&path, updated).map_err(|e| format!("VHost config yazilamadi: {}", e))?;
+        Self::reload_ols()
+    }
+
+    fn apply_custom_ssl_to_vhost(domain: &str, cert_path: &Path, key_path: &Path) -> Result<(), String> {
+        let path = Self::vhost_conf_path(domain);
+        if !path.exists() {
+            return Err(format!("VHost config bulunamadi: {}", path.display()));
+        }
+
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("VHost config okunamadi: {}", e))?;
+        let mut updated = Self::strip_vhssl_blocks(&content);
+        updated.push_str(&format!(
+            "\nvhssl {{\n  keyFile         {}\n  certFile        {}\n  certChain       1\n}}\n",
+            key_path.to_string_lossy(),
+            cert_path.to_string_lossy()
+        ));
+
+        fs::write(&path, updated).map_err(|e| format!("VHost config yazilamadi: {}", e))?;
+        Self::reload_ols()
     }
 
     fn find_or_default_advanced_config<'a>(
@@ -488,16 +717,18 @@ impl WebsitesManager {
             .find(|x| x.domain == domain && x.alias == alias)
             .cloned()
         {
+            let _ = Self::apply_aliases_to_vhost(&store, &domain);
             return Ok(existing);
         }
 
         let entry = WebsiteAliasEntry {
-            domain,
+            domain: domain.clone(),
             alias,
             created_at: Self::now_ts(),
         };
 
         store.aliases.push(entry.clone());
+        Self::apply_aliases_to_vhost(&store, &domain)?;
         Self::save_store(&store)?;
         Ok(entry)
     }
@@ -519,6 +750,7 @@ impl WebsitesManager {
             return Err("Alias kaydi bulunamadi".to_string());
         }
 
+        Self::apply_aliases_to_vhost(&store, &domain)?;
         Self::save_store(&store)
     }
 
@@ -575,31 +807,29 @@ impl WebsitesManager {
         entry.updated_at = Self::now_ts();
 
         let vhost_file = Self::vhost_conf_path(&domain);
-        if vhost_file.exists() {
-            if let Ok(raw) = fs::read_to_string(&vhost_file) {
-                let marker_prefix = "# AURAPANEL_OPEN_BASEDIR=";
-                let mut lines: Vec<String> = raw.lines().map(|x| x.to_string()).collect();
-                let mut marker_idx = None;
-                for (i, line) in lines.iter().enumerate() {
-                    if line.trim_start().starts_with(marker_prefix) {
-                        marker_idx = Some(i);
-                        break;
-                    }
-                }
-                let new_marker =
-                    format!("{}{}", marker_prefix, if req.enabled { "1" } else { "0" });
-                if let Some(i) = marker_idx {
-                    lines[i] = new_marker;
-                } else {
-                    lines.insert(0, new_marker);
-                }
-                let mut updated_raw = lines.join("\n");
-                if raw.ends_with('\n') {
-                    updated_raw.push('\n');
-                }
-                let _ = fs::write(&vhost_file, updated_raw);
-            }
+        if !vhost_file.exists() {
+            return Err(format!("VHost config bulunamadi: {}", vhost_file.display()));
         }
+        let raw =
+            fs::read_to_string(&vhost_file).map_err(|e| format!("VHost config okunamadi: {}", e))?;
+        let with_marker = Self::upsert_open_basedir_marker(&raw, req.enabled);
+        let open_basedir_value = if req.enabled {
+            let docroot = Self::find_docroot(&domain).ok_or_else(|| {
+                format!(
+                    "OpenBasedir uygulanamadi: docroot bulunamadi (domain: {}).",
+                    domain
+                )
+            })?;
+            Some(format!(
+                "{}:/tmp:/var/tmp:/usr/share/pear",
+                docroot.to_string_lossy()
+            ))
+        } else {
+            None
+        };
+        let updated_raw = Self::upsert_open_basedir_env(&with_marker, open_basedir_value.as_deref());
+        fs::write(&vhost_file, updated_raw).map_err(|e| format!("VHost config yazilamadi: {}", e))?;
+        Self::reload_ols()?;
 
         let updated = entry.clone();
         Self::save_store(&store)?;
@@ -679,12 +909,15 @@ impl WebsitesManager {
             return Err("PEM formati gecersiz".to_string());
         }
 
+        let (cert_path, key_path) = Self::write_custom_ssl_files(&domain, &cert_pem, &key_pem)?;
+        Self::apply_custom_ssl_to_vhost(&domain, &cert_path, &key_path)?;
+
         let mut store = Self::load_store()?;
         let now = Self::now_ts();
 
         if let Some(existing) = store.custom_ssl.iter_mut().find(|x| x.domain == domain) {
-            existing.cert_pem = cert_pem;
-            existing.key_pem = key_pem;
+            existing.cert_pem = cert_pem.clone();
+            existing.key_pem = key_pem.clone();
             existing.updated_at = now;
             let updated = existing.clone();
             Self::save_store(&store)?;
@@ -718,6 +951,10 @@ impl WebsitesManager {
             .retain(|x| x.domain != domain && x.alias != domain);
         store.advanced_configs.retain(|x| x.domain != domain);
         store.custom_ssl.retain(|x| x.domain != domain);
+        let custom_ssl_root = Self::custom_ssl_root(&domain);
+        if custom_ssl_root.exists() {
+            let _ = fs::remove_dir_all(custom_ssl_root);
+        }
         Self::save_store(&store)
     }
 }
