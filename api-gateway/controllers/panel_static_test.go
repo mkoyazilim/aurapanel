@@ -31,6 +31,9 @@ func TestPanelStaticHandlerServesIndexAndAssets(t *testing.T) {
 	if recRoot.Code != http.StatusOK {
 		t.Fatalf("expected 200 for /, got %d", recRoot.Code)
 	}
+	if got := recRoot.Header().Get("Cache-Control"); got == "" {
+		t.Fatalf("expected Cache-Control on index response")
+	}
 
 	recAsset := httptest.NewRecorder()
 	handler.ServeHTTP(recAsset, httptest.NewRequest(http.MethodGet, "/assets/app.js", nil))
@@ -42,6 +45,9 @@ func TestPanelStaticHandlerServesIndexAndAssets(t *testing.T) {
 	handler.ServeHTTP(recSpa, httptest.NewRequest(http.MethodGet, "/websites/example.com", nil))
 	if recSpa.Code != http.StatusOK {
 		t.Fatalf("expected 200 for SPA fallback, got %d", recSpa.Code)
+	}
+	if got := recSpa.Header().Get("Cache-Control"); got == "" {
+		t.Fatalf("expected Cache-Control on SPA fallback response")
 	}
 }
 

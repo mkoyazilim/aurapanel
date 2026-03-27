@@ -19,6 +19,12 @@ func isAPIPath(path string) bool {
 	return strings.HasPrefix(path, "/api/")
 }
 
+func serveIndexNoCache(w http.ResponseWriter, r *http.Request, dist string) {
+	// Prevent stale SPA shell after deployments; hashed assets remain cacheable.
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	http.ServeFile(w, r, filepath.Join(dist, "index.html"))
+}
+
 // PanelStaticHandler serves compiled frontend assets and falls back to index.html for SPA routes.
 func PanelStaticHandler() http.Handler {
 	dist := panelDistPath()
@@ -32,7 +38,7 @@ func PanelStaticHandler() http.Handler {
 
 		cleanPath := filepath.Clean(r.URL.Path)
 		if cleanPath == "." || cleanPath == "/" {
-			http.ServeFile(w, r, filepath.Join(dist, "index.html"))
+			serveIndexNoCache(w, r, dist)
 			return
 		}
 
@@ -42,6 +48,6 @@ func PanelStaticHandler() http.Handler {
 			return
 		}
 
-		http.ServeFile(w, r, filepath.Join(dist, "index.html"))
+		serveIndexNoCache(w, r, dist)
 	})
 }
