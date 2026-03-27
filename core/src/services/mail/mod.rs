@@ -984,13 +984,8 @@ impl MailManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
+    use crate::test_support::env_lock;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn test_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
 
     fn setup_env(test_name: &str) -> std::path::PathBuf {
         let now = SystemTime::now()
@@ -1012,7 +1007,7 @@ mod tests {
 
     #[test]
     fn forward_rule_lifecycle_works() {
-        let _guard = test_lock().lock().expect("test lock");
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("forward");
 
         let created = MailManager::add_forward(&MailForwardConfig {
@@ -1040,7 +1035,7 @@ mod tests {
 
     #[test]
     fn catch_all_routing_and_dkim_work() {
-        let _guard = test_lock().lock().expect("test lock");
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("mailops");
 
         let catch_all = MailManager::set_catch_all(&MailCatchAllConfig {
@@ -1073,7 +1068,7 @@ mod tests {
 
     #[test]
     fn webmail_sso_requires_valid_address() {
-        let _guard = test_lock().lock().expect("test lock");
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("sso");
 
         let invalid = MailManager::generate_webmail_sso_link(&MailWebmailSsoRequest {

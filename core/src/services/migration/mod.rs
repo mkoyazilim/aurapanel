@@ -103,10 +103,7 @@ impl MigrationManager {
         ensure_archive_format(&archive_path)?;
 
         let analysis_id = next_id("analysis");
-        let extracted_path = state_root()
-            .join("migrations")
-            .join("analysis")
-            .join(&analysis_id);
+        let extracted_path = analysis_root().join(&analysis_id);
         fs::create_dir_all(&extracted_path)
             .map_err(|e| format!("Analiz dizini olusturulamadi: {}", e))?;
 
@@ -380,6 +377,20 @@ fn state_root() -> PathBuf {
         prod.to_path_buf()
     } else {
         std::env::temp_dir().join("aurapanel")
+    }
+}
+
+fn analysis_root() -> PathBuf {
+    #[cfg(test)]
+    {
+        std::env::temp_dir()
+            .join("aurapanel")
+            .join("migrations")
+            .join("analysis")
+    }
+    #[cfg(not(test))]
+    {
+        state_root().join("migrations").join("analysis")
     }
 }
 
@@ -789,7 +800,7 @@ mod tests {
 
     #[test]
     fn analyze_detects_cpanel_artifacts() {
-        let root = std::env::temp_dir().join(format!("aurapanel-migration-test-{}", now_ts()));
+        let root = std::env::temp_dir().join(next_id("aurapanel-migration-test"));
         let source = root.join("source");
         let mysql_dir = source.join("mysql");
         let mail_dir = source

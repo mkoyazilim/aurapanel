@@ -11,6 +11,8 @@ mod auth;
 mod config;
 mod runtime;
 mod services;
+#[cfg(test)]
+mod test_support;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

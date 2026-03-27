@@ -4511,6 +4511,7 @@ mod tests {
     use super::routes;
     use crate::auth::jwt;
     use crate::services::users::{CreateUserRequest, UserManager};
+    use crate::test_support::env_lock;
     use axum::body::Body;
     use axum::http::{Method, Request, StatusCode};
     use serde_json::json;
@@ -4571,6 +4572,7 @@ mod tests {
 
     #[tokio::test]
     async fn login_route_returns_token_for_valid_credentials() {
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("login");
         UserManager::create_user(&CreateUserRequest {
             username: "admin".to_string(),
@@ -4602,6 +4604,7 @@ mod tests {
 
     #[tokio::test]
     async fn status_panel_port_route_is_reachable_with_auth() {
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("panel-port");
         UserManager::create_user(&CreateUserRequest {
             username: "admin".to_string(),
@@ -4632,6 +4635,7 @@ mod tests {
 
     #[tokio::test]
     async fn reseller_cannot_access_admin_endpoints() {
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("reseller-rbac");
         UserManager::create_user(&CreateUserRequest {
             username: "reseller1".to_string(),
@@ -4661,6 +4665,7 @@ mod tests {
 
     #[tokio::test]
     async fn user_can_access_basic_status_endpoint() {
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("user-rbac");
         UserManager::create_user(&CreateUserRequest {
             username: "user1".to_string(),
@@ -4740,6 +4745,7 @@ mod tests {
 
     #[tokio::test]
     async fn all_defined_routes_are_reachable_without_404_405_or_5xx() {
+        let _guard = env_lock().lock().expect("test lock");
         let state_dir = setup_env("all-routes-smoke");
         UserManager::create_user(&CreateUserRequest {
             username: "admin".to_string(),
