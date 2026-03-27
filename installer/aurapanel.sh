@@ -501,6 +501,58 @@ ensure_openlitespeed() {
   systemctl restart lshttpd >/dev/null 2>&1 || true
 }
 
+ensure_ols_public_listeners() {
+  local ols_conf="/usr/local/lsws/conf/httpd_config.conf"
+  local tls_key="/usr/local/lsws/admin/conf/webadmin.key"
+  local tls_crt="/usr/local/lsws/admin/conf/webadmin.crt"
+
+  if [ ! -f "${ols_conf}" ]; then
+    warn "OpenLiteSpeed config not found: ${ols_conf}"
+    return 0
+  fi
+
+  if [ ! -f "${tls_key}" ] || [ ! -f "${tls_crt}" ]; then
+    log "Generating fallback TLS cert for OpenLiteSpeed listener..."
+    mkdir -p /usr/local/lsws/admin/conf
+    openssl req -x509 -nodes -newkey rsa:2048 \
+      -keyout "${tls_key}" \
+      -out "${tls_crt}" \
+      -days 3650 \
+      -subj "/CN=$(hostname -f 2>/dev/null || hostname)" >/dev/null 2>&1 || true
+    chmod 600 "${tls_key}" >/dev/null 2>&1 || true
+    chmod 644 "${tls_crt}" >/dev/null 2>&1 || true
+  fi
+
+  cp -n "${ols_conf}" "${ols_conf}.aurapanel.bak" >/dev/null 2>&1 || true
+
+  # Ensure default public HTTP listener is on port 80.
+  sed -i '/^[[:space:]]*listener[[:space:]]\+Default{/,/^[[:space:]]*}/{s/^[[:space:]]*address[[:space:]]\+.*/    address                  *:80/;s/^[[:space:]]*secure[[:space:]]\+.*/    secure                   0/}' "${ols_conf}"
+
+  # Ensure a public HTTPS listener exists.
+  if ! grep -Eq '^[[:space:]]*listener[[:space:]]+AuraPanelSSL[[:space:]]*\{' "${ols_conf}"; then
+    cat <<EOF >> "${ols_conf}"
+
+listener AuraPanelSSL{
+    address                  *:443
+    secure                   1
+    keyFile                  ${tls_key}
+    certFile                 ${tls_crt}
+    map                      Example *
+}
+EOF
+    ok "OpenLiteSpeed HTTPS listener AuraPanelSSL ensured on 443."
+  fi
+
+  # Template vhosts should be attached to both HTTP/HTTPS listeners.
+  sed -i 's/^\([[:space:]]*listeners[[:space:]]\+\)Default[[:space:]]*$/\1Default,AuraPanelSSL/' "${ols_conf}"
+
+  if ! /usr/local/lsws/bin/lswsctrl restart >/dev/null 2>&1; then
+    warn "OpenLiteSpeed restart failed after listener update. Check ${ols_conf}."
+  else
+    ok "OpenLiteSpeed listeners synchronized (80/443)."
+  fi
+}
+
 ensure_openlitespeed_admin_php() {
   local admin_php="/usr/local/lsws/admin/fcgi-bin/admin_php"
   local target_lsphp="/usr/local/lsws/lsphp83/bin/lsphp"
@@ -954,6 +1006,7 @@ main() {
   ensure_go
   ensure_node20
   ensure_openlitespeed
+  ensure_ols_public_listeners
   ensure_openlitespeed_admin_php
   ensure_certbot
   configure_ols_admin_credentials
