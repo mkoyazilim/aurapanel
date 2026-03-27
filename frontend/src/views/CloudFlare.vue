@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="cloudflare-view space-y-6">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="flex items-center gap-3 text-2xl font-bold text-white">
@@ -11,14 +11,14 @@
     </div>
 
     <div v-if="!connected" class="rounded-xl border border-panel-border bg-panel-card p-6">
-      <h2 class="mb-4 text-lg font-semibold text-white">{{ t('cloudflare_manager.connect_title') }}</h2>
+      <h2 class="cf-connect-title mb-4 text-lg font-semibold">{{ t('cloudflare_manager.connect_title') }}</h2>
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label class="mb-1 block text-sm text-gray-400">{{ t('cloudflare_manager.email') }}</label>
+          <label class="cf-field-label mb-1 block text-sm">{{ t('cloudflare_manager.email') }}</label>
           <input v-model="cfEmail" type="email" placeholder="user@example.com" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none" />
         </div>
         <div>
-          <label class="mb-1 block text-sm text-gray-400">{{ t('cloudflare_manager.api_key') }}</label>
+          <label class="cf-field-label mb-1 block text-sm">{{ t('cloudflare_manager.api_key') }}</label>
           <input v-model="cfApiKey" type="password" placeholder="****************" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none" />
         </div>
       </div>
@@ -330,7 +330,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Cloud, Trash2 } from 'lucide-vue-next'
 import api from '../services/api'
@@ -343,6 +343,7 @@ const connected = ref(false)
 const notification = ref(null)
 const activeTab = ref('zones')
 const loading = ref(false)
+const cfStorageKey = 'aurapanel.cloudflare.auth.v1'
 
 const tabs = [
   { id: 'zones', label: t('cloudflare_manager.tabs.zones') },
@@ -391,10 +392,41 @@ const showNotif = (message, type = 'success') => {
   }, 3000)
 }
 
+const readStoredCfAuth = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(cfStorageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const saveStoredCfAuth = () => {
+  if (typeof window === 'undefined') return
+  if (!cfEmail.value || !cfApiKey.value) return
+  const payload = {
+    email: cfEmail.value,
+    api_key: cfApiKey.value,
+    zone_id: selectedZone.value?.id || '',
+  }
+  window.localStorage.setItem(cfStorageKey, JSON.stringify(payload))
+}
+
+const clearStoredCfAuth = () => {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(cfStorageKey)
+}
+
 const authPayload = () => ({ api_key: cfApiKey.value, email: cfEmail.value })
 
-const connectCf = async () => {
+const connectCf = async (opts = {}) => {
+  const { silent = false, auto = false, preferredZoneId = '' } = opts
   if (!cfEmail.value || !cfApiKey.value) {
+    if (auto) return
     showNotif(t('cloudflare_manager.messages.credentials_required'), 'error')
     return
   }
@@ -403,8 +435,19 @@ const connectCf = async () => {
     const { data } = await api.post('/cloudflare/zones', authPayload())
     zones.value = data.data || []
     connected.value = true
-    showNotif(t('cloudflare_manager.messages.connected', { count: zones.value.length }))
+    const preferred = preferredZoneId || readStoredCfAuth()?.zone_id || ''
+    const matchedZone = zones.value.find(zone => zone.id === preferred) || zones.value[0] || null
+    selectedZone.value = matchedZone
+    saveStoredCfAuth()
+    if (!silent) {
+      showNotif(t('cloudflare_manager.messages.connected', { count: zones.value.length }))
+    }
   } catch (err) {
+    if (auto) {
+      connected.value = false
+      clearStoredCfAuth()
+      return
+    }
     showNotif(err.response?.data?.error || t('cloudflare_manager.messages.connect_failed'), 'error')
   } finally {
     loading.value = false
@@ -415,6 +458,7 @@ const loadZones = connectCf
 
 const selectZone = async zone => {
   selectedZone.value = zone
+  saveStoredCfAuth()
   analyticsZoneId.value = zone?.id || ''
   activeTab.value = 'dns'
   dnsRecords.value = []
@@ -595,4 +639,42 @@ const dnsTypeBadge = type => {
   }
   return map[type] || 'bg-gray-500/15 text-gray-400'
 }
+
+onMounted(async () => {
+  const saved = readStoredCfAuth()
+  if (!saved) return
+  cfEmail.value = saved.email || ''
+  cfApiKey.value = saved.api_key || ''
+  if (!cfEmail.value || !cfApiKey.value) return
+  await connectCf({ silent: true, auto: true, preferredZoneId: saved.zone_id || '' })
+})
 </script>
+
+<style scoped>
+.cloudflare-view .cf-connect-title,
+.cloudflare-view .cf-field-label {
+  color: rgb(253 186 116);
+}
+
+.cloudflare-view :is(input[type='text'], input[type='email'], input[type='password'], input[type='number'], input[type='search'], input[type='url'], textarea, select) {
+  background-color: rgb(15 23 42) !important;
+  color: rgb(253 186 116) !important;
+  border-color: rgb(249 115 22 / 0.45) !important;
+  caret-color: rgb(251 146 60);
+}
+
+.cloudflare-view :is(input[type='text'], input[type='email'], input[type='password'], input[type='number'], input[type='search'], input[type='url'], textarea)::placeholder {
+  color: rgb(251 146 60 / 0.65) !important;
+}
+
+.cloudflare-view input:-webkit-autofill,
+.cloudflare-view input:-webkit-autofill:hover,
+.cloudflare-view input:-webkit-autofill:focus,
+.cloudflare-view textarea:-webkit-autofill,
+.cloudflare-view select:-webkit-autofill {
+  -webkit-text-fill-color: rgb(253 186 116) !important;
+  -webkit-box-shadow: 0 0 0 1000px rgb(15 23 42) inset !important;
+  box-shadow: 0 0 0 1000px rgb(15 23 42) inset !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+</style>
