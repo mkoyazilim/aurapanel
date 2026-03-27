@@ -43,10 +43,17 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api/v1", api::routes());
 
     // run it
-    let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
-    tracing::info!("Core listening on {}", listener.local_addr().unwrap());
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("core bind failed ({}): {}", bind_addr, e))?;
+    let local_addr = listener
+        .local_addr()
+        .map_err(|e| anyhow::anyhow!("listener address resolution failed: {}", e))?;
+    tracing::info!("Core listening on {}", local_addr);
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| anyhow::anyhow!("core server terminated with error: {}", e))?;
 
     Ok(())
 }

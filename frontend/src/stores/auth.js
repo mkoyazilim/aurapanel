@@ -44,6 +44,17 @@ function clearStoredAuth() {
   }
 }
 
+function normalizeUserPayload(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const email = typeof raw.email === 'string' ? raw.email : ''
+  const username = raw.username || raw.name || (email.includes('@') ? email.split('@')[0] : '')
+  return {
+    ...raw,
+    username,
+    name: raw.name || username,
+  }
+}
+
 function getInitialAuth() {
   let localToken = null
   let sessionToken = null
@@ -69,7 +80,7 @@ function getInitialAuth() {
   let user = null
   if (userRaw) {
     try {
-      user = JSON.parse(userRaw)
+      user = normalizeUserPayload(JSON.parse(userRaw))
     } catch {
       clearStoredAuth()
       return { token: null, user: null, persistent: false }
@@ -140,7 +151,8 @@ export const useAuthStore = defineStore('auth', {
         const response = await api.get('/auth/me', {
           headers: { 'X-Aura-Silent-Error': '1' },
         })
-        const user = response.data?.data || null
+        // Backward-compatible: support wrapped (`{data:{...}}`) and flat (`{...}`) responses.
+        const user = normalizeUserPayload(response.data?.data || response.data?.user || response.data || null)
         if (!user) return null
         this.user = user
         const target = this.persistent ? localStorage : sessionStorage
@@ -153,13 +165,13 @@ export const useAuthStore = defineStore('auth', {
     },
     setAuth(token, user, persistent = false) {
       this.token = token
-      this.user = user
+      this.user = normalizeUserPayload(user)
       this.persistent = !!persistent
 
       clearStoredAuth()
       const target = this.persistent ? localStorage : sessionStorage
       target.setItem(TOKEN_KEY, token)
-      target.setItem(USER_KEY, JSON.stringify(user))
+      target.setItem(USER_KEY, JSON.stringify(this.user))
       if (this.persistent) {
         localStorage.setItem(PERSIST_KEY, '1')
       }

@@ -213,21 +213,32 @@ fn inject_managed_block(original: &str, block: &str) -> String {
 fn restart_ols() -> Result<(), String> {
     let lswsctrl = Path::new("/usr/local/lsws/bin/lswsctrl");
 
-    let output = if lswsctrl.exists() {
-        Command::new(lswsctrl)
+    if lswsctrl.exists() {
+        let output = Command::new(lswsctrl)
             .arg("restart")
             .output()
-            .map_err(|e| format!("lswsctrl restart failed: {}", e))?
-    } else {
-        Command::new("systemctl")
-            .args(["restart", "lsws"])
-            .output()
-            .map_err(|e| format!("systemctl restart lsws failed: {}", e))?
-    };
-
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+            .map_err(|e| format!("lswsctrl restart failed: {}", e))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
+
+    let mut failures = Vec::new();
+    for service in ["lshttpd", "lsws"] {
+        let output = Command::new("systemctl")
+            .args(["restart", service])
+            .output()
+            .map_err(|e| format!("systemctl restart {} failed: {}", service, e))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        failures.push(format!("{} -> {}", service, stderr));
+    }
+
+    Err(format!(
+        "OpenLiteSpeed restart failed via systemctl candidates: {}",
+        failures.join(" | ")
+    ))
 }
