@@ -141,6 +141,38 @@ impl SslManager {
         }
     }
 
+    fn can_serve_http_challenge(domain: &str, webroot: &str) -> bool {
+        if !Path::new(webroot).exists() || !Path::new(webroot).is_dir() {
+            return false;
+        }
+
+        let token = format!("aurapanel-probe-{}-{}", Self::now_ts(), std::process::id());
+        let expected = format!("ok-{}", token);
+        let challenge_dir = Path::new(webroot).join(".well-known").join("acme-challenge");
+        if fs::create_dir_all(&challenge_dir).is_err() {
+            return false;
+        }
+        let probe_file = challenge_dir.join(&token);
+        if fs::write(&probe_file, &expected).is_err() {
+            return false;
+        }
+
+        let url = format!("http://{}/.well-known/acme-challenge/{}", domain, token);
+        let mut ok = false;
+        let output = Command::new("curl")
+            .args(["-fsS", "--max-time", "6", &url])
+            .output();
+        if let Ok(out) = output {
+            if out.status.success() {
+                let body = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                ok = body == expected;
+            }
+        }
+
+        let _ = fs::remove_file(probe_file);
+        ok
+    }
+
     fn resolve_webroot(config: &SslConfig, domain: &str) -> Result<String, String> {
         if let Some(raw) = config.webroot.as_deref() {
             let explicit = raw.trim();
@@ -156,17 +188,31 @@ impl SslManager {
             }
         }
 
+        let mut candidates: Vec<String> = Vec::new();
+
         if let Some(vhost_root) = Self::discover_vhost_webroot(domain) {
-            return Ok(vhost_root);
+            candidates.push(vhost_root);
         }
 
         let legacy = "/usr/local/lsws/Example/html";
         if Path::new(legacy).exists() && Path::new(legacy).is_dir() {
-            return Ok(legacy.to_string());
+            candidates.push(legacy.to_string());
         }
 
         if let Some(panel_dist) = Self::panel_dist_path() {
-            return Ok(panel_dist);
+            if !candidates.iter().any(|x| x == &panel_dist) {
+                candidates.push(panel_dist);
+            }
+        }
+
+        for candidate in &candidates {
+            if Self::can_serve_http_challenge(domain, candidate) {
+                return Ok(candidate.clone());
+            }
+        }
+
+        if let Some(first_existing) = candidates.first() {
+            return Ok(first_existing.clone());
         }
 
         Err(
