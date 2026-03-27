@@ -568,6 +568,29 @@ ensure_openlitespeed_admin_php() {
   fi
 }
 
+ensure_lsphp_database_drivers() {
+  log "Ensuring lsphp83 database drivers (mysql, pgsql, sqlite3)..."
+  install_optional_packages lsphp83-mysql lsphp83-pgsql lsphp83-sqlite3
+
+  local ext_dir
+  ext_dir="$(/usr/local/lsws/lsphp83/bin/lsphp -i 2>/dev/null | awk -F'=> ' '/^extension_dir =>/{print $2; exit}' | awk '{print $1}')"
+  if [ -n "${ext_dir}" ]; then
+    local missing=()
+    for so in pdo_mysql.so pdo_pgsql.so pdo_sqlite.so; do
+      if [ ! -f "${ext_dir}/${so}" ]; then
+        missing+=("${so}")
+      fi
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+      warn "Some lsphp83 PDO drivers are missing: ${missing[*]}"
+    else
+      ok "lsphp83 PDO drivers are present (mysql, pgsql, sqlite)."
+    fi
+  else
+    warn "Could not detect lsphp83 extension_dir for PDO driver verification."
+  fi
+}
+
 ensure_ioncube_loader() {
   if [ "${AURAPANEL_INSTALL_IONCUBE:-1}" != "1" ]; then
     warn "ionCube loader install skipped (AURAPANEL_INSTALL_IONCUBE!=1)."
@@ -1099,6 +1122,7 @@ main() {
   ensure_openlitespeed
   ensure_ols_public_listeners
   ensure_openlitespeed_admin_php
+  ensure_lsphp_database_drivers
   ensure_ioncube_loader
   ensure_certbot
   configure_ols_admin_credentials
