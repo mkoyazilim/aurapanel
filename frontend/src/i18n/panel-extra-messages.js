@@ -1035,7 +1035,7 @@ Object.assign(extraEn, {
       hostname: 'panel.example.com',
       mail_hostname: 'mail.example.com',
       domain: 'example.com',
-      email: 'admin@example.com',
+      email: 'admin(at)example.com',
       webroot: '/usr/local/lsws/Example/html',
     },
     messages: {
@@ -1275,7 +1275,7 @@ Object.assign(extraTr, {
       hostname: 'panel.example.com',
       mail_hostname: 'mail.example.com',
       domain: 'example.com',
-      email: 'admin@example.com',
+      email: 'admin(at)example.com',
       webroot: '/usr/local/lsws/Example/html',
     },
     messages: {
