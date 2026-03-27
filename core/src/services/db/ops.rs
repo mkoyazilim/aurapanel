@@ -41,10 +41,6 @@ pub struct DbConnectionCheckResult {
     pub ready: bool,
 }
 
-fn simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled()
-}
-
 fn mysql_escape(value: &str) -> String {
     value.replace('\\', "\\\\").replace('\'', "\\'")
 }
@@ -104,7 +100,6 @@ fn run_mysql(sql: &str) -> Result<String, String> {
     match output {
         Ok(o) if o.status.success() => Ok(String::from_utf8_lossy(&o.stdout).to_string()),
         Ok(o) => Err(String::from_utf8_lossy(&o.stderr).to_string()),
-        Err(_) if simulation_enabled() => Ok("[simulated]".to_string()),
         Err(_) => Err("mysql client is not available.".to_string()),
     }
 }
@@ -116,7 +111,6 @@ fn run_psql(sql: &str) -> Result<String, String> {
     match output {
         Ok(o) if o.status.success() => Ok(String::from_utf8_lossy(&o.stdout).to_string()),
         Ok(o) => Err(String::from_utf8_lossy(&o.stderr).to_string()),
-        Err(_) if simulation_enabled() => Ok("[simulated]".to_string()),
         Err(_) => Err("postgresql command path is not available.".to_string()),
     }
 }
@@ -156,20 +150,18 @@ pub fn change_password_postgres(req: &DbPasswordChangeRequest) -> Result<String,
 pub fn list_remote_access_mariadb(db_user: Option<&str>) -> Result<Vec<RemoteAccessRule>, String> {
     let mut rules = load_rules("mariadb");
     let output = run_mysql("SELECT User, Host FROM mysql.user WHERE Host NOT IN ('localhost','127.0.0.1','::1');")?;
-    if !output.contains("[simulated]") {
-        for line in output.lines().skip(1).filter(|x| !x.trim().is_empty()) {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if let (Some(user), Some(host)) = (parts.first(), parts.get(1)) {
-                let exists = rules.iter().any(|r| r.db_user == *user && r.remote == *host && r.engine == "mariadb");
-                if !exists {
-                    rules.push(RemoteAccessRule {
-                        engine: "mariadb".to_string(),
-                        db_user: (*user).to_string(),
-                        db_name: "*".to_string(),
-                        remote: (*host).to_string(),
-                        auth_method: "mysql-native-password".to_string(),
-                    });
-                }
+    for line in output.lines().skip(1).filter(|x| !x.trim().is_empty()) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if let (Some(user), Some(host)) = (parts.first(), parts.get(1)) {
+            let exists = rules.iter().any(|r| r.db_user == *user && r.remote == *host && r.engine == "mariadb");
+            if !exists {
+                rules.push(RemoteAccessRule {
+                    engine: "mariadb".to_string(),
+                    db_user: (*user).to_string(),
+                    db_name: "*".to_string(),
+                    remote: (*host).to_string(),
+                    auth_method: "mysql-native-password".to_string(),
+                });
             }
         }
     }
@@ -190,8 +182,8 @@ pub fn allow_remote_access_mariadb(req: &RemoteAccessGrantRequest) -> Result<Str
     if user.is_empty() || db_name.is_empty() || remote.is_empty() {
         return Err("db_user, db_name and remote_ip are required.".to_string());
     }
-    if pass.is_empty() && !simulation_enabled() {
-        return Err("db_pass is required in non-simulation mode.".to_string());
+    if pass.is_empty() {
+        return Err("db_pass is required.".to_string());
     }
 
     if !pass.is_empty() {
@@ -223,15 +215,6 @@ pub fn allow_remote_access_mariadb(req: &RemoteAccessGrantRequest) -> Result<Str
 
 pub fn list_remote_access_postgres(db_user: Option<&str>) -> Result<Vec<RemoteAccessRule>, String> {
     let mut rules = load_rules("postgresql");
-    if simulation_enabled() && rules.is_empty() {
-        rules.push(RemoteAccessRule {
-            engine: "postgresql".to_string(),
-            db_user: db_user.unwrap_or("app_user").to_string(),
-            db_name: "app_db".to_string(),
-            remote: "198.51.100.22/32".to_string(),
-            auth_method: "scram-sha-256".to_string(),
-        });
-    }
     if let Some(user) = db_user {
         let user = user.trim();
         if !user.is_empty() {

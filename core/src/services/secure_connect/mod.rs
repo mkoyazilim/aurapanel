@@ -77,10 +77,6 @@ fn now_ts() -> u64 {
         .unwrap_or(0)
 }
 
-fn simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled() || cfg!(windows)
-}
-
 fn normalize_username(input: &str) -> Option<String> {
     let value = input
         .trim()
@@ -161,9 +157,6 @@ fn purepdb_file() -> String {
 }
 
 fn ensure_purepw_backend() -> Result<(), String> {
-    if simulation_enabled() {
-        return Ok(());
-    }
     if !pure_pw_exists() {
         return Err("pure-pw binary not found. Install pure-ftpd package first.".to_string());
     }
@@ -178,10 +171,6 @@ fn ensure_purepw_backend() -> Result<(), String> {
 }
 
 fn purepw_mkdb() -> Result<(), String> {
-    if simulation_enabled() {
-        return Ok(());
-    }
-
     let status = Command::new(purepw_path())
         .args(["mkdb", &purepdb_file(), "-f", &purepw_file()])
         .status()
@@ -195,10 +184,6 @@ fn purepw_mkdb() -> Result<(), String> {
 }
 
 fn run_purepw_with_password(args: &[String], password: &str) -> Result<(), String> {
-    if simulation_enabled() {
-        return Ok(());
-    }
-
     let mut child = Command::new(purepw_path())
         .args(args)
         .stdin(Stdio::piped())
@@ -226,9 +211,6 @@ fn run_purepw_with_password(args: &[String], password: &str) -> Result<(), Strin
 }
 
 fn run_purepw(args: &[String]) -> Result<(), String> {
-    if simulation_enabled() {
-        return Ok(());
-    }
     let output = Command::new(purepw_path())
         .args(args)
         .output()
@@ -273,29 +255,27 @@ impl SecureConnectManager {
             return Err("username, password and home_dir are required.".to_string());
         }
 
-        if !simulation_enabled() {
-            let _ = Command::new("useradd")
-                .args([
-                    "-m",
-                    "-d",
-                    &home_dir,
-                    "-s",
-                    "/usr/sbin/nologin",
-                    "-G",
-                    "sftponly",
-                    &username,
-                ])
-                .output()
-                .map_err(|e| format!("useradd failed: {}", e))?;
+        let _ = Command::new("useradd")
+            .args([
+                "-m",
+                "-d",
+                &home_dir,
+                "-s",
+                "/usr/sbin/nologin",
+                "-G",
+                "sftponly",
+                &username,
+            ])
+            .output()
+            .map_err(|e| format!("useradd failed: {}", e))?;
 
-            let _ = Command::new("sh")
-                .args(["-c", &format!("echo '{}:{}' | chpasswd", username, password)])
-                .output()
-                .map_err(|e| format!("chpasswd failed: {}", e))?;
+        let _ = Command::new("sh")
+            .args(["-c", &format!("echo '{}:{}' | chpasswd", username, password)])
+            .output()
+            .map_err(|e| format!("chpasswd failed: {}", e))?;
 
-            let _ = Command::new("chown").args(["root:root", &home_dir]).output();
-            let _ = Command::new("chmod").args(["755", &home_dir]).output();
-        }
+        let _ = Command::new("chown").args(["root:root", &home_dir]).output();
+        let _ = Command::new("chmod").args(["755", &home_dir]).output();
 
         let mut users = load_sftp_users()?;
         if !users.iter().any(|u| u.username == username) {
@@ -319,9 +299,7 @@ impl SecureConnectManager {
             return Err("username is required.".to_string());
         }
 
-        if !simulation_enabled() {
-            let _ = Command::new("userdel").args(["-r", username]).output();
-        }
+        let _ = Command::new("userdel").args(["-r", username]).output();
 
         let mut users = load_sftp_users()?;
         let before = users.len();
@@ -339,12 +317,10 @@ impl SecureConnectManager {
             return Err("username and new_password are required.".to_string());
         }
 
-        if !simulation_enabled() {
-            let _ = Command::new("sh")
-                .args(["-c", &format!("echo '{}:{}' | chpasswd", username, password)])
-                .output()
-                .map_err(|e| format!("chpasswd failed: {}", e))?;
-        }
+        let _ = Command::new("sh")
+            .args(["-c", &format!("echo '{}:{}' | chpasswd", username, password)])
+            .output()
+            .map_err(|e| format!("chpasswd failed: {}", e))?;
         Ok(())
     }
 
@@ -365,9 +341,7 @@ impl SecureConnectManager {
 
         ensure_purepw_backend()?;
 
-        if !simulation_enabled() {
-            fs::create_dir_all(&home_dir).map_err(|e| format!("home_dir create failed: {}", e))?;
-        }
+        fs::create_dir_all(&home_dir).map_err(|e| format!("home_dir create failed: {}", e))?;
 
         let mut args = vec![
             "useradd".to_string(),
@@ -452,6 +426,13 @@ impl SecureConnectManager {
     }
 
     pub async fn start_web_terminal(port: u16) -> Result<String, String> {
-        Ok(format!("https://panel.domain.com:{}", port))
+        if port == 0 {
+            return Err("port is required.".to_string());
+        }
+        let host = std::env::var("AURAPANEL_PANEL_HOST")
+            .ok()
+            .filter(|x| !x.trim().is_empty())
+            .unwrap_or_else(|| "127.0.0.1".to_string());
+        Ok(format!("https://{}:{}", host.trim(), port))
     }
 }

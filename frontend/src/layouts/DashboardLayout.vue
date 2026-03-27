@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="min-h-screen bg-panel-darker flex text-gray-100">
     <!-- Sidebar -->
     <aside class="w-64 bg-panel-dark border-r border-panel-border flex flex-col transition-all duration-300">
@@ -51,6 +51,16 @@
         <router-link to="/ftp" class="sidebar-link" active-class="sidebar-link-active">
           <KeyRound class="w-5 h-5 mr-3" />
           <span>FTP</span>
+        </router-link>
+
+        <router-link to="/sftp" class="sidebar-link" active-class="sidebar-link-active">
+          <KeyRound class="w-5 h-5 mr-3" />
+          <span>SFTP</span>
+        </router-link>
+
+        <router-link to="/backups" class="sidebar-link" active-class="sidebar-link-active">
+          <HardDrive class="w-5 h-5 mr-3" />
+          <span>Backups</span>
         </router-link>
 
         <router-link to="/dns" class="sidebar-link" active-class="sidebar-link-active">
@@ -106,7 +116,17 @@
 
         <router-link to="/php" class="sidebar-link" active-class="sidebar-link-active">
           <Code class="w-5 h-5 mr-3" />
-          <span>PHP Yönetimi</span>
+          <span>PHP Yonetimi</span>
+        </router-link>
+
+        <router-link to="/ols-tuning" class="sidebar-link" active-class="sidebar-link-active">
+          <Settings2 class="w-5 h-5 mr-3" />
+          <span>OLS Tuning</span>
+        </router-link>
+
+        <router-link to="/reseller" class="sidebar-link" active-class="sidebar-link-active">
+          <Users class="w-5 h-5 mr-3" />
+          <span>Reseller & ACL</span>
         </router-link>
 
         <router-link to="/server-status" class="sidebar-link" active-class="sidebar-link-active">
@@ -312,7 +332,7 @@
             <!-- Dropdown -->
             <div v-show="toggleMenu" class="absolute top-12 right-0 w-48 bg-panel-card border border-panel-border rounded-lg shadow-xl py-2 z-50">
               <button @click="handleLogout" class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-panel-dark transition-colors">
-                Güvenli Çıkış (Logout)
+                GÃ¼venli Ã‡Ä±kÄ±ÅŸ (Logout)
               </button>
             </div>
           </div>
@@ -418,6 +438,8 @@ const commandItems = [
   { label: 'AuraDB Explorer', path: '/auradb' },
   { label: 'Emails', path: '/emails' },
   { label: 'FTP', path: '/ftp' },
+  { label: 'SFTP', path: '/sftp' },
+  { label: 'Backups', path: '/backups' },
   { label: 'DNS', path: '/dns' },
   { label: 'Manage SSL', path: '/ssl?tab=manage' },
   { label: 'Hostname SSL', path: '/ssl?tab=hostname' },
@@ -430,6 +452,8 @@ const commandItems = [
   { label: 'Federated', path: '/federated' },
   { label: 'File Manager', path: '/filemanager' },
   { label: 'PHP', path: '/php' },
+  { label: 'OLS Tuning', path: '/ols-tuning' },
+  { label: 'Reseller & ACL', path: '/reseller' },
   { label: 'Server Status', path: '/server-status' },
   { label: 'Panel Port', path: '/panel-port' },
   { label: 'Docker Images', path: '/docker/images' },
@@ -580,3 +604,4 @@ onBeforeUnmount(() => {
   transform: translateY(10px);
 }
 </style>
+

@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const BRIDGE_ISSUER: &str = "aurapanel-core";
@@ -165,16 +167,49 @@ impl DbExplorerManager {
     }
 
     pub fn execute_query(&self, db_type: &str, connection_string: &str, query: &str) -> Result<String> {
-        println!("Executing {} query on {}: {}", db_type, connection_string, query);
+        let db_name = parse_db_name(connection_string)
+            .ok_or_else(|| anyhow!("Invalid bridge connection string."))?;
+        let sql = query.trim();
+        if sql.is_empty() {
+            return Err(anyhow!("query is required"));
+        }
 
-        let mock_result = serde_json::json!({
-            "status": "success",
-            "mode": if crate::runtime::simulation_enabled() { "simulated" } else { "dry-run" },
-            "rows_affected": 0,
-            "data": []
-        });
+        let output = match normalize_engine(db_type).as_deref() {
+            Some("mariadb") => Command::new("mysql")
+                .args(["-u", "root", "-D", &db_name, "-e", sql, "--batch", "--raw"])
+                .output()
+                .map_err(|e| anyhow!("mysql query failed: {}", e))?,
+            Some("postgresql") => Command::new("sudo")
+                .args([
+                    "-u",
+                    "postgres",
+                    "psql",
+                    "-X",
+                    "-A",
+                    "-F",
+                    "\t",
+                    "-P",
+                    "footer=off",
+                    "-d",
+                    &db_name,
+                    "-c",
+                    sql,
+                ])
+                .output()
+                .map_err(|e| anyhow!("psql query failed: {}", e))?,
+            _ => return Err(anyhow!("Unsupported database engine.")),
+        };
 
-        Ok(mock_result.to_string())
+        if !output.status.success() {
+            return Err(anyhow!(
+                "{}",
+                String::from_utf8_lossy(&output.stderr).trim().to_string()
+            ));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let payload = parse_tsv_payload(&stdout, db_type);
+        Ok(payload.to_string())
     }
 
     pub fn execute_query_with_bridge(&self, bridge_token: &str, query: &str) -> Result<String> {
@@ -186,8 +221,54 @@ impl DbExplorerManager {
         self.execute_query(&profile.engine, &connection_string, query)
     }
 
-    pub fn list_tables(&self, _db_type: &str, _connection_string: &str) -> Result<Vec<String>> {
-        Ok(vec!["users".to_string(), "posts".to_string()])
+    pub fn list_tables(&self, db_type: &str, connection_string: &str) -> Result<Vec<String>> {
+        let engine = normalize_engine(db_type).ok_or_else(|| anyhow!("Unsupported database engine."))?;
+        let db_name = parse_db_name(connection_string)
+            .ok_or_else(|| anyhow!("Invalid bridge connection string."))?;
+
+        let output = if engine == "mariadb" {
+            Command::new("mysql")
+                .args(["-u", "root", "-D", &db_name, "-e", "SHOW TABLES;", "--batch", "--raw"])
+                .output()
+                .map_err(|e| anyhow!("mysql list tables failed: {}", e))?
+        } else {
+            Command::new("sudo")
+                .args([
+                    "-u",
+                    "postgres",
+                    "psql",
+                    "-X",
+                    "-A",
+                    "-t",
+                    "-d",
+                    &db_name,
+                    "-c",
+                    "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename;",
+                ])
+                .output()
+                .map_err(|e| anyhow!("psql list tables failed: {}", e))?
+        };
+
+        if !output.status.success() {
+            return Err(anyhow!(
+                "{}",
+                String::from_utf8_lossy(&output.stderr).trim().to_string()
+            ));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut tables = Vec::new();
+        for (idx, line) in stdout.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if engine == "mariadb" && idx == 0 {
+                continue;
+            }
+            tables.push(trimmed.to_string());
+        }
+        Ok(tables)
     }
 
     pub fn list_tables_with_bridge(&self, bridge_token: &str) -> Result<Vec<String>> {
@@ -199,4 +280,51 @@ impl DbExplorerManager {
         println!("Creating database {} for user {} with password {}", db_name, user, pass);
         Ok(true)
     }
+}
+
+fn parse_db_name(connection_string: &str) -> Option<String> {
+    let value = connection_string.trim();
+    let parts: Vec<&str> = value.split('/').collect();
+    let db_user = parts.get(4)?.trim();
+    let db_name = db_user.split('@').next()?.trim();
+    if db_name.is_empty() {
+        None
+    } else {
+        Some(db_name.to_string())
+    }
+}
+
+fn parse_tsv_payload(stdout: &str, db_type: &str) -> Value {
+    let mut lines = stdout.lines();
+    let Some(header_line) = lines.next() else {
+        return json!({
+            "status": "success",
+            "engine": db_type,
+            "columns": [],
+            "rows": []
+        });
+    };
+
+    let columns: Vec<String> = header_line.split('\t').map(|x| x.trim().to_string()).collect();
+    let mut rows: Vec<Value> = Vec::new();
+
+    for line in lines {
+        let values: Vec<&str> = line.split('\t').collect();
+        if values.is_empty() || (values.len() == 1 && values[0].trim().is_empty()) {
+            continue;
+        }
+        let mut row = Map::new();
+        for (idx, column) in columns.iter().enumerate() {
+            let value = values.get(idx).copied().unwrap_or_default().trim().to_string();
+            row.insert(column.clone(), Value::String(value));
+        }
+        rows.push(Value::Object(row));
+    }
+
+    json!({
+        "status": "success",
+        "engine": db_type,
+        "columns": columns,
+        "rows": rows
+    })
 }

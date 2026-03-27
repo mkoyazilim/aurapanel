@@ -51,10 +51,6 @@ fn runtime_state() -> &'static Mutex<RuntimeState> {
     STATE.get_or_init(|| Mutex::new(RuntimeState::default()))
 }
 
-fn dev_simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled()
-}
-
 fn command_available(cmd: &str) -> bool {
     Command::new("which")
         .arg(cmd)
@@ -70,15 +66,10 @@ impl AppManager {
     pub async fn install_cms(config: &CmsInstallConfig) -> Result<(), String> {
         let public_html = format!("/home/aurapanel/public_html/{}", config.domain);
 
-        if dev_simulation_enabled() {
-            println!("[DEV MODE] Installing {} on {}", config.app_type, config.domain);
-            return Ok(());
-        }
-
         match config.app_type.as_str() {
             "wordpress" => {
                 if !command_available("wp") {
-                    return Err("wp-cli is not installed. Install wp-cli or enable AURAPANEL_DEV_SIMULATION=1.".to_string());
+                    return Err("wp-cli is not installed.".to_string());
                 }
                 std::fs::create_dir_all(&public_html)
                     .map_err(|e| format!("Failed to create target directory: {}", e))?;
@@ -94,7 +85,7 @@ impl AppManager {
             },
             "laravel" => {
                 if !command_available("composer") {
-                    return Err("composer is not installed. Install composer or enable AURAPANEL_DEV_SIMULATION=1.".to_string());
+                    return Err("composer is not installed.".to_string());
                 }
                 let output = Command::new("composer")
                     .args(["create-project", "--prefer-dist", "--no-interaction", "laravel/laravel"])
@@ -118,10 +109,7 @@ impl AppManager {
 
     pub fn node_install_dependencies(dir: &str) -> Result<String, String> {
         if cfg!(target_os = "windows") {
-            if dev_simulation_enabled() {
-                return Ok("[DEV MODE] Node dependencies installed (simulated).".to_string());
-            }
-            return Err("Node dependency install is not supported on Windows runtime mode. Enable AURAPANEL_DEV_SIMULATION=1 for simulation.".to_string());
+            return Err("Node dependency install is not supported on Windows hosts.".to_string());
         }
         let ok = NodeManager::new()
             .install_dependencies(dir)
@@ -135,20 +123,7 @@ impl AppManager {
 
     pub fn node_start(req: &NodeAppRequest) -> Result<String, String> {
         if cfg!(target_os = "windows") {
-            if !dev_simulation_enabled() {
-                return Err("Node runtime start is not supported on Windows runtime mode. Enable AURAPANEL_DEV_SIMULATION=1 for simulation.".to_string());
-            }
-            let mut guard = runtime_state().lock().map_err(|e| e.to_string())?;
-            guard.apps.insert(
-                req.app_name.clone(),
-                RuntimeAppInfo {
-                    app_name: req.app_name.clone(),
-                    runtime: "node".to_string(),
-                    dir: req.dir.clone(),
-                    status: "running".to_string(),
-                },
-            );
-            return Ok("[DEV MODE] Node app started (simulated).".to_string());
+            return Err("Node runtime start is not supported on Windows hosts.".to_string());
         }
         let ok = NodeManager::new()
             .start_app(&req.app_name, &req.start_script, &req.dir)
@@ -172,14 +147,7 @@ impl AppManager {
 
     pub fn node_stop(app_name: &str) -> Result<String, String> {
         if cfg!(target_os = "windows") {
-            if !dev_simulation_enabled() {
-                return Err("Node runtime stop is not supported on Windows runtime mode. Enable AURAPANEL_DEV_SIMULATION=1 for simulation.".to_string());
-            }
-            let mut guard = runtime_state().lock().map_err(|e| e.to_string())?;
-            if let Some(app) = guard.apps.get_mut(app_name) {
-                app.status = "stopped".to_string();
-            }
-            return Ok("[DEV MODE] Node app stopped (simulated).".to_string());
+            return Err("Node runtime stop is not supported on Windows hosts.".to_string());
         }
         let ok = NodeManager::new().stop_app(app_name).map_err(|e| e.to_string())?;
         if ok {
@@ -195,10 +163,7 @@ impl AppManager {
 
     pub fn python_create_venv(dir: &str) -> Result<String, String> {
         if cfg!(target_os = "windows") {
-            if dev_simulation_enabled() {
-                return Ok("[DEV MODE] Python venv created (simulated).".to_string());
-            }
-            return Err("Python venv creation is not supported on Windows runtime mode. Enable AURAPANEL_DEV_SIMULATION=1 for simulation.".to_string());
+            return Err("Python venv creation is not supported on Windows hosts.".to_string());
         }
         let ok = PythonManager::new().create_venv(dir).map_err(|e| e.to_string())?;
         if ok {
@@ -210,10 +175,7 @@ impl AppManager {
 
     pub fn python_install_requirements(dir: &str) -> Result<String, String> {
         if cfg!(target_os = "windows") {
-            if dev_simulation_enabled() {
-                return Ok("[DEV MODE] Python requirements installed (simulated).".to_string());
-            }
-            return Err("Python requirements install is not supported on Windows runtime mode. Enable AURAPANEL_DEV_SIMULATION=1 for simulation.".to_string());
+            return Err("Python requirements install is not supported on Windows hosts.".to_string());
         }
         let ok = PythonManager::new()
             .install_requirements(dir)
@@ -227,20 +189,7 @@ impl AppManager {
 
     pub fn python_start(req: &PythonAppRequest) -> Result<String, String> {
         if cfg!(target_os = "windows") {
-            if !dev_simulation_enabled() {
-                return Err("Python runtime start is not supported on Windows runtime mode. Enable AURAPANEL_DEV_SIMULATION=1 for simulation.".to_string());
-            }
-            let mut guard = runtime_state().lock().map_err(|e| e.to_string())?;
-            guard.apps.insert(
-                req.app_name.clone(),
-                RuntimeAppInfo {
-                    app_name: req.app_name.clone(),
-                    runtime: "python".to_string(),
-                    dir: req.dir.clone(),
-                    status: "running".to_string(),
-                },
-            );
-            return Ok("[DEV MODE] Python app started (simulated).".to_string());
+            return Err("Python runtime start is not supported on Windows hosts.".to_string());
         }
 
         let ok = PythonManager::new()

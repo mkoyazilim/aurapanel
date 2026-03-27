@@ -137,8 +137,8 @@ async function loadAliases() {
 
 async function loadAdvanced() {
   const [cfgRes, sslRes] = await Promise.all([
-    api.get('/websites/advanced-config', { params: { domain: domain.value } }).catch(() => ({ data: { data: {} } })),
-    api.get('/websites/custom-ssl', { params: { domain: domain.value } }).catch(() => ({ data: { data: {} } })),
+    api.get('/websites/advanced-config', { params: { domain: domain.value } }),
+    api.get('/websites/custom-ssl', { params: { domain: domain.value } }),
   ])
   const cfg = cfgRes.data?.data || {}
   advanced.value = {

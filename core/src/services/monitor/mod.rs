@@ -44,10 +44,6 @@ fn monitor_state() -> &'static Mutex<MonitorDevState> {
     STATE.get_or_init(|| Mutex::new(MonitorDevState::default()))
 }
 
-fn simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled()
-}
-
 fn read_network_totals_linux() -> Option<(u64, u64)> {
     let content = fs::read_to_string("/proc/net/dev").ok()?;
     let mut rx_total = 0_u64;
@@ -157,19 +153,7 @@ impl MonitorManager {
                     network_out_bps: tx_total,
                 })
             }
-            Err(err) => {
-                if simulation_enabled() {
-                    Ok(SreMetrics {
-                        cpu_usage: 12.5,
-                        ram_usage: 45.2,
-                        disk_usage: 60.1,
-                        network_in_bps: 1_024_000,
-                        network_out_bps: 2_048_000,
-                    })
-                } else {
-                    Err(format!("Failed to collect runtime metrics: {}", err))
-                }
-            }
+            Err(err) => Err(format!("Failed to collect runtime metrics: {}", err)),
         }
     }
 
@@ -200,11 +184,8 @@ impl MonitorManager {
         let lower = query.to_lowercase();
 
         let answer = if sources.is_empty() {
-            if simulation_enabled() {
-                "No runtime log sources detected; returning simulation analysis profile.".to_string()
-            } else {
-                "No log source configured. Set AURAPANEL_LOG_SOURCES for production log analytics.".to_string()
-            }
+            "No log source configured. Set AURAPANEL_LOG_SOURCES for production log analytics."
+                .to_string()
         } else if lower.contains("slow") || lower.contains("yavas") {
             format!(
                 "Latency indicators detected. Review slow-path endpoints in {} log source(s).",
@@ -230,7 +211,7 @@ impl MonitorManager {
         Ok(LogQueryAnswer {
             answer,
             matched_sources: sources,
-            confidence: if simulation_enabled() { 0.65 } else { 0.84 },
+            confidence: 0.84,
         })
     }
 
@@ -307,14 +288,6 @@ impl MonitorManager {
             if Path::new(&file).exists() {
                 return read_tail_lines(&file, take);
             }
-        }
-
-        if simulation_enabled() {
-            let mut out = Vec::new();
-            for i in 1..=take {
-                out.push(format!("[{}] {} access log line {}", i, domain, i));
-            }
-            return Ok(out);
         }
 
         Err(format!(

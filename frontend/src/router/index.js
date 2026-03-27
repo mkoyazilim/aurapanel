@@ -58,6 +58,11 @@ const routes = [
         component: () => import('../views/FTP.vue')
       },
       {
+        path: 'sftp',
+        name: 'SFTP',
+        component: () => import('../views/SFTP.vue')
+      },
+      {
         path: 'dns',
         name: 'DNS',
         component: () => import('../views/DNS.vue')
@@ -168,6 +173,21 @@ const routes = [
         path: 'panel-port',
         name: 'PanelPort',
         component: () => import('../views/PanelPort.vue')
+      },
+      {
+        path: 'backups',
+        name: 'Backups',
+        component: () => import('../views/Backup.vue')
+      },
+      {
+        path: 'ols-tuning',
+        name: 'OlsTuning',
+        component: () => import('../views/OlsTuning.vue')
+      },
+      {
+        path: 'reseller',
+        name: 'Reseller',
+        component: () => import('../views/Reseller.vue')
       }
     ]
   }

@@ -111,7 +111,7 @@
 
     <div v-if="tab === 'mail'" class="aura-card space-y-4">
       <p class="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-        Mail server sertifikasi uretilir. Postfix/Dovecot cert bind adimi mail stack entegrasyonu ile tamamlanir.
+        Mail server sertifikasi uretilir ve Postfix/Dovecot baglantisi otomatik uygulanir.
       </p>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div>

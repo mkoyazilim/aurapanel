@@ -45,15 +45,25 @@ use crate::services::secure_connect::{
     FtpUserConfig,
     FtpPasswordResetRequest,
 };
-use crate::services::storage::{BackupManager, BackupConfig, StorageManager, MinioBucketRequest, MinioCredentialsRequest};
+use crate::services::storage::{
+    BackupManager,
+    BackupConfig,
+    BackupDestination,
+    BackupSchedule,
+    StorageManager,
+    MinioBucketRequest,
+    MinioCredentialsRequest,
+};
 use crate::services::monitor::gitops::{GitOpsManager, GitOpsConfig};
 use crate::services::docker::{DockerManager, docker::{CreateContainerConfig, PullImageConfig}, apps::{DockerAppsManager, CreateDockerAppRequest}};
 use crate::services::cloudflare::CloudFlareManager;
 use crate::services::cloudflare::cloudflare::*;
 use crate::services::filemanager::FileManager;
+use crate::services::ols_tuning::{OlsTuningConfig, OlsTuningManager};
 use crate::services::php::PhpManager;
 use crate::services::status::StatusManager;
 use crate::services::users::{UserManager, CreateUserRequest};
+use crate::services::users::reseller::{AclAssignment, AclPolicy, ResellerManager, ResellerQuota, WhiteLabelConfig};
 use crate::services::packages::{PackageManager, CreatePackageRequest};
 use crate::services::websites::{
     WebsitesManager,
@@ -207,6 +217,13 @@ pub fn routes() -> Router {
         .route("/sftp/password", post(reset_sftp_password_handler))
         .route("/backup/create", post(create_backup_handler))
         .route("/backup/restore", post(restore_backup_handler))
+        .route("/backup/snapshots", post(backup_snapshots_handler))
+        .route("/backup/destinations", get(backup_destinations_list_handler))
+        .route("/backup/destinations", post(backup_destinations_upsert_handler))
+        .route("/backup/destinations", axum::routing::delete(backup_destinations_delete_handler))
+        .route("/backup/schedules", get(backup_schedules_list_handler))
+        .route("/backup/schedules", post(backup_schedules_upsert_handler))
+        .route("/backup/schedules", axum::routing::delete(backup_schedules_delete_handler))
         .route("/storage/minio/buckets", get(minio_buckets_list_handler))
         .route("/storage/minio/buckets", post(minio_buckets_create_handler))
         .route("/storage/minio/credentials", post(minio_credentials_handler))
@@ -258,6 +275,20 @@ pub fn routes() -> Router {
         .route("/status/service/control", post(status_service_control_handler))
         .route("/status/panel-port", get(status_panel_port_handler))
         .route("/status/panel-port", post(status_panel_port_update_handler))
+        .route("/ols/tuning", get(ols_tuning_get_handler))
+        .route("/ols/tuning", post(ols_tuning_save_handler))
+        .route("/ols/tuning/apply", post(ols_tuning_apply_handler))
+        .route("/reseller/quotas", get(reseller_quotas_list_handler))
+        .route("/reseller/quotas", post(reseller_quotas_upsert_handler))
+        .route("/reseller/whitelabel", get(reseller_whitelabel_list_handler))
+        .route("/reseller/whitelabel", post(reseller_whitelabel_upsert_handler))
+        .route("/acl/policies", get(acl_policies_list_handler))
+        .route("/acl/policies", post(acl_policies_upsert_handler))
+        .route("/acl/policies", axum::routing::delete(acl_policies_delete_handler))
+        .route("/acl/assignments", get(acl_assignments_list_handler))
+        .route("/acl/assignments", post(acl_assignments_upsert_handler))
+        .route("/acl/assignments", axum::routing::delete(acl_assignments_delete_handler))
+        .route("/acl/effective", get(acl_effective_permissions_handler))
 }
 
 async fn health_check() -> Json<StatusResponse> {
@@ -1206,8 +1237,7 @@ async fn issue_mail_ssl_handler(
     match SslManager::issue_mail_server_certificate(&payload).await {
         Ok(_) => Json(json!({
             "status": "success",
-            "message": format!("Mail server SSL certificate issued for {}.", payload.domain),
-            "warning": "Certificate was issued. Postfix/Dovecot certificate bind should be configured in mail stack integration.",
+            "message": format!("Mail server SSL certificate issued and bound for {}.", payload.domain),
         })),
         Err(e) => Json(json!({
             "status": "error",
@@ -1366,6 +1396,70 @@ async fn restore_backup_handler(
 
     match BackupManager::restore_backup(&cfg, &payload.snapshot_id).await {
         Ok(_) => Json(json!({ "status": "success", "message": "Backup restore tamamlandi." })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct BackupDeleteQuery {
+    id: String,
+}
+
+async fn backup_snapshots_handler(
+    Json(payload): Json<BackupConfig>,
+) -> Json<serde_json::Value> {
+    match BackupManager::list_snapshots(&payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn backup_destinations_list_handler() -> Json<serde_json::Value> {
+    match BackupManager::list_destinations() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn backup_destinations_upsert_handler(
+    Json(payload): Json<BackupDestination>,
+) -> Json<serde_json::Value> {
+    match BackupManager::upsert_destination(payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn backup_destinations_delete_handler(
+    axum::extract::Query(query): axum::extract::Query<BackupDeleteQuery>,
+) -> Json<serde_json::Value> {
+    match BackupManager::delete_destination(&query.id) {
+        Ok(_) => Json(json!({ "status": "success", "message": "Backup destination deleted." })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn backup_schedules_list_handler() -> Json<serde_json::Value> {
+    match BackupManager::list_schedules() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn backup_schedules_upsert_handler(
+    Json(payload): Json<BackupSchedule>,
+) -> Json<serde_json::Value> {
+    match BackupManager::upsert_schedule(payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn backup_schedules_delete_handler(
+    axum::extract::Query(query): axum::extract::Query<BackupDeleteQuery>,
+) -> Json<serde_json::Value> {
+    match BackupManager::delete_schedule(&query.id) {
+        Ok(_) => Json(json!({ "status": "success", "message": "Backup schedule deleted." })),
         Err(e) => Json(json!({ "status": "error", "message": e })),
     }
 }
@@ -1884,6 +1978,31 @@ async fn status_panel_port_update_handler(
 }
 
 // ─── VHost / Sites Handlers ──────────────────────────────────────────────────
+
+async fn ols_tuning_get_handler() -> Json<serde_json::Value> {
+    match OlsTuningManager::get_config() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn ols_tuning_save_handler(
+    Json(payload): Json<OlsTuningConfig>,
+) -> Json<serde_json::Value> {
+    match OlsTuningManager::save_config(&payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn ols_tuning_apply_handler(
+    Json(payload): Json<OlsTuningConfig>,
+) -> Json<serde_json::Value> {
+    match OlsTuningManager::apply_config(&payload) {
+        Ok(message) => Json(json!({ "status": "success", "message": message })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
 
 #[derive(Deserialize, Default)]
 struct VhostListQuery {
@@ -2661,6 +2780,112 @@ async fn mail_webmail_sso_handler(
 }
 
 // ─── Users Handlers ───────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct AclDeletePolicyQuery {
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct AclDeleteAssignmentQuery {
+    username: String,
+}
+
+#[derive(Deserialize)]
+struct AclEffectiveQuery {
+    username: String,
+}
+
+async fn reseller_quotas_list_handler() -> Json<serde_json::Value> {
+    match ResellerManager::list_quotas() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn reseller_quotas_upsert_handler(
+    Json(payload): Json<ResellerQuota>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::upsert_quota(payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn reseller_whitelabel_list_handler() -> Json<serde_json::Value> {
+    match ResellerManager::list_white_labels() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn reseller_whitelabel_upsert_handler(
+    Json(payload): Json<WhiteLabelConfig>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::upsert_white_label(payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_policies_list_handler() -> Json<serde_json::Value> {
+    match ResellerManager::list_policies() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_policies_upsert_handler(
+    Json(payload): Json<AclPolicy>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::upsert_policy(payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_policies_delete_handler(
+    axum::extract::Query(query): axum::extract::Query<AclDeletePolicyQuery>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::delete_policy(&query.id) {
+        Ok(_) => Json(json!({ "status": "success", "message": "ACL policy deleted." })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_assignments_list_handler() -> Json<serde_json::Value> {
+    match ResellerManager::list_assignments() {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_assignments_upsert_handler(
+    Json(payload): Json<AclAssignment>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::assign_policy(payload) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_assignments_delete_handler(
+    axum::extract::Query(query): axum::extract::Query<AclDeleteAssignmentQuery>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::remove_assignment(&query.username) {
+        Ok(_) => Json(json!({ "status": "success", "message": "ACL assignment deleted." })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
+
+async fn acl_effective_permissions_handler(
+    axum::extract::Query(query): axum::extract::Query<AclEffectiveQuery>,
+) -> Json<serde_json::Value> {
+    match ResellerManager::effective_permissions(&query.username) {
+        Ok(data) => Json(json!({ "status": "success", "data": data })),
+        Err(e) => Json(json!({ "status": "error", "message": e })),
+    }
+}
 
 async fn users_list_handler() -> Json<serde_json::Value> {
     match UserManager::list_users() {

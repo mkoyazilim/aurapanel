@@ -8,13 +8,18 @@ impl EbpfManager {
     }
 
     pub fn attach_syscall_probe(&self, program_name: &str) -> Result<bool> {
-        // eBPF mocking for zero-trust (aya library integration)
-        println!("Attached eBPF probe for tracking {} syscalls in kernel space.", program_name);
-        Ok(true)
+        if program_name.trim().is_empty() {
+            anyhow::bail!("program_name is required");
+        }
+        anyhow::bail!(
+            "eBPF probe attach is not wired in this build. Install and configure aya/bpftool integration."
+        )
     }
 
     pub fn block_process(&self, pid: u32) -> Result<bool> {
-        println!("Blocked malicious process PID {} via eBPF ring buffer trigger.", pid);
-        Ok(true)
+        if pid == 0 {
+            anyhow::bail!("pid must be > 0");
+        }
+        anyhow::bail!("eBPF process blocking is not wired in this build.")
     }
 }

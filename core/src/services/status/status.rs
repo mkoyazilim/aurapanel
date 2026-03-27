@@ -75,26 +75,12 @@ pub struct PanelPortUpdateResult {
 pub struct StatusManager;
 
 impl StatusManager {
-    fn is_dev_mode() -> bool {
-        cfg!(windows) || !Path::new("/proc/loadavg").exists()
-    }
-
     pub fn get_metrics() -> Result<SystemMetrics, String> {
-        if Self::is_dev_mode() {
-            return Ok(SystemMetrics {
-                cpu_usage: 23.5,
-                cpu_cores: 8,
-                cpu_model: "AMD EPYC 7443P".to_string(),
-                ram_usage: 58.0,
-                ram_used: "11.6 GB".to_string(),
-                ram_total: "20 GB".to_string(),
-                disk_usage: 42.0,
-                disk_used: "84 GB".to_string(),
-                disk_total: "200 GB".to_string(),
-                uptime_seconds: 4_086_000,
-                uptime_human: "47 gun, 14 saat, 22 dk".to_string(),
-                load_avg: "0.45, 0.38, 0.41".to_string(),
-            });
+        if cfg!(windows) {
+            return Err("System metrics are supported only on Linux hosts.".to_string());
+        }
+        if !Path::new("/proc/loadavg").exists() {
+            return Err("/proc/loadavg not found. Real Linux metrics cannot be collected.".to_string());
         }
 
         let cpu_cores = fs::read_to_string("/proc/cpuinfo")
@@ -172,6 +158,10 @@ impl StatusManager {
     }
 
     pub fn get_services() -> Result<Vec<ServiceStatus>, String> {
+        if cfg!(windows) {
+            return Err("Service status is supported only on Linux hosts.".to_string());
+        }
+
         let service_list = vec![
             ("lshttpd", "OpenLiteSpeed", "Web Sunucusu"),
             ("mariadb", "MariaDB", "Veritabani Sunucusu"),
@@ -185,17 +175,6 @@ impl StatusManager {
             ("docker", "Docker", "Container Engine"),
             ("fail2ban", "Fail2Ban", "Brute-force Korumasi"),
         ];
-
-        if Self::is_dev_mode() {
-            return Ok(service_list
-                .iter()
-                .map(|(_, name, desc)| ServiceStatus {
-                    name: name.to_string(),
-                    status: "running".to_string(),
-                    desc: desc.to_string(),
-                })
-                .collect());
-        }
 
         let mut results = Vec::new();
         for (unit, name, desc) in &service_list {
@@ -221,15 +200,8 @@ impl StatusManager {
     }
 
     pub fn get_processes() -> Result<Vec<ProcessInfo>, String> {
-        if Self::is_dev_mode() {
-            return Ok(vec![
-                ProcessInfo { pid: 1, user: "root".into(), cpu: 0.1, mem: 0.3, command: "/sbin/init".into() },
-                ProcessInfo { pid: 1842, user: "mysql".into(), cpu: 8.5, mem: 12.4, command: "/usr/sbin/mariadbd".into() },
-                ProcessInfo { pid: 2103, user: "postgres".into(), cpu: 3.2, mem: 5.1, command: "postgres: writer process".into() },
-                ProcessInfo { pid: 3456, user: "nobody".into(), cpu: 45.2, mem: 8.7, command: "lshttpd (openlitespeed)".into() },
-                ProcessInfo { pid: 4521, user: "www-data".into(), cpu: 12.1, mem: 4.3, command: "php-fpm: pool www".into() },
-                ProcessInfo { pid: 5678, user: "root".into(), cpu: 0.5, mem: 1.2, command: "fail2ban-server".into() },
-            ]);
+        if cfg!(windows) {
+            return Err("Process inspection is supported only on Linux hosts.".to_string());
         }
 
         let output = Command::new("ps")
@@ -267,10 +239,6 @@ impl StatusManager {
                 return Err("process id is required for kill action.".to_string());
             }
 
-            if Self::is_dev_mode() {
-                return Ok(format!("(Dev Mode) process {} killed.", normalized_name));
-            }
-
             let output = Command::new("kill")
                 .args(["-9", &normalized_name])
                 .output()
@@ -282,9 +250,8 @@ impl StatusManager {
 
             return Err(String::from_utf8_lossy(&output.stderr).to_string());
         }
-
-        if Self::is_dev_mode() {
-            return Ok(format!("(Dev Mode) {} servisi {} edildi.", normalized_name, normalized_action));
+        if cfg!(windows) {
+            return Err("Service control is supported only on Linux hosts.".to_string());
         }
 
         let output = Command::new("systemctl")
@@ -595,7 +562,7 @@ impl StatusManager {
     }
 
     fn schedule_gateway_restart() -> Result<bool, String> {
-        if Self::is_dev_mode() || cfg!(windows) {
+        if cfg!(windows) {
             return Ok(false);
         }
 

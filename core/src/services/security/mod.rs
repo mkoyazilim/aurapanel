@@ -75,10 +75,6 @@ fn now_epoch() -> u64 {
         .as_secs()
 }
 
-fn dev_simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled()
-}
-
 fn default_state_dir() -> PathBuf {
     if cfg!(windows) {
         return std::env::temp_dir().join("aurapanel");
@@ -246,15 +242,6 @@ impl SecurityManager {
         }
 
         save_firewall_rules(&rules)?;
-
-        if dev_simulation_enabled() {
-            println!(
-                "[DEV MODE] Firewall rule persisted (sync skipped): Block={}, IP={}, Reason={}",
-                rule.block, rule.ip_address, rule.reason
-            );
-            return Ok(());
-        }
-
         sync_nftables(&rules)
     }
 
@@ -274,12 +261,6 @@ impl SecurityManager {
         }
 
         save_firewall_rules(&rules)?;
-
-        if dev_simulation_enabled() {
-            println!("[DEV MODE] Firewall delete persisted (sync skipped): {}", ip_address);
-            return Ok(());
-        }
-
         sync_nftables(&rules)
     }
 
@@ -423,14 +404,6 @@ impl SecurityManager {
             return Ok(lines);
         }
 
-        if dev_simulation_enabled() {
-            return Ok(vec![
-                "blocked write attempt: /etc/passwd".to_string(),
-                "suspicious outbound connection blocked: 185.10.10.10:4444".to_string(),
-                "shell injection signature detected in php-fpm worker".to_string(),
-            ]);
-        }
-
         Err(format!(
             "eBPF event log not found: {} (set AURAPANEL_EBPF_EVENTS_LOG)",
             log_path.display()
@@ -471,14 +444,6 @@ impl SecurityManager {
             }
         }
 
-        if collected.is_empty() && dev_simulation_enabled() {
-            collected = vec![
-                "collector: blocked write attempt: /etc/passwd".to_string(),
-                "collector: suspicious outbound connection blocked: 185.10.10.10:4444".to_string(),
-                "collector: shell injection signature detected in php-fpm worker".to_string(),
-            ];
-        }
-
         if collected.is_empty() {
             return Err("No eBPF event source produced output.".to_string());
         }
@@ -494,11 +459,6 @@ impl SecurityManager {
 
     /// Load eBPF WAF programs.
     pub fn load_ebpf_waf() -> Result<(), String> {
-        if dev_simulation_enabled() {
-            println!("[DEV MODE] eBPF WAF load simulated.");
-            return Ok(());
-        }
-
         let output = Command::new("sh")
             .args(["-c", "command -v bpftool >/dev/null 2>&1"])
             .output()

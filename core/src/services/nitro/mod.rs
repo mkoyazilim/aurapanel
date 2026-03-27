@@ -5,10 +5,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn dev_simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled()
-}
-
 fn state_dir() -> PathBuf {
     if let Ok(path) = std::env::var("AURAPANEL_STATE_DIR") {
         return PathBuf::from(path);
@@ -326,18 +322,6 @@ impl NitroEngine {
         let vhost_conf_dir = format!("/usr/local/lsws/conf/vhosts/{}", domain);
 
         if !Path::new("/usr/local/lsws").exists() {
-            if dev_simulation_enabled() {
-                println!("[DEV MODE] OLS is not installed. Simulating VHost creation for {}", domain);
-                let _ = upsert_vhost_metadata(VHostMetadata {
-                    domain: domain.clone(),
-                    owner: owner.clone(),
-                    php_version: php_version.clone(),
-                    package: "default".to_string(),
-                    email: format!("webmaster@{}", domain),
-                    updated_at: now_ts(),
-                });
-                return Ok(());
-            }
             return Err("OpenLiteSpeed is not installed on this system.".to_string());
         }
 
@@ -417,10 +401,6 @@ extprocessor {domain}_php {{
     /// Graceful restart for OpenLiteSpeed
     pub fn reload_ols() -> Result<(), String> {
         if !Path::new("/usr/local/lsws").exists() {
-            if dev_simulation_enabled() {
-                println!("[DEV MODE] OLS not found. Reload simulated.");
-                return Ok(());
-            }
             return Err("OpenLiteSpeed is not installed on this system.".to_string());
         }
 
@@ -443,53 +423,6 @@ extprocessor {domain}_php {{
         let metadata = load_vhost_metadata();
 
         if !Path::new("/usr/local/lsws").exists() {
-            if dev_simulation_enabled() {
-                let example_meta = metadata.get("example.com").cloned().unwrap_or(VHostMetadata {
-                    domain: "example.com".to_string(),
-                    owner: "aura".to_string(),
-                    php_version: "8.3".to_string(),
-                    package: "default".to_string(),
-                    email: "webmaster@example.com".to_string(),
-                    updated_at: now_ts(),
-                });
-                let mysite_meta = metadata.get("mysite.net").cloned().unwrap_or(VHostMetadata {
-                    domain: "mysite.net".to_string(),
-                    owner: "aura".to_string(),
-                    php_version: "8.2".to_string(),
-                    package: "default".to_string(),
-                    email: "webmaster@mysite.net".to_string(),
-                    updated_at: now_ts(),
-                });
-
-                return Ok(vec![
-                    json!({
-                        "domain": "example.com",
-                        "ssl": true,
-                        "disk_usage": "1.2 GB",
-                        "quota": "10 GB",
-                        "php": example_meta.php_version,
-                        "php_version": example_meta.php_version,
-                        "user": example_meta.owner,
-                        "owner": example_meta.owner,
-                        "package": example_meta.package,
-                        "email": example_meta.email,
-                        "status": if suspended.contains("example.com") { "suspended" } else { "active" }
-                    }),
-                    json!({
-                        "domain": "mysite.net",
-                        "ssl": false,
-                        "disk_usage": "450 MB",
-                        "quota": "5 GB",
-                        "php": mysite_meta.php_version,
-                        "php_version": mysite_meta.php_version,
-                        "user": mysite_meta.owner,
-                        "owner": mysite_meta.owner,
-                        "package": mysite_meta.package,
-                        "email": mysite_meta.email,
-                        "status": if suspended.contains("mysite.net") { "suspended" } else { "active" }
-                    }),
-                ]);
-            }
             return Err("OpenLiteSpeed is not installed on this system.".to_string());
         }
 
@@ -552,10 +485,6 @@ extprocessor {domain}_php {{
         let domain = sanitize_domain(domain);
 
         if !Path::new("/usr/local/lsws").exists() {
-            if dev_simulation_enabled() {
-                let _ = remove_vhost_metadata(&domain);
-                return Ok(format!("[DEV MODE] {} deleted (simulated).", domain));
-            }
             return Err("OpenLiteSpeed is not installed on this system.".to_string());
         }
 
@@ -619,7 +548,7 @@ extprocessor {domain}_php {{
             None
         };
 
-        if !ols_exists && !dev_simulation_enabled() {
+        if !ols_exists {
             return Err("OpenLiteSpeed is not installed on this system.".to_string());
         }
 

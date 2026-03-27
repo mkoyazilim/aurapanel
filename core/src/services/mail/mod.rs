@@ -1,3 +1,4 @@
+use bcrypt::{hash as bcrypt_hash, DEFAULT_COST};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
@@ -310,8 +311,8 @@ impl MailManager {
     }
 
     fn ensure_maildir_permissions(path: &Path) -> Result<(), String> {
-        if crate::runtime::simulation_enabled() || cfg!(windows) {
-            return Ok(());
+        if cfg!(windows) {
+            return Err("maildir permission setup is supported only on Linux hosts.".to_string());
         }
 
         fs::create_dir_all(path).map_err(|e| e.to_string())?;
@@ -344,10 +345,6 @@ impl MailManager {
     }
 
     fn hash_password(password: &str) -> String {
-        if crate::runtime::simulation_enabled() || cfg!(windows) {
-            return format!("{{PLAIN}}{}", password);
-        }
-
         if let Ok(output) = Command::new("doveadm")
             .args(["pw", "-s", "SHA512-CRYPT", "-p", password])
             .output()
@@ -369,7 +366,10 @@ impl MailManager {
             }
         }
 
-        format!("{{PLAIN}}{}", password)
+        match bcrypt_hash(password, DEFAULT_COST) {
+            Ok(value) => value,
+            Err(_) => format!("{{PLAIN}}{}", password),
+        }
     }
 
     fn maildir_base_path(domain: &str, username: &str) -> PathBuf {
@@ -404,8 +404,8 @@ impl MailManager {
     }
 
     fn postmap(path: &Path) -> Result<(), String> {
-        if crate::runtime::simulation_enabled() || cfg!(windows) {
-            return Ok(());
+        if cfg!(windows) {
+            return Err("postmap is supported only on Linux hosts.".to_string());
         }
         let output = Command::new("postmap")
             .arg(path.as_os_str())
@@ -419,7 +419,7 @@ impl MailManager {
     }
 
     fn reload_service(unit: &str) {
-        if crate::runtime::simulation_enabled() || cfg!(windows) {
+        if cfg!(windows) {
             return;
         }
         let _ = Command::new("systemctl").args(["reload", unit]).output();
@@ -482,7 +482,7 @@ impl MailManager {
             Self::postmap(&postfix_mailbox)?;
         }
 
-        if !crate::runtime::simulation_enabled() && !cfg!(windows) {
+        if !cfg!(windows) {
             let domain = address.split('@').nth(1).unwrap_or_default();
             let user = Self::username_from_address(address).unwrap_or_default();
             if !domain.is_empty() && !user.is_empty() {
@@ -610,10 +610,6 @@ impl MailManager {
     fn validate_backend_for_write() -> Result<(), String> {
         let backend = Self::backend();
         if backend == "local" || Self::backend_is_vmail() {
-            return Ok(());
-        }
-        if crate::runtime::simulation_enabled() {
-            println!("[DEV MODE] Mail backend '{}' simulated.", backend);
             return Ok(());
         }
         Err(format!(

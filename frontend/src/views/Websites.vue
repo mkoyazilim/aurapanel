@@ -772,24 +772,17 @@ async function refreshAdvanced() {
 }
 
 async function loadDatabases() {
-  try {
-    const [mariaDbRes, mariaUsersRes, pgDbRes, pgUsersRes] = await Promise.all([
-      api.get('/db/mariadb/list').catch(() => ({ data: { data: [] } })),
-      api.get('/db/mariadb/users').catch(() => ({ data: { data: [] } })),
-      api.get('/db/postgres/list').catch(() => ({ data: { data: [] } })),
-      api.get('/db/postgres/users').catch(() => ({ data: { data: [] } })),
-    ])
+  const [mariaDbRes, mariaUsersRes, pgDbRes, pgUsersRes] = await Promise.all([
+    api.get('/db/mariadb/list'),
+    api.get('/db/mariadb/users'),
+    api.get('/db/postgres/list'),
+    api.get('/db/postgres/users'),
+  ])
 
-    mariadbDatabases.value = mariaDbRes.data?.data || []
-    mariadbUsers.value = mariaUsersRes.data?.data || []
-    postgresDatabases.value = pgDbRes.data?.data || []
-    postgresUsers.value = pgUsersRes.data?.data || []
-  } catch {
-    mariadbDatabases.value = []
-    mariadbUsers.value = []
-    postgresDatabases.value = []
-    postgresUsers.value = []
-  }
+  mariadbDatabases.value = mariaDbRes.data?.data || []
+  mariadbUsers.value = mariaUsersRes.data?.data || []
+  postgresDatabases.value = pgDbRes.data?.data || []
+  postgresUsers.value = pgUsersRes.data?.data || []
 }
 
 async function refreshAll() {

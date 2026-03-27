@@ -426,7 +426,7 @@ impl PowerDnsManager {
             "nameservers": []
         });
 
-        println!("[DEV MODE] Creating/Reconciling PowerDNS Zone for: {}", domain);
+        println!("[DNS] Creating or reconciling PowerDNS zone for: {}", domain);
         self.reconcile_zone_defaults(&domain, &config.server_ip)?;
 
         Ok(())
@@ -451,7 +451,7 @@ impl PowerDnsManager {
         });
 
         println!(
-            "[DEV MODE] Adding DNS Record: {} -> {} ({})",
+            "[DNS] Adding DNS record: {} -> {} ({})",
             record.name, record.content, record.record_type
         );
 

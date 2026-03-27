@@ -180,24 +180,7 @@ const showNotif = (message) => {
 const fetchMetrics = async () => {
   loadingMetrics.value = true
   try {
-    const res = await api.get('/status/metrics').catch(() => ({
-      data: {
-        data: {
-          cpu_usage: 18,
-          cpu_cores: 4,
-          cpu_model: 'Intel Xeon',
-          ram_usage: 45,
-          ram_used: '4.5 GB',
-          ram_total: '10 GB',
-          disk_usage: 22,
-          disk_used: '11 GB',
-          disk_total: '50 GB',
-          uptime_seconds: 1209600,
-          uptime_human: '14 gun 5 saat',
-          load_avg: '0.12, 0.15, 0.20'
-        }
-      }
-    }))
+    const res = await api.get('/status/metrics')
 
     const payload = res.data?.data || {}
     metrics.value = {
@@ -222,16 +205,7 @@ const fetchMetrics = async () => {
 const fetchServices = async () => {
   loadingServices.value = true
   try {
-    const res = await api.get('/status/services').catch(() => ({
-      data: {
-        data: [
-          { name: 'OpenLiteSpeed', desc: 'Web Server', status: 'running' },
-          { name: 'MariaDB', desc: 'Database', status: 'running' },
-          { name: 'PureFTPd', desc: 'FTP Server', status: 'running' },
-          { name: 'Redis', desc: 'Cache', status: 'stopped' }
-        ]
-      }
-    }))
+    const res = await api.get('/status/services')
     services.value = Array.isArray(res.data?.data) ? res.data.data : []
   } finally {
     loadingServices.value = false
@@ -241,14 +215,7 @@ const fetchServices = async () => {
 const fetchProcesses = async () => {
   loadingProcesses.value = true
   try {
-    const res = await api.get('/status/processes').catch(() => ({
-      data: {
-        data: [
-          { pid: 1, user: 'root', cpu: 0.1, mem: 0.3, command: '/sbin/init' },
-          { pid: 1842, user: 'mysql', cpu: 2.5, mem: 12.4, command: 'mariadbd' }
-        ]
-      }
-    }))
+    const res = await api.get('/status/processes')
     processes.value = Array.isArray(res.data?.data) ? res.data.data : []
   } finally {
     loadingProcesses.value = false

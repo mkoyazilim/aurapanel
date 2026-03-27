@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+﻿use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -19,17 +19,6 @@ pub struct PhpExtension {
 pub struct PhpManager;
 
 impl PhpManager {
-    /// Sistemde PHP kurulu mu dev mode mu kontrolü (Windows vs Linux) 
-    fn is_dev_mode() -> bool {
-        if cfg!(windows) {
-            true
-        } else {
-            // Linux'ta da apt paket yöneticisi yoksa dev mode kabul et
-            !Path::new("/usr/bin/apt").exists()
-        }
-    }
-
-    /// Desteklenen ve kurulu servisleri listeler
     pub fn list_versions() -> Result<Vec<PhpVersion>, String> {
         let mut versions = vec![
             PhpVersion { version: "7.4".to_string(), installed: false, eol: true },
@@ -40,17 +29,8 @@ impl PhpManager {
             PhpVersion { version: "8.4".to_string(), installed: false, eol: false },
         ];
 
-        if Self::is_dev_mode() {
-            // Mock data
-            if let Some(v) = versions.iter_mut().find(|v| v.version == "8.2") { v.installed = true; }
-            if let Some(v) = versions.iter_mut().find(|v| v.version == "8.3") { v.installed = true; }
-            return Ok(versions);
-        }
-
-        // Linux Debian/Ubuntu check
         for v in &mut versions {
-            let path = format!("/usr/bin/php{}", v.version);
-            if Path::new(&path).exists() {
+            if Self::is_php_installed(&v.version) {
                 v.installed = true;
             }
         }
@@ -58,87 +38,131 @@ impl PhpManager {
         Ok(versions)
     }
 
-    /// PHP versiyonu kurar
     pub fn install_version(version: &str) -> Result<String, String> {
-        if Self::is_dev_mode() {
-            return Ok(format!("(Dev Mode) PHP {} başarıyla kuruldu gibi simüle edildi.", version));
-        }
+        let version = normalize_version(version)?;
+        ensure_linux("PHP install is supported only on Linux hosts.")?;
 
         let pkg = format!("php{}-fpm", version);
         let output = Command::new("apt")
-            .args(&["install", "-y", &pkg])
+            .args(["install", "-y", &pkg])
             .output()
-            .map_err(|e| format!("apt install çalıştırılamadı: {}", e))?;
+            .map_err(|e| format!("apt install failed: {}", e))?;
 
         if output.status.success() {
-            Ok(format!("PHP {} başarıyla kuruldu.", version))
+            Ok(format!("PHP {} installed successfully.", version))
         } else {
-            Err(String::from_utf8_lossy(&output.stderr).to_string())
+            Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
         }
     }
 
-    /// PHP versiyonu kaldırır
     pub fn remove_version(version: &str) -> Result<String, String> {
-        if Self::is_dev_mode() {
-            return Ok(format!("(Dev Mode) PHP {} başarıyla kaldırıldı gibi simüle edildi.", version));
-        }
+        let version = normalize_version(version)?;
+        ensure_linux("PHP remove is supported only on Linux hosts.")?;
 
         let pkg = format!("php{}-fpm", version);
         let output = Command::new("apt")
-            .args(&["purge", "-y", &pkg])
+            .args(["purge", "-y", &pkg])
             .output()
-            .map_err(|e| format!("apt purge çalıştırılamadı: {}", e))?;
+            .map_err(|e| format!("apt purge failed: {}", e))?;
 
         if output.status.success() {
-            Ok(format!("PHP {} başarıyla kaldırıldı.", version))
+            Ok(format!("PHP {} removed successfully.", version))
         } else {
-            Err(String::from_utf8_lossy(&output.stderr).to_string())
+            Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
         }
     }
 
-    /// PHP servisini FPM yeniden başlatır
     pub fn restart_fpm(version: &str) -> Result<String, String> {
-        if Self::is_dev_mode() {
-            return Ok(format!("(Dev Mode) PHP {} FPM restart edildi.", version));
-        }
+        let version = normalize_version(version)?;
+        ensure_linux("PHP restart is supported only on Linux hosts.")?;
 
         let srv = format!("php{}-fpm", version);
         let output = Command::new("systemctl")
-            .args(&["restart", &srv])
+            .args(["restart", &srv])
             .output()
-            .map_err(|e| format!("systemctl restart çalıştırılamadı: {}", e))?;
+            .map_err(|e| format!("systemctl restart failed: {}", e))?;
 
         if output.status.success() {
-            Ok(format!("PHP {} FPM servisi yeniden başlatıldı.", version))
+            Ok(format!("PHP {} FPM restarted.", version))
         } else {
-            Err(String::from_utf8_lossy(&output.stderr).to_string())
+            Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
         }
     }
 
-    /// php.ini dosyasını okur
     pub fn get_ini(version: &str) -> Result<String, String> {
-        if Self::is_dev_mode() {
-            return Ok(format!("; Dev Mode php.ini for PHP {}\nmemory_limit = 256M\nupload_max_filesize = 64M\npost_max_size = 64M\nmax_execution_time = 300\n", version));
-        }
+        let version = normalize_version(version)?;
+        let path = Self::resolve_ini_path(&version)
+            .ok_or_else(|| format!("php.ini not found for PHP {}", version))?;
 
-        let path = format!("/etc/php/{}/fpm/php.ini", version);
         fs::read_to_string(&path)
-            .map_err(|e| format!("php.ini okunamadı (Path: {}): {}", path, e))
+            .map_err(|e| format!("php.ini read failed ({}): {}", path.display(), e))
     }
 
-    /// php.ini dosyasını kaydeder
     pub fn save_ini(version: &str, content: &str) -> Result<String, String> {
-        if Self::is_dev_mode() {
-            return Ok(format!("(Dev Mode) PHP {} php.ini başarıyla kaydedildi.", version));
+        let version = normalize_version(version)?;
+        let path = Self::resolve_ini_path(&version)
+            .ok_or_else(|| format!("php.ini not found for PHP {}", version))?;
+
+        fs::write(&path, content)
+            .map_err(|e| format!("php.ini write failed ({}): {}", path.display(), e))?;
+
+        let _ = Self::restart_fpm(&version);
+        Ok(format!("PHP {} php.ini saved.", version))
+    }
+
+    fn is_php_installed(version: &str) -> bool {
+        let cli_path = format!("/usr/bin/php{}", version);
+        if Path::new(&cli_path).exists() {
+            return true;
         }
 
-        let path = format!("/etc/php/{}/fpm/php.ini", version);
-        fs::write(&path, content)
-            .map_err(|e| format!("php.ini yazılamadı (Path: {}): {}", path, e))?;
-        
-        // Restart fpm right after save? 
-        let _ = Self::restart_fpm(version);
+        let fpm_service = format!("php{}-fpm", version);
+        let status = Command::new("systemctl")
+            .args(["status", &fpm_service])
+            .output();
+        if let Ok(output) = status {
+            if output.status.success() {
+                return true;
+            }
+        }
 
-        Ok(format!("PHP {} php.ini başarıyla kaydedildi ve servis yeniden başlatıldı.", version))
+        let lsws_version = version.replace('.', "");
+        let lsphp_path = format!("/usr/local/lsws/lsphp{}/bin/lsphp", lsws_version);
+        Path::new(&lsphp_path).exists()
     }
+
+    fn resolve_ini_path(version: &str) -> Option<std::path::PathBuf> {
+        let candidates = [
+            format!("/etc/php/{}/fpm/php.ini", version),
+            format!("/usr/local/lsws/lsphp{}/etc/php/{}/litespeed/php.ini", version.replace('.', ""), version),
+            format!("/usr/local/lsws/lsphp{}/etc/php.ini", version.replace('.', "")),
+        ];
+
+        for candidate in candidates {
+            let path = std::path::PathBuf::from(candidate);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+        None
+    }
+}
+
+fn normalize_version(version: &str) -> Result<String, String> {
+    let cleaned = version.trim();
+    let parts: Vec<&str> = cleaned.split('.').collect();
+    if parts.len() != 2 {
+        return Err("version must be in major.minor format (e.g. 8.3)".to_string());
+    }
+    if parts.iter().any(|p| p.is_empty() || p.chars().any(|c| !c.is_ascii_digit())) {
+        return Err("version must be numeric in major.minor format".to_string());
+    }
+    Ok(format!("{}.{}", parts[0], parts[1]))
+}
+
+fn ensure_linux(message: &str) -> Result<(), String> {
+    if cfg!(windows) {
+        return Err(message.to_string());
+    }
+    Ok(())
 }

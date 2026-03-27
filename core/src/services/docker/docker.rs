@@ -41,46 +41,13 @@ pub struct PullImageConfig {
 pub struct DockerManager;
 
 impl DockerManager {
-    fn simulation_enabled() -> bool {
-        crate::runtime::simulation_enabled()
-    }
-
     fn docker_unavailable_error() -> String {
-        "docker is not available on this host. Install docker or enable AURAPANEL_DEV_SIMULATION=1.".to_string()
+        "docker is not available on this host. Install docker first.".to_string()
     }
 
     pub fn list_containers() -> Result<Vec<ContainerInfo>, String> {
         if !Self::is_docker_available() {
-            if !Self::simulation_enabled() {
-                return Err(Self::docker_unavailable_error());
-            }
-
-            return Ok(vec![
-                ContainerInfo {
-                    id: "abc123def456".into(),
-                    name: "nginx-proxy".into(),
-                    image: "nginx:latest".into(),
-                    status: "Up 3 days".into(),
-                    ports: "0.0.0.0:80->80/tcp".into(),
-                    created: "3 days ago".into(),
-                },
-                ContainerInfo {
-                    id: "789ghi012jkl".into(),
-                    name: "mysql-db".into(),
-                    image: "mariadb:11".into(),
-                    status: "Up 3 days".into(),
-                    ports: "3306/tcp".into(),
-                    created: "3 days ago".into(),
-                },
-                ContainerInfo {
-                    id: "mno345pqr678".into(),
-                    name: "redis-cache".into(),
-                    image: "redis:7-alpine".into(),
-                    status: "Exited (0) 2 hours ago".into(),
-                    ports: "6379/tcp".into(),
-                    created: "5 days ago".into(),
-                },
-            ]);
+            return Err(Self::docker_unavailable_error());
         }
 
         let output = Command::new("docker")
@@ -112,10 +79,6 @@ impl DockerManager {
         println!("[DOCKER] Creating container: {} from image: {}", config.name, config.image);
 
         if !Self::is_docker_available() {
-            if Self::simulation_enabled() {
-                println!("[DEV MODE] Docker not available. Simulating container creation.");
-                return Ok(format!("simulated-container-id-{}", config.name));
-            }
             return Err(Self::docker_unavailable_error());
         }
 
@@ -190,9 +153,6 @@ impl DockerManager {
 
     pub fn container_logs(id: &str, tail: u32) -> Result<String, String> {
         if !Self::is_docker_available() {
-            if Self::simulation_enabled() {
-                return Ok(format!("[DEV MODE] Simulated logs for container {}", id));
-            }
             return Err(Self::docker_unavailable_error());
         }
 
@@ -207,33 +167,7 @@ impl DockerManager {
 
     pub fn list_images() -> Result<Vec<ImageInfo>, String> {
         if !Self::is_docker_available() {
-            if !Self::simulation_enabled() {
-                return Err(Self::docker_unavailable_error());
-            }
-
-            return Ok(vec![
-                ImageInfo {
-                    id: "sha256:abc123".into(),
-                    repository: "nginx".into(),
-                    tag: "latest".into(),
-                    size: "187MB".into(),
-                    created: "2 weeks ago".into(),
-                },
-                ImageInfo {
-                    id: "sha256:def456".into(),
-                    repository: "mariadb".into(),
-                    tag: "11".into(),
-                    size: "405MB".into(),
-                    created: "3 weeks ago".into(),
-                },
-                ImageInfo {
-                    id: "sha256:ghi789".into(),
-                    repository: "redis".into(),
-                    tag: "7-alpine".into(),
-                    size: "32MB".into(),
-                    created: "1 month ago".into(),
-                },
-            ]);
+            return Err(Self::docker_unavailable_error());
         }
 
         let output = Command::new("docker")
@@ -269,10 +203,6 @@ impl DockerManager {
         println!("[DOCKER] Pulling image: {}", full_image);
 
         if !Self::is_docker_available() {
-            if Self::simulation_enabled() {
-                println!("[DEV MODE] Docker pull simulated for {}", full_image);
-                return Ok(());
-            }
             return Err(Self::docker_unavailable_error());
         }
 
@@ -306,10 +236,6 @@ impl DockerManager {
 
     fn docker_cmd(args: &[&str]) -> Result<(), String> {
         if !Self::is_docker_available() {
-            if Self::simulation_enabled() {
-                println!("[DEV MODE] docker {} simulated.", args.join(" "));
-                return Ok(());
-            }
             return Err(Self::docker_unavailable_error());
         }
 

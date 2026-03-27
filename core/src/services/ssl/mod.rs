@@ -4,10 +4,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn dev_simulation_enabled() -> bool {
-    crate::runtime::simulation_enabled()
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SslConfig {
     pub domain: String,
@@ -106,14 +102,7 @@ impl SslManager {
         );
 
         if !Path::new("/usr/bin/certbot").exists() {
-            if dev_simulation_enabled() {
-                println!("[DEV MODE] certbot not found. Simulating SSL issuance.");
-                return Ok(());
-            }
-            return Err(
-                "certbot is not installed. Install certbot or enable AURAPANEL_DEV_SIMULATION=1."
-                    .to_string(),
-            );
+            return Err("certbot is not installed.".to_string());
         }
 
         let output = Command::new("certbot")
@@ -158,6 +147,7 @@ impl SslManager {
 
     pub async fn issue_mail_server_certificate(config: &SslConfig) -> Result<(), String> {
         Self::issue_certificate_only(config).await?;
+        Self::bind_ssl_to_mailstack(&Self::normalize_domain(&config.domain))?;
         let mut state = Self::load_bindings()?;
         state.mail_ssl_domain = Some(Self::normalize_domain(&config.domain));
         state.updated_at = Self::now_ts();
@@ -167,14 +157,7 @@ impl SslManager {
     pub fn renew_all() -> Result<(), String> {
         println!("[ACME] Running certbot renew for all domains...");
         if !Path::new("/usr/bin/certbot").exists() {
-            if dev_simulation_enabled() {
-                println!("[DEV MODE] certbot not found. Skipping renewal.");
-                return Ok(());
-            }
-            return Err(
-                "certbot is not installed. Install certbot or enable AURAPANEL_DEV_SIMULATION=1."
-                    .to_string(),
-            );
+            return Err("certbot is not installed.".to_string());
         }
 
         Command::new("certbot")
@@ -302,15 +285,89 @@ vhssl {{
                 .map_err(|e| format!("vhconf read failed: {}", e))?;
             content.push_str(&ssl_block);
             fs::write(&vhconf_path, content).map_err(|e| format!("vhconf write failed: {}", e))?;
-        } else if dev_simulation_enabled() {
-            println!(
-                "[DEV MODE] VHost config not found for {}. SSL binding simulated.",
-                domain
-            );
         } else {
             return Err(format!("VHost config not found: {}", vhconf_path));
         }
 
         Ok(())
+    }
+
+    fn bind_ssl_to_mailstack(domain: &str) -> Result<(), String> {
+        let cert_dir = PathBuf::from(format!("/etc/letsencrypt/live/{}", domain));
+        let cert_file = cert_dir.join("fullchain.pem");
+        let key_file = cert_dir.join("privkey.pem");
+
+        if !cert_file.exists() || !key_file.exists() {
+            return Err(format!(
+                "Mail SSL cert files missing for {}: {} / {}",
+                domain,
+                cert_file.display(),
+                key_file.display()
+            ));
+        }
+
+        let postfix_main_cf = PathBuf::from(
+            std::env::var("AURAPANEL_POSTFIX_MAIN_CF")
+                .unwrap_or_else(|_| "/etc/postfix/main.cf".to_string()),
+        );
+        if postfix_main_cf.exists() {
+            let mut content = fs::read_to_string(&postfix_main_cf)
+                .map_err(|e| format!("postfix main.cf read failed: {}", e))?;
+            content = Self::upsert_kv_line(&content, "smtpd_tls_cert_file", &cert_file.to_string_lossy());
+            content = Self::upsert_kv_line(&content, "smtpd_tls_key_file", &key_file.to_string_lossy());
+            content = Self::upsert_kv_line(&content, "smtp_tls_cert_file", &cert_file.to_string_lossy());
+            content = Self::upsert_kv_line(&content, "smtp_tls_key_file", &key_file.to_string_lossy());
+            fs::write(&postfix_main_cf, content)
+                .map_err(|e| format!("postfix main.cf write failed: {}", e))?;
+        }
+
+        let dovecot_ssl_conf = PathBuf::from(
+            std::env::var("AURAPANEL_DOVECOT_SSL_CONF")
+                .unwrap_or_else(|_| "/etc/dovecot/conf.d/10-ssl.conf".to_string()),
+        );
+        if dovecot_ssl_conf.exists() {
+            let mut content = fs::read_to_string(&dovecot_ssl_conf)
+                .map_err(|e| format!("dovecot ssl conf read failed: {}", e))?;
+            content = Self::upsert_kv_line(&content, "ssl", "required");
+            content = Self::upsert_kv_line(
+                &content,
+                "ssl_cert",
+                &format!("<{}", cert_file.to_string_lossy()),
+            );
+            content = Self::upsert_kv_line(
+                &content,
+                "ssl_key",
+                &format!("<{}", key_file.to_string_lossy()),
+            );
+            fs::write(&dovecot_ssl_conf, content)
+                .map_err(|e| format!("dovecot ssl conf write failed: {}", e))?;
+        }
+
+        let _ = Command::new("systemctl").args(["reload", "postfix"]).output();
+        let _ = Command::new("systemctl").args(["restart", "dovecot"]).output();
+        Ok(())
+    }
+
+    fn upsert_kv_line(content: &str, key: &str, value: &str) -> String {
+        let mut replaced = false;
+        let mut lines = Vec::new();
+        for line in content.lines() {
+            let trimmed = line.trim_start();
+            let is_match = trimmed.starts_with(&format!("{} =", key))
+                || trimmed.starts_with(&format!("{}=", key));
+            if is_match {
+                lines.push(format!("{} = {}", key, value));
+                replaced = true;
+            } else {
+                lines.push(line.to_string());
+            }
+        }
+
+        if !replaced {
+            lines.push(format!("{} = {}", key, value));
+        }
+        let mut out = lines.join("\n");
+        out.push('\n');
+        out
     }
 }

@@ -92,12 +92,12 @@ async function loadDashboard() {
       metricsRes,
       servicesRes,
     ] = await Promise.all([
-      api.get('/vhost/list').catch(() => ({ data: { data: [] } })),
-      api.get('/db/mariadb/list').catch(() => ({ data: { data: [] } })),
-      api.get('/db/postgres/list').catch(() => ({ data: { data: [] } })),
-      api.get('/security/ebpf/events').catch(() => ({ data: { data: [] } })),
-      api.get('/status/metrics').catch(() => ({ data: { data: {} } })),
-      api.get('/status/services').catch(() => ({ data: { data: [] } })),
+      api.get('/vhost/list'),
+      api.get('/db/mariadb/list'),
+      api.get('/db/postgres/list'),
+      api.get('/security/ebpf/events'),
+      api.get('/status/metrics'),
+      api.get('/status/services'),
     ])
 
     const websites = Array.isArray(vhostsRes.data?.data) ? vhostsRes.data.data : []

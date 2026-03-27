@@ -19,3 +19,4 @@ pub mod php;
 pub mod status;
 pub mod packages;
 pub mod websites;
+pub mod ols_tuning;
