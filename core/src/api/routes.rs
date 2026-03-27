@@ -23,7 +23,7 @@ use crate::services::db::ops::{
     list_remote_access_postgres, DbPasswordChangeRequest, RemoteAccessGrantRequest,
 };
 use crate::services::db::{auradb::DbExplorerManager, DbConfig, MariaDbManager, PostgresManager};
-use crate::services::dns::{DnsZoneConfig, PowerDnsManager};
+use crate::services::dns::{DnsRecord, DnsZoneConfig, PowerDnsManager};
 use crate::services::docker::{
     apps::{CreateDockerAppRequest, DockerAppsManager},
     docker::{CreateContainerConfig, PullImageConfig},
@@ -2393,7 +2393,25 @@ async fn create_vhost_handler(Json(payload): Json<CreateVhostPayload>) -> Json<s
             }
 
             if payload.mail_domain.unwrap_or(false) {
-                warnings.push("Mail domain bootstrap su an metadata seviyesinde; DKIM/MX otomasyonu sonraki fazda.".to_string());
+                match MailManager::rotate_dkim(&domain) {
+                    Ok(dkim) => {
+                        let dkim_record = DnsRecord {
+                            name: format!("{}._domainkey.{}.", dkim.selector, domain),
+                            record_type: "TXT".to_string(),
+                            content: format!("\"{}\"", dkim.public_key.replace('"', "")),
+                            ttl: 3600,
+                        };
+                        if let Err(e) = pdns.add_record(&domain, dkim_record).await {
+                            warnings.push(format!(
+                                "Mail domain DKIM DNS kaydi eklenemedi: {}",
+                                e
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        warnings.push(format!("Mail domain DKIM olusturulamadi: {}", e));
+                    }
+                }
             }
             if payload.apache_backend.unwrap_or(false) {
                 warnings.push("Apache backend toggle secildi; runtime backend switch sonraki fazda tamamlanacak.".to_string());

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::net::{ToSocketAddrs, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -65,6 +66,55 @@ impl SslManager {
         "certbot is not installed. Re-run AuraPanel installer, or install manually (Ubuntu/Debian: apt-get install -y certbot; Alma/Rocky: dnf install -y certbot).".to_string()
     }
 
+    fn detect_server_ip() -> Option<String> {
+        if let Ok(ip) = std::env::var("AURAPANEL_SERVER_IP") {
+            let ip = ip.trim().to_string();
+            if !ip.is_empty() {
+                return Some(ip);
+            }
+        }
+
+        let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+        socket.connect("1.1.1.1:80").ok()?;
+        let ip = socket.local_addr().ok()?.ip();
+        if ip.is_loopback() || ip.is_unspecified() {
+            None
+        } else {
+            Some(ip.to_string())
+        }
+    }
+
+    fn dns_preflight_disabled() -> bool {
+        std::env::var("AURAPANEL_SSL_SKIP_DNS_PREFLIGHT")
+            .map(|v| {
+                matches!(
+                    v.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
+            .unwrap_or(false)
+    }
+
+    fn resolve_host_ips(host: &str) -> Result<Vec<String>, String> {
+        let addr = format!("{}:80", host);
+        let mut ips: Vec<String> = addr
+            .to_socket_addrs()
+            .map_err(|e| format!("DNS cozumleme basarisiz ({}): {}", host, e))?
+            .map(|sock| sock.ip().to_string())
+            .collect();
+        ips.sort();
+        ips.dedup();
+        Ok(ips)
+    }
+
+    fn host_points_to_server(host: &str, server_ip: &str) -> Result<bool, String> {
+        let ips = Self::resolve_host_ips(host)?;
+        if ips.is_empty() {
+            return Ok(false);
+        }
+        Ok(ips.iter().any(|ip| ip == server_ip))
+    }
+
     fn state_root() -> PathBuf {
         if let Ok(path) = std::env::var("AURAPANEL_STATE_DIR") {
             let p = PathBuf::from(path.trim());
@@ -119,21 +169,60 @@ impl SslManager {
         );
 
         let certbot_bin = Self::certbot_binary().ok_or_else(Self::certbot_missing_message)?;
+
+        let mut domains_for_cert = vec![domain.clone()];
+        if !Self::dns_preflight_disabled() {
+            let server_ip = Self::detect_server_ip().ok_or_else(|| {
+                "Sunucu IP'si tespit edilemedi. AURAPANEL_SERVER_IP tanimlayin veya DNS preflight'i kapatin (AURAPANEL_SSL_SKIP_DNS_PREFLIGHT=1).".to_string()
+            })?;
+
+            let apex_ips = Self::resolve_host_ips(&domain)?;
+            if apex_ips.is_empty() || !apex_ips.iter().any(|ip| ip == &server_ip) {
+                return Err(format!(
+                    "DNS preflight failed for {}. Beklenen sunucu IP: {}. Bulunan A/AAAA: [{}]. Domain kaydini bu sunucuya yonlendirin ve varsa proxy/CDN'i gecici DNS only yapin.",
+                    domain,
+                    server_ip,
+                    apex_ips.join(", ")
+                ));
+            }
+
+            let www_domain = format!("www.{}", domain);
+            match Self::host_points_to_server(&www_domain, &server_ip) {
+                Ok(true) => domains_for_cert.push(www_domain),
+                Ok(false) => {
+                    println!(
+                        "[ACME] www domain DNS preflight skip edildi, sertifika yalnizca apex domain icin alinacak: {}",
+                        www_domain
+                    );
+                }
+                Err(err) => {
+                    println!(
+                        "[ACME] www domain DNS preflight okunamadi, sertifika yalnizca apex domain icin alinacak ({}): {}",
+                        www_domain, err
+                    );
+                }
+            }
+        } else {
+            domains_for_cert.push(format!("www.{}", domain));
+        }
+
+        let mut certbot_args = vec![
+            "certonly".to_string(),
+            "--webroot".to_string(),
+            "-w".to_string(),
+            webroot.to_string(),
+        ];
+        for host in domains_for_cert {
+            certbot_args.push("-d".to_string());
+            certbot_args.push(host);
+        }
+        certbot_args.push("--email".to_string());
+        certbot_args.push(email.to_string());
+        certbot_args.push("--agree-tos".to_string());
+        certbot_args.push("--non-interactive".to_string());
+
         let output = Command::new(certbot_bin)
-            .args([
-                "certonly",
-                "--webroot",
-                "-w",
-                webroot,
-                "-d",
-                &domain,
-                "-d",
-                &format!("www.{}", domain),
-                "--email",
-                email,
-                "--agree-tos",
-                "--non-interactive",
-            ])
+            .args(&certbot_args)
             .output()
             .map_err(|e| format!("certbot calistirilamadi: {}", e))?;
 
