@@ -913,6 +913,8 @@ EOF
     minio_secret="$(openssl rand -hex 24 | tr -d '\n')"
 
     cat <<EOF > "${SERVICE_ENV_FILE}"
+AURAPANEL_ADMIN_EMAIL=$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_ADMIN_EMAIL")
+AURAPANEL_ADMIN_PASSWORD=$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_ADMIN_PASSWORD")
 AURAPANEL_RUNTIME_MODE=production
 AURAPANEL_SECURITY_POLICY=fail-closed
 AURAPANEL_GATEWAY_ONLY=1
@@ -941,6 +943,23 @@ EOF
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_PANEL_DIST" "${PROJECT_DIR}/frontend/dist"
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_ALLOWED_ORIGINS" "http://127.0.0.1:${PANEL_PORT_DEFAULT},http://localhost:${PANEL_PORT_DEFAULT}"
   delete_env "${GATEWAY_ENV_FILE}" "${legacy_gateway_core_url_key}"
+
+  local shared_admin_email shared_admin_password shared_admin_hash
+  shared_admin_email="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_ADMIN_EMAIL")"
+  shared_admin_password="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_ADMIN_PASSWORD")"
+  shared_admin_hash="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_ADMIN_PASSWORD_BCRYPT")"
+
+  if [ -n "${shared_admin_email}" ]; then
+    upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_ADMIN_EMAIL" "${shared_admin_email}"
+  fi
+  if [ -n "${shared_admin_password}" ]; then
+    upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_ADMIN_PASSWORD" "${shared_admin_password}"
+  fi
+  if [ -n "${shared_admin_hash}" ]; then
+    upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_ADMIN_PASSWORD_BCRYPT" "${shared_admin_hash}"
+  else
+    delete_env "${SERVICE_ENV_FILE}" "AURAPANEL_ADMIN_PASSWORD_BCRYPT"
+  fi
 
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_RUNTIME_MODE" "production"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_SECURITY_POLICY" "fail-closed"

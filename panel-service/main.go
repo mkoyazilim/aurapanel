@@ -261,9 +261,7 @@ func newService() *service {
 
 func seedState() appState {
 	now := time.Now().UTC().Unix()
-	adminEmail := envOr("AURAPANEL_ADMIN_EMAIL", "admin@server.com")
-	adminPassword := envOr("AURAPANEL_ADMIN_PASSWORD", "password123")
-	adminHash := mustHashPassword(adminPassword)
+	adminEmail, adminHash := loadAdminSeedCredentials()
 
 	users := []PanelUser{
 		{
@@ -1866,6 +1864,66 @@ func envOr(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func readEnvFileValue(path, key string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+
+	prefix := key + "="
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, prefix))
+		}
+	}
+
+	return ""
+}
+
+func readTrimmedFile(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func loadAdminSeedCredentials() (string, string) {
+	const (
+		gatewayEnvPath      = "/etc/aurapanel/aurapanel.env"
+		initialPasswordPath = "/opt/aurapanel/logs/initial_password.txt"
+		defaultAdminEmail   = "admin@server.com"
+		defaultAdminPass    = "password123"
+	)
+
+	adminEmail := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_ADMIN_EMAIL")),
+		readEnvFileValue(gatewayEnvPath, "AURAPANEL_ADMIN_EMAIL"),
+		defaultAdminEmail,
+	)
+
+	adminHash := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_ADMIN_PASSWORD_BCRYPT")),
+		readEnvFileValue(gatewayEnvPath, "AURAPANEL_ADMIN_PASSWORD_BCRYPT"),
+	)
+	if adminHash != "" {
+		return adminEmail, adminHash
+	}
+
+	adminPassword := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_ADMIN_PASSWORD")),
+		readEnvFileValue(gatewayEnvPath, "AURAPANEL_ADMIN_PASSWORD"),
+		readTrimmedFile(initialPasswordPath),
+		defaultAdminPass,
+	)
+
+	return adminEmail, mustHashPassword(adminPassword)
 }
 
 func decodeJSON(r *http.Request, dst interface{}) error {
