@@ -23,7 +23,8 @@ export default {
           dark: '#0f172a',    // Slate 900
           darker: '#020617',  // Slate 950
           card: '#1e293b',    // Slate 800
-          border: '#334155'   // Slate 700
+          border: '#334155',  // Slate 700
+          hover: '#475569'    // Slate 600
         }
       }
     },

@@ -52,11 +52,11 @@
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label class="cf-field-label mb-1 block text-sm">{{ t('cloudflare_manager.email') }}</label>
-          <input v-model="cfEmail" type="email" placeholder="user@example.com" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none" />
+          <input v-model="cfEmail" type="email" placeholder="user@example.com" class="aura-input" />
         </div>
         <div>
           <label class="cf-field-label mb-1 block text-sm">{{ t('cloudflare_manager.api_key') }}</label>
-          <input v-model="cfApiKey" type="password" placeholder="****************" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none" />
+          <input v-model="cfApiKey" type="password" placeholder="****************" class="aura-input" />
         </div>
       </div>
       <button
@@ -324,17 +324,17 @@
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('cloudflare_manager.dns.type') }}</label>
-            <select v-model="newDns.type" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white focus:border-orange-500 focus:outline-none">
+            <select v-model="newDns.type" class="aura-input">
               <option v-for="type in ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA']" :key="type" :value="type">{{ type }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('cloudflare_manager.dns.name') }}</label>
-            <input v-model="newDns.name" type="text" placeholder="@, www, mail" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none" />
+            <input v-model="newDns.name" type="text" placeholder="@, www, mail" class="aura-input" />
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('cloudflare_manager.dns.value') }}</label>
-            <input v-model="newDns.content" type="text" placeholder="93.184.216.34" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none" />
+            <input v-model="newDns.content" type="text" placeholder="93.184.216.34" class="aura-input" />
           </div>
           <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 text-sm text-gray-300">
@@ -765,16 +765,5 @@ onMounted(async () => {
 
 .cloudflare-view :is(input[type='text'], input[type='email'], input[type='password'], input[type='number'], input[type='search'], input[type='url'], textarea)::placeholder {
   color: rgb(251 146 60 / 0.65) !important;
-}
-
-.cloudflare-view input:-webkit-autofill,
-.cloudflare-view input:-webkit-autofill:hover,
-.cloudflare-view input:-webkit-autofill:focus,
-.cloudflare-view textarea:-webkit-autofill,
-.cloudflare-view select:-webkit-autofill {
-  -webkit-text-fill-color: rgb(253 186 116) !important;
-  -webkit-box-shadow: 0 0 0 1000px rgb(15 23 42) inset !important;
-  box-shadow: 0 0 0 1000px rgb(15 23 42) inset !important;
-  transition: background-color 9999s ease-in-out 0s;
 }
 </style>

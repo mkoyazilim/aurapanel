@@ -35,7 +35,7 @@
 
   /* Form Input */
   .aura-input {
-    @apply w-full bg-panel-dark border border-panel-border rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all duration-300;
+    @apply w-full bg-panel-darker border border-panel-border rounded-lg px-4 py-2 text-orange-400 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all duration-300;
   }
 }
 
@@ -49,4 +49,16 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-panel-border rounded-full hover:bg-brand-500/50 transition-colors;
+}
+
+/* Chrome Autofill Fix for Dark Theme */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: theme('colors.orange.400') !important;
+  -webkit-box-shadow: 0 0 0 1000px theme('colors.panel.darker') inset !important;
+  box-shadow: 0 0 0 1000px theme('colors.panel.darker') inset !important;
+  transition: background-color 9999s ease-in-out 0s;
 }

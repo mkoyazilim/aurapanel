@@ -107,8 +107,8 @@
     <div v-if="showCompressModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showCompressModal = false">
       <div class="bg-panel-card border border-panel-border rounded-2xl w-full max-w-sm p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-white mb-4">📦 {{ t('filemanager.compress_title') }}</h3>
-        <input v-model="compressName" type="text" placeholder="arsiv_adi" class="w-full px-4 py-2.5 bg-panel-hover border border-panel-border rounded-lg text-white mb-4">
-        <select v-model="compressFormat" class="w-full px-4 py-2.5 bg-panel-hover border border-panel-border rounded-lg text-white mb-4">
+        <input v-model="compressName" type="text" placeholder="arsiv_adi" class="aura-input mb-4">
+        <select v-model="compressFormat" class="aura-input mb-4">
           <option value="zip">.zip</option>
           <option value="tar.gz">.tar.gz</option>
         </select>
@@ -123,7 +123,7 @@
     <div v-if="showNewModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showNewModal = false">
       <div class="bg-panel-card border border-panel-border rounded-2xl w-full max-w-sm p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-white mb-4">📄 {{ t('filemanager.new_file') }}</h3>
-        <input v-model="newFileName" type="text" placeholder="dosya_adi.txt" class="w-full px-4 py-2.5 bg-panel-hover border border-panel-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+        <input v-model="newFileName" type="text" placeholder="dosya_adi.txt" class="aura-input">
         <div class="flex gap-3 mt-4">
           <button @click="createFile" class="flex-1 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg text-sm">{{ t('common.create') }}</button>
           <button @click="showNewModal = false" class="px-4 py-2 bg-panel-hover text-gray-300 rounded-lg text-sm">{{ t('common.cancel') }}</button>
@@ -135,7 +135,7 @@
     <div v-if="showNewFolderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showNewFolderModal = false">
       <div class="bg-panel-card border border-panel-border rounded-2xl w-full max-w-sm p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-white mb-4">📁 {{ t('filemanager.new_folder') }}</h3>
-        <input v-model="newFolderName" type="text" placeholder="klasor_adi" class="w-full px-4 py-2.5 bg-panel-hover border border-panel-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+        <input v-model="newFolderName" type="text" placeholder="klasor_adi" class="aura-input">
         <div class="flex gap-3 mt-4">
           <button @click="createFolder" class="flex-1 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg text-sm">{{ t('common.create') }}</button>
           <button @click="showNewFolderModal = false" class="px-4 py-2 bg-panel-hover text-gray-300 rounded-lg text-sm">{{ t('common.cancel') }}</button>

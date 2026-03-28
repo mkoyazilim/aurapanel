@@ -110,18 +110,18 @@
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('docker_apps_screen.modal.app_name') }}</label>
-            <input v-model="installForm.app_name" type="text" :placeholder="`my-${selectedTemplate?.id}`" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none" />
+            <input v-model="installForm.app_name" type="text" :placeholder="`my-${selectedTemplate?.id}`" class="aura-input" />
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('docker_apps_screen.modal.package') }}</label>
-            <select v-model="installForm.package_id" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white focus:border-purple-500 focus:outline-none">
+            <select v-model="installForm.package_id" class="aura-input">
               <option value="">{{ t('docker_apps_screen.modal.unlimited') }}</option>
               <option v-for="pkg in packages" :key="pkg.id" :value="pkg.id">{{ pkg.name }} ({{ pkg.memory_limit }} RAM, {{ pkg.cpu_limit }} CPU)</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('docker_apps_screen.modal.extra_env') }}</label>
-            <input v-model="installForm.custom_env_str" type="text" placeholder="KEY=VALUE, KEY2=VALUE2" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none" />
+            <input v-model="installForm.custom_env_str" type="text" placeholder="KEY=VALUE, KEY2=VALUE2" class="aura-input" />
             <span class="mt-1 inline-block text-xs text-gray-500">{{ t('docker_apps_screen.modal.extra_env_hint') }}</span>
           </div>
         </div>
