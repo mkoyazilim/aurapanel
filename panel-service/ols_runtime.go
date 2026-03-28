@@ -290,6 +290,16 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	builder.WriteString("  keepDays                30\n")
 	builder.WriteString("  rollingSize             10M\n")
 	builder.WriteString("}\n\n")
+	
+	// Add explicit acme-challenge routing context to ensure Let's Encrypt validation works even with strict rewrites
+	builder.WriteString("context /.well-known/acme-challenge/ {\n")
+	builder.WriteString("  location                " + docroot + "/.well-known/acme-challenge/\n")
+	builder.WriteString("  allowBrowse             1\n")
+	builder.WriteString("  rewrite  {\n")
+	builder.WriteString("    enable                0\n")
+	builder.WriteString("  }\n")
+	builder.WriteString("}\n\n")
+
 	builder.WriteString("extProcessor " + socketName + "{\n")
 	builder.WriteString("  type                    lsapi\n")
 	builder.WriteString("  address                 " + olsManagedSocket(item.Site.Domain) + "\n")
