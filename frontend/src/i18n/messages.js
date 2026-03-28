@@ -909,5 +909,5 @@ const es = deepMerge(en, { common: { active: 'Activo', inactive: 'Inactivo' }, l
 const fr = deepMerge(en, { common: { active: 'Actif', inactive: 'Inactif' }, locale: { label: 'Langue', select: 'Choisir la langue' }, login: { title: 'Connexion', email_label: 'E-mail / Nom utilisateur', password_label: 'Mot de passe', remember_me: 'Se souvenir de cet appareil', submit: 'Se connecter', submitting: 'Connexion en cours...', error_default: 'Connexion impossible.' }, layout: { toggle_all_open: 'Tout Ouvrir', toggle_all_close: 'Tout Fermer', toggle_all_label: 'Groupes de Menu', groups: { web_apps: 'Web et Apps', data_access: 'Donnees et Acces', security_logs: 'Securite et Journaux', devops: 'Developpement' }, notifications: { title: 'Notifications', unread: '{count} non lues', mark_all_read: 'Tout marquer comme lu', clear: 'Effacer', empty: 'Aucune notification pour le moment.', new: 'NOUVEAU' }, user_menu: { secure_logout: 'Deconnexion securisee' }, footer: { zero_trust: 'Zero-Trust Actif', server_load: 'Charge Serveur' } } })
 
 export const messages = { en, tr, de, es, fr }
-export const supportedLocales = ['tr', 'en', 'de', 'es', 'fr']
+export const supportedLocales = ['en', 'tr', 'de', 'es', 'fr']
 export const rtlLocales = []
