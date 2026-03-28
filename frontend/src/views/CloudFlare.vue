@@ -10,8 +10,37 @@
       </div>
     </div>
 
+    <div class="rounded-xl border border-panel-border bg-panel-card p-5">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-white">{{ t('cloudflare_manager.server_status.title') }}</p>
+          <p class="mt-1 text-sm text-gray-400">
+            {{
+              serverStatus.configured
+                ? t('cloudflare_manager.server_status.ready', {
+                    source: serverStatus.credential_source,
+                    email: serverStatus.email_hint || '-',
+                  })
+                : t('cloudflare_manager.server_status.missing')
+            }}
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="serverStatus.configured ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-300'">
+            {{ serverStatus.configured ? t('cloudflare_manager.server_status.configured') : t('cloudflare_manager.server_status.not_configured') }}
+          </span>
+          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="serverStatus.auto_sync ? 'bg-cyan-500/15 text-cyan-300' : 'bg-gray-500/15 text-gray-400'">
+            {{ serverStatus.auto_sync ? t('cloudflare_manager.server_status.auto_sync_on') : t('cloudflare_manager.server_status.auto_sync_off') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
     <div v-if="!connected" class="rounded-xl border border-panel-border bg-panel-card p-6">
       <h2 class="cf-connect-title mb-4 text-lg font-semibold">{{ t('cloudflare_manager.connect_title') }}</h2>
+      <div v-if="serverStatus.configured" class="mb-4 rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-200">
+        {{ t('cloudflare_manager.server_status.server_auth_active') }}
+      </div>
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label class="cf-field-label mb-1 block text-sm">{{ t('cloudflare_manager.email') }}</label>
@@ -344,6 +373,12 @@ const notification = ref(null)
 const activeTab = ref('zones')
 const loading = ref(false)
 const cfStorageKey = 'aurapanel.cloudflare.auth.v1'
+const serverStatus = ref({
+  configured: false,
+  auto_sync: false,
+  credential_source: 'none',
+  email_hint: '',
+})
 
 const tabs = [
   { id: 'zones', label: t('cloudflare_manager.tabs.zones') },
@@ -421,11 +456,31 @@ const clearStoredCfAuth = () => {
   window.localStorage.removeItem(cfStorageKey)
 }
 
-const authPayload = () => ({ api_key: cfApiKey.value, email: cfEmail.value })
+const authPayload = () => {
+  const payload = {}
+  if (cfApiKey.value) payload.api_key = cfApiKey.value
+  if (cfEmail.value) payload.email = cfEmail.value
+  return payload
+}
+
+const loadServerStatus = async () => {
+  try {
+    const { data } = await api.get('/cloudflare/status')
+    serverStatus.value = {
+      configured: Boolean(data?.data?.configured),
+      auto_sync: Boolean(data?.data?.auto_sync),
+      credential_source: data?.data?.credential_source || 'none',
+      email_hint: data?.data?.email_hint || '',
+    }
+  } catch {
+    serverStatus.value = { configured: false, auto_sync: false, credential_source: 'none', email_hint: '' }
+  }
+}
 
 const connectCf = async (opts = {}) => {
   const { silent = false, auto = false, preferredZoneId = '' } = opts
-  if (!cfEmail.value || !cfApiKey.value) {
+  const hasManualCreds = Boolean(cfEmail.value && cfApiKey.value)
+  if (!hasManualCreds && !serverStatus.value.configured) {
     if (auto) return
     showNotif(t('cloudflare_manager.messages.credentials_required'), 'error')
     return
@@ -641,12 +696,19 @@ const dnsTypeBadge = type => {
 }
 
 onMounted(async () => {
+  await loadServerStatus()
   const saved = readStoredCfAuth()
-  if (!saved) return
-  cfEmail.value = saved.email || ''
-  cfApiKey.value = saved.api_key || ''
-  if (!cfEmail.value || !cfApiKey.value) return
-  await connectCf({ silent: true, auto: true, preferredZoneId: saved.zone_id || '' })
+  if (saved) {
+    cfEmail.value = saved.email || ''
+    cfApiKey.value = saved.api_key || ''
+    if (cfEmail.value && cfApiKey.value) {
+      await connectCf({ silent: true, auto: true, preferredZoneId: saved.zone_id || '' })
+      return
+    }
+  }
+  if (serverStatus.value.configured) {
+    await connectCf({ silent: true, auto: true })
+  }
 })
 </script>
 

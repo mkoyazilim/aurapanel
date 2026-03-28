@@ -19,6 +19,15 @@ type cloudflareCredentials struct {
 	APIToken string
 }
 
+type cloudflareRuntimeStatus struct {
+	Configured       bool   `json:"configured"`
+	AutoSync         bool   `json:"auto_sync"`
+	CredentialSource string `json:"credential_source"`
+	EmailHint        string `json:"email_hint,omitempty"`
+	HasAPIToken      bool   `json:"has_api_token"`
+	HasGlobalKey     bool   `json:"has_global_key"`
+}
+
 type cloudflareAPIResponse[T any] struct {
 	Success bool     `json:"success"`
 	Errors  []cfErr  `json:"errors"`
@@ -72,6 +81,14 @@ func cloudflareEnvCredentials() cloudflareCredentials {
 	}
 }
 
+func cloudflareResolveCredentials(body map[string]interface{}) cloudflareCredentials {
+	requestCreds := cloudflareRequestCredentials(body)
+	if requestCreds.valid() {
+		return requestCreds
+	}
+	return cloudflareEnvCredentials()
+}
+
 func (c cloudflareCredentials) valid() bool {
 	return c.APIToken != "" || (c.Email != "" && c.APIKey != "")
 }
@@ -89,6 +106,38 @@ func looksLikeAPIToken(value string) bool {
 func cloudflareAutoSyncEnabled() bool {
 	value := strings.ToLower(strings.TrimSpace(envOr("AURAPANEL_CLOUDFLARE_AUTO_SYNC", "0")))
 	return value == "1" || value == "true" || value == "yes" || value == "on"
+}
+
+func cloudflareRuntimeSnapshot() cloudflareRuntimeStatus {
+	creds := cloudflareEnvCredentials()
+	source := "none"
+	switch {
+	case creds.APIToken != "":
+		source = "api_token"
+	case creds.Email != "" && creds.APIKey != "":
+		source = "global_key"
+	}
+	return cloudflareRuntimeStatus{
+		Configured:       creds.valid(),
+		AutoSync:         cloudflareAutoSyncEnabled(),
+		CredentialSource: source,
+		EmailHint:        redactEmailHint(creds.Email),
+		HasAPIToken:      creds.APIToken != "",
+		HasGlobalKey:     creds.Email != "" && creds.APIKey != "",
+	}
+}
+
+func redactEmailHint(email string) string {
+	email = strings.TrimSpace(email)
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return ""
+	}
+	local := parts[0]
+	if len(local) <= 2 {
+		return local[:1] + "***@" + parts[1]
+	}
+	return local[:1] + "***" + local[len(local)-1:] + "@" + parts[1]
 }
 
 func cloudflareHTTPClient() *http.Client {

@@ -387,7 +387,7 @@ func (s *service) handleCloudflareZones(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare credentials payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	if !creds.valid() {
 		writeError(w, http.StatusBadRequest, "Cloudflare credentials are required.")
 		return
@@ -403,13 +403,17 @@ func (s *service) handleCloudflareZones(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: zones})
 }
 
+func (s *service) handleCloudflareStatus(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: cloudflareRuntimeSnapshot()})
+}
+
 func (s *service) handleCloudflareDNSList(w http.ResponseWriter, r *http.Request) {
 	var payload map[string]interface{}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare DNS list payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	if !creds.valid() || zoneID == "" {
 		writeError(w, http.StatusBadRequest, "Cloudflare credentials and zone_id are required.")
@@ -432,7 +436,7 @@ func (s *service) handleCloudflareDNSCreate(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare DNS create payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	record := CloudflareDNSRecord{
 		Type:    strings.ToUpper(strings.TrimSpace(stringValue(payload["type"]))),
@@ -462,7 +466,7 @@ func (s *service) handleCloudflareDNSDelete(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare DNS delete payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	recordID := strings.TrimSpace(stringValue(payload["record_id"]))
 	if !creds.valid() || zoneID == "" || recordID == "" {
@@ -493,7 +497,7 @@ func (s *service) handleCloudflareSSL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare SSL payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	mode := firstNonEmpty(strings.TrimSpace(stringValue(payload["mode"])), "full")
 	if !creds.valid() || zoneID == "" {
@@ -518,7 +522,7 @@ func (s *service) handleCloudflareSecurity(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare security payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	level := firstNonEmpty(strings.TrimSpace(stringValue(payload["level"])), "medium")
 	if !creds.valid() || zoneID == "" {
@@ -543,7 +547,7 @@ func (s *service) handleCloudflareDevMode(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare dev mode payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	enabled := boolValue(payload["enabled"])
 	if !creds.valid() || zoneID == "" {
@@ -572,7 +576,7 @@ func (s *service) handleCloudflareCachePurge(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare cache purge payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	if !creds.valid() || zoneID == "" {
 		writeError(w, http.StatusBadRequest, "Cloudflare credentials and zone_id are required.")
@@ -600,7 +604,7 @@ func (s *service) handleCloudflareAnalytics(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "Invalid Cloudflare analytics payload.")
 		return
 	}
-	creds := cloudflareRequestCredentials(payload)
+	creds := cloudflareResolveCredentials(payload)
 	zoneID := strings.TrimSpace(stringValue(payload["zone_id"]))
 	if !creds.valid() || zoneID == "" {
 		writeError(w, http.StatusBadRequest, "Cloudflare credentials and zone_id are required.")

@@ -84,6 +84,16 @@ Object.assign(extraEn, {
     connect: 'Connect',
     connecting: 'Connecting...',
     refresh: 'Refresh',
+    server_status: {
+      title: 'Server Authentication',
+      ready: 'Server credentials are configured. Source: {source}. Email: {email}',
+      missing: 'No server-side CloudFlare credentials are configured yet.',
+      configured: 'Configured',
+      not_configured: 'Missing',
+      auto_sync_on: 'Auto-sync on',
+      auto_sync_off: 'Auto-sync off',
+      server_auth_active: 'Server-managed CloudFlare authentication is active. You can connect without entering browser-side credentials.',
+    },
     tabs: {
       zones: 'Zones',
       dns: 'DNS Records',
@@ -324,6 +334,16 @@ Object.assign(extraTr, {
     connect: 'Baglan',
     connecting: 'Baglaniyor...',
     refresh: 'Yenile',
+    server_status: {
+      title: 'Sunucu Kimlik Dogrulamasi',
+      ready: 'Sunucu credential tanimli. Kaynak: {source}. E-posta: {email}',
+      missing: 'Sunucu tarafinda henuz CloudFlare credential tanimli degil.',
+      configured: 'Tanimli',
+      not_configured: 'Eksik',
+      auto_sync_on: 'Auto-sync acik',
+      auto_sync_off: 'Auto-sync kapali',
+      server_auth_active: 'Sunucu yonetimli CloudFlare dogrulamasi aktif. Tarayiciya credential girmeden baglanabilirsiniz.',
+    },
     tabs: { zones: 'Zonelar', dns: 'DNS Kayitlari', ssl: 'SSL/TLS', cache: 'Cache', security: 'Guvenlik' },
     zones: {
       title: 'Zone Listesi',
