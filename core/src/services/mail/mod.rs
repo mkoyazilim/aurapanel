@@ -351,6 +351,11 @@ if ($address === '' || $password === '') {
     aura_sso_fail(401, 'SSO session could not be created.');
 }
 
+$hostHeader = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($hostHeader === '') {
+    $hostHeader = 'localhost';
+}
+$requestHeaders = ['Host: ' . $hostHeader];
 $base = 'http://127.0.0.1/webmail';
 $cookieFile = tempnam(sys_get_temp_dir(), 'rcsso_');
 $loginUrl = $base . '/?_task=login';
@@ -360,6 +365,7 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_COOKIEJAR => $cookieFile,
     CURLOPT_COOKIEFILE => $cookieFile,
+    CURLOPT_HTTPHEADER => $requestHeaders,
     CURLOPT_TIMEOUT => 10,
 ]);
 $loginPage = curl_exec($ch);
@@ -389,7 +395,10 @@ curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POSTFIELDS => http_build_query($postFields),
-    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+    CURLOPT_HTTPHEADER => array_merge(
+        $requestHeaders,
+        ['Content-Type: application/x-www-form-urlencoded']
+    ),
     CURLOPT_COOKIEJAR => $cookieFile,
     CURLOPT_COOKIEFILE => $cookieFile,
     CURLOPT_TIMEOUT => 10,
