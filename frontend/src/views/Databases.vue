@@ -44,7 +44,22 @@
 
     <!-- Tuning Tab Content -->
     <div v-if="engine === 'tuning'" class="space-y-6">
-      <div class="aura-card">
+      <!-- Engine Selector for Tuning -->
+      <div class="flex gap-4 mb-4">
+        <button 
+          @click="tuningEngine = 'mariadb'; loadTuning()" 
+          :class="['px-4 py-2 rounded-lg text-sm font-medium transition', tuningEngine === 'mariadb' ? 'bg-blue-600 text-white' : 'bg-panel-card text-gray-400 border border-panel-border hover:text-white']">
+          MariaDB Tuning
+        </button>
+        <button 
+          @click="tuningEngine = 'postgresql'; loadTuning()" 
+          :class="['px-4 py-2 rounded-lg text-sm font-medium transition', tuningEngine === 'postgresql' ? 'bg-blue-600 text-white' : 'bg-panel-card text-gray-400 border border-panel-border hover:text-white']">
+          PostgreSQL Tuning
+        </button>
+      </div>
+
+      <!-- MariaDB Tuning Form -->
+      <div v-if="tuningEngine === 'mariadb'" class="aura-card">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h2 class="text-lg font-bold text-white">MariaDB İnce Ayar (Tuning)</h2>
@@ -78,6 +93,46 @@
         <div class="mt-6 flex justify-end">
           <button class="btn-primary" @click="saveTuning" :disabled="tuningSaving">
             {{ tuningSaving ? 'Kaydediliyor & Restart...' : 'Ayarları Kaydet ve MariaDB\'yi Yeniden Başlat' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- PostgreSQL Tuning Form -->
+      <div v-if="tuningEngine === 'postgresql'" class="aura-card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">PostgreSQL İnce Ayar (Tuning)</h2>
+            <p class="text-sm text-gray-400">PostgreSQL sunucunuzun RAM tüketimini ve eşzamanlı işlem kapasitesini ayarlayın.</p>
+          </div>
+          <button class="btn-secondary" @click="loadTuning">Yenile</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Max Connections</label>
+            <input v-model="pgTuningForm.max_connections" type="text" class="aura-input w-full" placeholder="Örn: 100" />
+            <p class="text-xs text-gray-500 mt-1">Maksimum veritabanı istemcisi bağlantı sayısı.</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Shared Buffers</label>
+            <input v-model="pgTuningForm.shared_buffers" type="text" class="aura-input w-full" placeholder="Örn: 128MB" />
+            <p class="text-xs text-gray-500 mt-1">PostgreSQL için ayrılan paylaşımlı bellek. (Sunucu RAM'inin %25'i önerilir)</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Work Mem</label>
+            <input v-model="pgTuningForm.work_mem" type="text" class="aura-input w-full" placeholder="Örn: 4MB" />
+            <p class="text-xs text-gray-500 mt-1">Her bir sorgu (SORT, HASH) işlemi için ayrılan RAM.</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Maintenance Work Mem</label>
+            <input v-model="pgTuningForm.maintenance_work_mem" type="text" class="aura-input w-full" placeholder="Örn: 64MB" />
+            <p class="text-xs text-gray-500 mt-1">VACUUM, CREATE INDEX gibi bakım işlemleri için maksimum bellek.</p>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end">
+          <button class="btn-primary" @click="saveTuning" :disabled="tuningSaving">
+            {{ tuningSaving ? 'Kaydediliyor & Restart...' : 'Ayarları Kaydet ve PostgreSQL\'i Yeniden Başlat' }}
           </button>
         </div>
       </div>
@@ -330,6 +385,7 @@ const router = useRouter()
 const { t } = useI18n({ useScope: 'global' })
 
 const engine = ref('mariadb')
+const tuningEngine = ref('mariadb') // Default tuning engine
 const showCreateModal = ref(false)
 const notification = ref(null)
 
@@ -339,13 +395,28 @@ const tuningForm = ref({
   key_buffer_size: '',
   max_allowed_packet: ''
 })
+
+const pgTuningForm = ref({
+  max_connections: '',
+  shared_buffers: '',
+  work_mem: '',
+  maintenance_work_mem: ''
+})
+
 const tuningSaving = ref(false)
 
 async function loadTuning() {
   try {
-    const res = await api.get('/db/mariadb/tuning')
-    if (res.data?.data) {
-      tuningForm.value = { ...tuningForm.value, ...res.data.data }
+    if (tuningEngine.value === 'mariadb') {
+      const res = await api.get('/db/mariadb/tuning')
+      if (res.data?.data) {
+        tuningForm.value = { ...tuningForm.value, ...res.data.data }
+      }
+    } else {
+      const res = await api.get('/db/postgresql/tuning')
+      if (res.data?.data) {
+        pgTuningForm.value = { ...pgTuningForm.value, ...res.data.data }
+      }
     }
   } catch (err) {
     console.error('Tuning load error', err)
@@ -355,8 +426,13 @@ async function loadTuning() {
 async function saveTuning() {
   tuningSaving.value = true
   try {
-    await api.post('/db/mariadb/tuning', tuningForm.value)
-    showNotif('MariaDB Tuning ayarları kaydedildi ve servis yeniden başlatıldı.', 'success')
+    if (tuningEngine.value === 'mariadb') {
+      await api.post('/db/mariadb/tuning', tuningForm.value)
+      showNotif('MariaDB Tuning ayarları kaydedildi ve servis yeniden başlatıldı.', 'success')
+    } else {
+      await api.post('/db/postgresql/tuning', pgTuningForm.value)
+      showNotif('PostgreSQL Tuning ayarları kaydedildi ve servis yeniden başlatıldı.', 'success')
+    }
   } catch (err) {
     showNotif('Tuning kaydedilemedi: ' + err.message, 'error')
   } finally {

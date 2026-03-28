@@ -138,6 +138,12 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.URL.Path == "/api/v1/mail/webmail/sso/verify":
 		s.handleMailWebmailVerify(w, r)
 		return true
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/mail/tuning":
+		s.handleMailTuningGet(w)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/mail/tuning":
+		s.handleMailTuningSet(w, r)
+		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/ftp/list":
 		s.handleTransferList(w, r, "ftp")
 		return true
@@ -149,6 +155,12 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 		return true
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/ftp/delete":
 		s.handleTransferDelete(w, r, "ftp")
+		return true
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/ftp/tuning":
+		s.handleFTPTuningGet(w)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/ftp/tuning":
+		s.handleFTPTuningSet(w, r)
 		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/sftp/list":
 		s.handleTransferList(w, r, "sftp")
@@ -344,6 +356,12 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 		return true
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/db/mariadb/tuning":
 		s.handleMariaDBTuningSet(w, r)
+		return true
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/db/postgresql/tuning":
+		s.handlePostgresTuningGet(w)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/db/postgresql/tuning":
+		s.handlePostgresTuningSet(w, r)
 		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/activity/log":
 		s.handleActivityLog(w)

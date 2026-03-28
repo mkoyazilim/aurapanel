@@ -1,17 +1,77 @@
-﻿<template>
+<template>
   <div class="space-y-6">
     <div class="flex items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold text-white">{{ t('ftp_manager.title') }}</h1>
         <p class="text-gray-400 mt-1">{{ t('ftp_manager.subtitle') }}</p>
       </div>
-      <button class="btn-primary" @click="showCreate = true">{{ t('ftp_manager.add_user') }}</button>
+      <button v-if="activeTab === 'ftp'" class="btn-primary" @click="showCreate = true">{{ t('ftp_manager.add_user') }}</button>
     </div>
 
     <div v-if="error" class="aura-card border-red-500/30 bg-red-500/5 text-red-400">{{ error }}</div>
     <div v-if="success" class="aura-card border-green-500/30 bg-green-500/5 text-green-300">{{ success }}</div>
 
-    <div class="aura-card space-y-4">
+    <!-- Navigation Tabs -->
+    <div class="border-b border-panel-border mb-6">
+      <nav class="flex gap-4">
+        <button
+          @click="activeTab = 'ftp'"
+          :class="['pb-3 text-sm font-medium transition', activeTab === 'ftp' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400 hover:text-white']"
+        >
+          FTP Users
+        </button>
+        <button
+          @click="activeTab = 'tuning'"
+          :class="['pb-3 text-sm font-medium transition', activeTab === 'tuning' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white']"
+        >
+          Tuning & Config
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tuning Tab -->
+    <div v-if="activeTab === 'tuning'" class="space-y-6">
+      <div class="aura-card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Pure-FTPd Tuning</h2>
+            <p class="text-sm text-gray-400">FTP sunucunuzun bağlantı portlarını ve güvenlik seviyelerini yapılandırın.</p>
+          </div>
+          <button class="btn-secondary" @click="loadTuning">Yenile</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Passive Port Range</label>
+            <input v-model="tuningForm.PassivePortRange" type="text" class="aura-input w-full" placeholder="Örn: 30000 30049" />
+            <p class="text-xs text-gray-500 mt-1">FTP pasif bağlantıları için kullanılacak port aralığı.</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Max Clients Number</label>
+            <input v-model="tuningForm.MaxClientsNumber" type="text" class="aura-input w-full" placeholder="Örn: 50" />
+            <p class="text-xs text-gray-500 mt-1">Aynı anda bağlanabilecek maksimum kullanıcı sayısı.</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">TLS Encryption Level</label>
+            <select v-model="tuningForm.TLS" class="aura-input w-full">
+              <option value="0">0 - TLS Kapalı (Sadece düz metin)</option>
+              <option value="1">1 - TLS İsteğe Bağlı</option>
+              <option value="2">2 - TLS Zorunlu (Önerilen)</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Bağlantıların şifrelenme zorunluluğu.</p>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end">
+          <button class="btn-primary" @click="saveTuning" :disabled="tuningSaving">
+            {{ tuningSaving ? 'Kaydediliyor & Restart...' : 'Ayarları Kaydet ve Pure-FTPd\'yi Yeniden Başlat' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FTP Users Tab -->
+    <div v-if="activeTab === 'ftp'" class="aura-card space-y-4">
       <div class="flex flex-col md:flex-row md:items-end gap-3">
         <div class="w-full md:max-w-sm">
           <label class="block text-sm text-gray-400 mb-1">{{ t('ftp_manager.domain_filter') }}</label>
@@ -125,6 +185,45 @@ const success = ref('')
 const showCreate = ref(false)
 const showReset = ref(false)
 const selectedDomain = ref(typeof route.query.domain === 'string' ? route.query.domain : '')
+
+const activeTab = ref('ftp')
+const tuningForm = ref({
+  PassivePortRange: '',
+  MaxClientsNumber: '',
+  TLS: '2'
+})
+const tuningSaving = ref(false)
+
+async function loadTuning() {
+  try {
+    const res = await api.get('/ftp/tuning')
+    if (res.data?.data) {
+      tuningForm.value = { ...tuningForm.value, ...res.data.data }
+    }
+  } catch (err) {
+    console.error('FTP tuning load error', err)
+  }
+}
+
+async function saveTuning() {
+  tuningSaving.value = true
+  try {
+    await api.post('/ftp/tuning', tuningForm.value)
+    success.value = 'Pure-FTPd Tuning ayarları başarıyla kaydedildi ve servis yeniden başlatıldı.'
+    setTimeout(() => { success.value = '' }, 3000)
+  } catch (err) {
+    error.value = 'Hata: ' + (err.response?.data?.message || err.message)
+    setTimeout(() => { error.value = '' }, 3000)
+  } finally {
+    tuningSaving.value = false
+  }
+}
+
+watch(activeTab, (newVal) => {
+  if (newVal === 'tuning') {
+    loadTuning()
+  }
+})
 
 const createForm = ref({
   domain: selectedDomain.value,

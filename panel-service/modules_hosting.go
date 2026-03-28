@@ -266,12 +266,177 @@ func (s *service) handleMariaDBTuningSet(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "MariaDB settings updated and service restarted"})
 }
 
+// PostgreSQL Tuning APIs
+func (s *service) handlePostgresTuningGet(w http.ResponseWriter) {
+	var configPath string
+	matches, _ := filepath.Glob("/etc/postgresql/*/main/postgresql.conf")
+	if len(matches) > 0 {
+		configPath = matches[0]
+	} else {
+		writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: map[string]string{
+			"max_connections": "100",
+			"shared_buffers": "128MB",
+			"work_mem": "4MB",
+			"maintenance_work_mem": "64MB",
+		}})
+		return
+	}
+	
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to read PostgreSQL config")
+		return
+	}
+	
+	lines := strings.Split(string(content), "\n")
+	settings := map[string]string{
+		"max_connections": "100",
+		"shared_buffers": "128MB",
+		"work_mem": "4MB",
+		"maintenance_work_mem": "64MB",
+	}
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		val = strings.Trim(val, "'\"")
+		
+		if idx := strings.Index(val, "#"); idx != -1 {
+			val = strings.TrimSpace(val[:idx])
+		}
+		
+		if _, exists := settings[key]; exists {
+			settings[key] = val
+		}
+	}
+	
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: settings})
+}
+
+func (s *service) handlePostgresTuningSet(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]string
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+	
+	var configPath string
+	matches, _ := filepath.Glob("/etc/postgresql/*/main/postgresql.conf")
+	if len(matches) > 0 {
+		configPath = matches[0]
+	} else {
+		writeError(w, http.StatusInternalServerError, "PostgreSQL config file not found. Ensure PostgreSQL is installed.")
+		return
+	}
+	
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to read config")
+		return
+	}
+	
+	lines := strings.Split(string(content), "\n")
+	updatedLines := make([]string, 0, len(lines))
+	keysHandled := make(map[string]bool)
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		for k, v := range payload {
+			if strings.HasPrefix(trimmed, "#"+k) || strings.HasPrefix(trimmed, "# "+k) {
+				if !keysHandled[k] {
+					updatedLines = append(updatedLines, fmt.Sprintf("%s = '%s'", k, v))
+					keysHandled[k] = true
+					continue
+				}
+			}
+		}
+		
+		if !strings.HasPrefix(trimmed, "#") && strings.Contains(trimmed, "=") {
+			parts := strings.SplitN(trimmed, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			if val, exists := payload[key]; exists {
+				updatedLines = append(updatedLines, fmt.Sprintf("%s = '%s'", key, val))
+				keysHandled[key] = true
+				continue
+			}
+		}
+		updatedLines = append(updatedLines, line)
+	}
+	
+	for k, v := range payload {
+		if !keysHandled[k] {
+			updatedLines = append(updatedLines, fmt.Sprintf("%s = '%s'", k, v))
+		}
+	}
+	
+	err = os.WriteFile(configPath, []byte(strings.Join(updatedLines, "\n")), 0644)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to write config")
+		return
+	}
+	
+	_ = exec.Command("systemctl", "restart", "postgresql").Run()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "PostgreSQL settings updated and service restarted"})
+}
+
 func (s *service) handleWebsiteAdvancedConfigGet(w http.ResponseWriter, r *http.Request) {
 	domain := normalizeDomain(r.URL.Query().Get("domain"))
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	s.ensureDefaultSiteArtifactsLocked(domain)
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.state.AdvancedConfig[domain]})
+}
+
+// Mail Tuning APIs (Postfix & Dovecot)
+func (s *service) handleMailTuningGet(w http.ResponseWriter) {
+	settings := map[string]string{
+		"message_size_limit": "10485760", // 10MB default
+		"mailbox_size_limit": "51200000", // 50MB default
+		"smtpd_client_connection_count_limit": "50",
+	}
+	
+	// Read Postfix main.cf
+	if content, err := os.ReadFile("/etc/postfix/main.cf"); err == nil {
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			val := strings.TrimSpace(parts[1])
+			if _, exists := settings[key]; exists {
+				settings[key] = val
+			}
+		}
+	}
+	
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: settings})
+}
+
+func (s *service) handleMailTuningSet(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]string
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+	
+	// Apply to Postfix using postconf
+	for k, v := range payload {
+		if k == "message_size_limit" || k == "mailbox_size_limit" || k == "smtpd_client_connection_count_limit" {
+			_ = exec.Command("postconf", "-e", fmt.Sprintf("%s=%s", k, v)).Run()
+		}
+	}
+	
+	_ = exec.Command("systemctl", "restart", "postfix").Run()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Mail server settings updated and Postfix restarted"})
 }
 
 func (s *service) handleWebsiteCustomSSLGet(w http.ResponseWriter, r *http.Request) {
@@ -1204,6 +1369,44 @@ func (s *service) handleTransferDelete(w http.ResponseWriter, r *http.Request, k
 	items := s.transferAccountsLocked(kind)
 	*items = removeTransferAccountByUsername(*items, key)
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: strings.ToUpper(kind) + " account deleted."})
+}
+
+// Pure-FTPd Tuning APIs
+func (s *service) handleFTPTuningGet(w http.ResponseWriter) {
+	settings := map[string]string{
+		"PassivePortRange": "30000 30049", // default
+		"TLS": "2", // 2=TLS required, 1=TLS optional, 0=No TLS
+		"MaxClientsNumber": "50",
+	}
+	
+	// Read Pure-FTPd conf files which are stored as individual files per setting in /etc/pure-ftpd/conf/
+	for key := range settings {
+		path := filepath.Join("/etc/pure-ftpd/conf", key)
+		if content, err := os.ReadFile(path); err == nil {
+			settings[key] = strings.TrimSpace(string(content))
+		}
+	}
+	
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: settings})
+}
+
+func (s *service) handleFTPTuningSet(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]string
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+	
+	for key, value := range payload {
+		// Basic validation to prevent arbitrary file writes
+		if key == "PassivePortRange" || key == "TLS" || key == "MaxClientsNumber" {
+			path := filepath.Join("/etc/pure-ftpd/conf", key)
+			_ = os.WriteFile(path, []byte(strings.TrimSpace(value)+"\n"), 0644)
+		}
+	}
+	
+	_ = exec.Command("systemctl", "restart", "pure-ftpd").Run()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "FTP settings updated and service restarted"})
 }
 
 func (s *service) handleCronJobsList(w http.ResponseWriter) {

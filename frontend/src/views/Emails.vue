@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="space-y-6">
     <div class="flex items-center justify-between gap-3">
       <div>
@@ -14,10 +14,48 @@
         <button @click="tab='forwards'" :class="tabClass('forwards')">{{ t('email_manager.tabs.forwards') }}</button>
         <button @click="tab='routing'" :class="tabClass('routing')">{{ t('email_manager.tabs.routing') }}</button>
         <button @click="tab='dkim'" :class="tabClass('dkim')">{{ t('email_manager.tabs.dkim') }}</button>
+        <button @click="tab='tuning'" :class="tabClass('tuning')">Tuning & Config</button>
       </nav>
     </div>
 
     <div v-if="error" class="aura-card border-red-500/30 bg-red-500/5 text-red-400">{{ error }}</div>
+
+    <!-- Tuning Tab -->
+    <div v-if="tab === 'tuning'" class="space-y-6">
+      <div class="aura-card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Mail Server (Postfix) Tuning</h2>
+            <p class="text-sm text-gray-400">Posta sunucunuzun bağlantı limitlerini ve boyut kısıtlamalarını yönetin.</p>
+          </div>
+          <button class="btn-secondary" @click="loadTuning">Yenile</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Message Size Limit (Maks Ek Boyutu - Byte)</label>
+            <input v-model="tuningForm.message_size_limit" type="text" class="aura-input w-full" placeholder="Örn: 10485760 (10MB)" />
+            <p class="text-xs text-gray-500 mt-1">Gelen/giden e-postanın toplam maksimum boyutu. (Örn 10MB = 10485760)</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Mailbox Size Limit (Byte)</label>
+            <input v-model="tuningForm.mailbox_size_limit" type="text" class="aura-input w-full" placeholder="Örn: 51200000 (50MB)" />
+            <p class="text-xs text-gray-500 mt-1">Sanal posta kutularının (eğer panel limiti 0 ise) varsayılan limiti.</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Max Client Connections (smtpd_client_connection_count_limit)</label>
+            <input v-model="tuningForm.smtpd_client_connection_count_limit" type="text" class="aura-input w-full" placeholder="Örn: 50" />
+            <p class="text-xs text-gray-500 mt-1">Tek bir IP'den yapılabilecek eşzamanlı bağlantı sayısı. (Spam koruması)</p>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end">
+          <button class="btn-primary" @click="saveTuning" :disabled="tuningSaving">
+            {{ tuningSaving ? 'Kaydediliyor & Restart...' : 'Ayarları Kaydet ve Postfix\'i Yeniden Başlat' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="tab === 'mailboxes'" class="space-y-4">
       <div class="flex items-center justify-between">
@@ -181,7 +219,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
 
@@ -190,6 +228,42 @@ const { t } = useI18n({ useScope: 'global' })
 const tab = ref('mailboxes')
 const error = ref('')
 const showAddModal = ref(false)
+
+const tuningForm = ref({
+  message_size_limit: '',
+  mailbox_size_limit: '',
+  smtpd_client_connection_count_limit: ''
+})
+const tuningSaving = ref(false)
+
+async function loadTuning() {
+  try {
+    const res = await api.get('/mail/tuning')
+    if (res.data?.data) {
+      tuningForm.value = { ...tuningForm.value, ...res.data.data }
+    }
+  } catch (err) {
+    console.error('Mail tuning load error', err)
+  }
+}
+
+async function saveTuning() {
+  tuningSaving.value = true
+  try {
+    await api.post('/mail/tuning', tuningForm.value)
+    alert('Postfix Tuning ayarları başarıyla kaydedildi ve servis yeniden başlatıldı.')
+  } catch (err) {
+    alert('Hata: ' + (err.response?.data?.message || err.message))
+  } finally {
+    tuningSaving.value = false
+  }
+}
+
+watch(tab, (newVal) => {
+  if (newVal === 'tuning') {
+    loadTuning()
+  }
+})
 
 const mailboxes = ref([])
 const forwards = ref([])
