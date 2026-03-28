@@ -447,6 +447,12 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/perf/redis":
 		s.handleRedisIsolation(w, r)
 		return true
+	case r.URL.Path == "/api/v1/security/fail2ban/list":
+		s.handleFail2banList(w)
+		return true
+	case r.URL.Path == "/api/v1/security/fail2ban/unban":
+		s.handleFail2banUnban(w, r)
+		return true
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/live-patch":
 		s.handleSecurityLivePatch(w, r)
 		return true
