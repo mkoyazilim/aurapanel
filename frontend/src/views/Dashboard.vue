@@ -4,6 +4,22 @@
       {{ error }}
     </div>
 
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div
+        v-for="card in serverStatusCards"
+        :key="card.name"
+        class="aura-card border border-panel-border/80 bg-panel-card/95 min-h-[148px]"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-sm text-gray-400">{{ card.name }}</div>
+          <component :is="card.icon" class="w-5 h-5" :class="card.iconColor" />
+        </div>
+        <div class="text-4xl font-bold text-white tracking-tight">{{ card.value }}</div>
+        <div class="mt-3 text-xs text-gray-500">{{ card.detail }}</div>
+        <div v-if="card.subdetail" class="mt-1 text-xs text-gray-500">{{ card.subdetail }}</div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <div v-for="stat in stats" :key="stat.name" class="aura-card hover:translate-y-[-2px]">
         <div class="flex items-center justify-between mb-4">
@@ -57,7 +73,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Server, Globe, Database, ShieldCheck, Activity } from 'lucide-vue-next'
+import { Server, Globe, Database, ShieldCheck, Activity, Cpu, MemoryStick, HardDrive, Clock } from 'lucide-vue-next'
 import api from '../services/api'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -66,6 +82,12 @@ const loading = ref(false)
 const error = ref('')
 const uptimeHuman = ref(t('dashboard.na'))
 const loadAvg = ref(t('dashboard.na'))
+const serverStatusCards = ref([
+  { name: t('server_status.cpu'), value: '0%', detail: t('dashboard.na'), subdetail: '', icon: Cpu, iconColor: 'text-blue-400' },
+  { name: t('server_status.ram'), value: '0%', detail: t('dashboard.na'), subdetail: '', icon: MemoryStick, iconColor: 'text-green-400' },
+  { name: t('server_status.disk'), value: '0%', detail: t('dashboard.na'), subdetail: '', icon: HardDrive, iconColor: 'text-fuchsia-400' },
+  { name: t('server_status.uptime'), value: t('dashboard.na'), detail: t('dashboard.na'), subdetail: '', icon: Clock, iconColor: 'text-orange-400' },
+])
 
 const stats = ref([
   { name: t('dashboard.stats.active_websites'), value: '0', icon: Globe, iconColor: 'text-blue-400', trend: 0 },
@@ -80,6 +102,12 @@ function summarizeTime(value) {
   if (!value) return t('dashboard.na')
   const text = String(value)
   return text.length > 28 ? `${text.slice(0, 28)}...` : text
+}
+
+function summarizeLine(value, max = 42) {
+  if (!value) return t('dashboard.na')
+  const text = String(value)
+  return text.length > max ? `${text.slice(0, max)}...` : text
 }
 
 async function loadDashboard() {
@@ -114,12 +142,47 @@ async function loadDashboard() {
     loadAvg.value = metrics.load_avg || t('dashboard.na')
 
     const runningServices = services.filter(s => String(s.status).toLowerCase() === 'running').length
+    const uptimeDays = Math.floor(Number(metrics.uptime_seconds || 0) / 86400)
 
     stats.value = [
       { name: t('dashboard.stats.active_websites'), value: String(websites.length), icon: Globe, iconColor: 'text-blue-400', trend: 0 },
       { name: t('dashboard.stats.server_uptime'), value: summarizeTime(metrics.uptime_human), icon: Server, iconColor: 'text-brand-400', trend: 0 },
       { name: t('dashboard.stats.databases'), value: String(mariaDbs.length + pgDbs.length), icon: Database, iconColor: 'text-orange-400', trend: 0 },
       { name: t('dashboard.stats.threats_blocked'), value: String(ebpfEvents.length), icon: ShieldCheck, iconColor: 'text-red-400', trend: 0 },
+    ]
+    serverStatusCards.value = [
+      {
+        name: t('server_status.cpu'),
+        value: `${Math.round(Number(metrics.cpu_usage || 0))}%`,
+        detail: summarizeLine(`${metrics.cpu_cores || 0} core / ${metrics.cpu_model || t('dashboard.na')}`),
+        subdetail: '',
+        icon: Cpu,
+        iconColor: 'text-blue-400',
+      },
+      {
+        name: t('server_status.ram'),
+        value: `${Math.round(Number(metrics.ram_usage || 0))}%`,
+        detail: summarizeLine(`${metrics.ram_used || t('dashboard.na')} / ${metrics.ram_total || t('dashboard.na')}`),
+        subdetail: '',
+        icon: MemoryStick,
+        iconColor: 'text-green-400',
+      },
+      {
+        name: t('server_status.disk'),
+        value: `${Math.round(Number(metrics.disk_usage || 0))}%`,
+        detail: summarizeLine(`${metrics.disk_used || t('dashboard.na')} / ${metrics.disk_total || t('dashboard.na')}`),
+        subdetail: '',
+        icon: HardDrive,
+        iconColor: 'text-fuchsia-400',
+      },
+      {
+        name: t('server_status.uptime'),
+        value: `${uptimeDays}d`,
+        detail: summarizeLine(metrics.uptime_human || t('dashboard.na')),
+        subdetail: t('server_status.load_avg', { value: metrics.load_avg || t('dashboard.na') }),
+        icon: Clock,
+        iconColor: 'text-orange-400',
+      },
     ]
 
     const serviceLog = services.slice(0, 2).map((service, index) => ({
