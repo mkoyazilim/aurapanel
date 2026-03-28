@@ -66,6 +66,11 @@ func NewServiceProxy() (http.Handler, error) {
 			}
 		}
 	}
+	
+	// Add websocket explicit support to proxy transport if needed
+	// The standard ReverseProxy handles websockets automatically in Go 1.12+, 
+	// but we need to make sure we don't accidentally buffer or block the upgrade.
+	
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)

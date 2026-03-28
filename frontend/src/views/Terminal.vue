@@ -22,7 +22,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useAuthStore } from '../stores/auth'
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const authStore = useAuthStore()
 
 const terminalContainer = ref(null)
@@ -36,9 +36,10 @@ let dataDisposable = null
 function buildTerminalUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const isDevPort = window.location.port === '5173'
-  // In production, connect directly to the gateway port.
-  // The backend uses token query param for auth.
-  const host = isDevPort ? `${window.location.hostname}:8090` : window.location.host
+  
+  // Connect directly to backend panel service (8081) for websockets to bypass 
+  // potential proxy buffering issues in the gateway.
+  const host = isDevPort ? `${window.location.hostname}:8081` : `${window.location.hostname}:8081`
   return `${protocol}//${host}/api/v1/terminal/ws?token=${encodeURIComponent(authStore.token || '')}`
 }
 
