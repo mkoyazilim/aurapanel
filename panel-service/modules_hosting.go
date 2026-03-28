@@ -1993,6 +1993,9 @@ func (s *service) handleSSLHostnameIssue(w http.ResponseWriter, r *http.Request)
 	s.modules.SSLBindings.UpdatedAt = time.Now().UTC().Unix()
 	s.modules.SSLCertificates[domain] = inspectCertificate(domain)
 	s.mu.Unlock()
+	
+	s.saveRuntimeState()
+	
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: fmt.Sprintf("Hostname SSL issued for %s.", domain)})
 }
 
@@ -2044,6 +2047,9 @@ func (s *service) handleSSLMailIssue(w http.ResponseWriter, r *http.Request) {
 	s.modules.SSLBindings.UpdatedAt = time.Now().UTC().Unix()
 	s.modules.SSLCertificates[domain] = inspectCertificate(domain)
 	s.mu.Unlock()
+	
+	s.saveRuntimeState()
+	
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: fmt.Sprintf("Mail SSL issued for %s.", domain)})
 }
 

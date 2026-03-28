@@ -9,7 +9,7 @@ const defaultBaseUrl = typeof window !== 'undefined'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || defaultBaseUrl,
-  timeout: 10000,
+  timeout: 60000, // Increased timeout to 60 seconds for long running tasks like SSL issuance
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
