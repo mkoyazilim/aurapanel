@@ -20,9 +20,9 @@ Bu belge, AuraPanel'in sektör devleriyle (cPanel, Plesk, CyberPanel) tam rekabe
 - [x] **Frontend (Vue3):** `Xterm.js` kütüphanesinin projeye dahil edilmesi ve Dashboard/Websites menüsünde "Terminal" penceresinin kodlanması.
 
 ## 🚚 Modül 4: Kapsamlı Taşıma (Migration) Aracı
-- [x] **Backend (Rust):** Yüklenen `cpmove-*.tar.gz` (cPanel) yedeğini analiz edecek ve ayrıştıracak (parse) modülün yazılması.
-- [x] **Backend (Rust):** cPanel MySQL dump'larının MariaDB'ye, Email hesaplarının MailManager'a, VHost dosyalarının NitroEngine'e dönüştürülüp import edilmesi.
-- [x] **Backend (Rust):** CyberPanel yedek yapısı için benzer dönüştürücü (Converter) fonksiyonlarının eklenmesi.
+- [x] **Backend:** Yüklenen `cpmove-*.tar.gz` (cPanel) yedeğini analiz edecek ve ayrıştıracak (parse) modülün yazılması.
+- [x] **Backend:** cPanel MySQL dump'larının MariaDB'ye, email hesaplarının MailManager'a ve VHost dosyalarının mevcut servis katmanına dönüştürülüp import edilmesi.
+- [x] **Backend:** CyberPanel yedek yapısı için benzer dönüştürücü (Converter) fonksiyonlarının eklenmesi.
 - [x] **Frontend (Vue3):** "Migration / Taşıma Sihirbazı" arayüzünün oluşturulması (Yükleme çubuğu, log izleme ve durum bildirimleri).
 
 ## 📊 Modül 5: Gelişmiş Trafik ve İstatistikler (Analytics)

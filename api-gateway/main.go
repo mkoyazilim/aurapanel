@@ -31,9 +31,9 @@ func main() {
 		log.Fatalf("security configuration error: %v", err)
 	}
 
-	coreProxy, err := controllers.NewCoreProxy()
+	serviceProxy, err := controllers.NewServiceProxy()
 	if err != nil {
-		log.Fatalf("failed to initialize core proxy: %v", err)
+		log.Fatalf("failed to initialize service proxy: %v", err)
 	}
 
 	publicMux := http.NewServeMux()
@@ -48,13 +48,14 @@ func main() {
 		})
 	})
 	publicMux.HandleFunc("/api/auth/login", controllers.Login)
-	// v1 login is delegated to core to support role-based auth accounts.
-	publicMux.Handle("/api/v1/auth/login", coreProxy)
+	// v1 login is delegated to the panel service to support dynamic role accounts.
+	publicMux.Handle("/api/v1/auth/login", serviceProxy)
 	// Roundcube SSO bridge consumes one-time token without panel bearer auth.
-	publicMux.Handle("/api/v1/mail/webmail/sso/consume", coreProxy)
+	publicMux.Handle("/api/v1/mail/webmail/sso/consume", serviceProxy)
 
 	// Protected auth/me routes
 	protectedMux.HandleFunc("/api/auth/me", controllers.Me)
+	protectedMux.HandleFunc("/api/v1/auth/me", controllers.Me)
 
 	// Legacy compatibility routes
 	protectedMux.HandleFunc("/api/system/status", handlers.GetSystemStatus)
@@ -71,8 +72,8 @@ func main() {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	})
 
-	// Main proxy surface for frontend/core communication
-	protectedMux.Handle("/api/v1/", coreProxy)
+	// Main proxy surface for frontend/service communication
+	protectedMux.Handle("/api/v1/", serviceProxy)
 
 	publicHandler := middleware.RequestIDMiddleware(
 		middleware.CorsMiddleware(
@@ -99,6 +100,7 @@ func main() {
 
 	// Protected
 	mainRouter.Handle("/api/auth/me", protectedHandler)
+	mainRouter.Handle("/api/v1/auth/me", protectedHandler)
 	mainRouter.Handle("/api/system/", protectedHandler)
 	mainRouter.Handle("/api/websites", protectedHandler)
 	mainRouter.Handle("/api/v1/", protectedHandler)

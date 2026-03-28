@@ -5,7 +5,7 @@
 ### Added
 - Website lifecycle parity updates including `/vhost/update` and advanced website controls.
 - DNS reconciliation and DNSSEC workflow endpoints.
-- Guided website/database flow with AuraDB secure bridge endpoints.
+- Guided website/database flow endpoints.
 - Mail operational endpoints for forwards, catch-all, routing, DKIM, and webmail SSO.
 - SFTP parity endpoints (`list`, `delete`, `password reset`) and state-backed management.
 - Backup restore endpoint and hardened storage/minio flow.

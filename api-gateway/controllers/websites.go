@@ -12,8 +12,8 @@ type BaseResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-func forwardCore(w http.ResponseWriter, r *http.Request, method, path string, body io.Reader) {
-	req, err := http.NewRequest(method, coreBaseURL()+path, body)
+func forwardService(w http.ResponseWriter, r *http.Request, method, path string, body io.Reader) {
+	req, err := http.NewRequest(method, serviceBaseURL()+path, body)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, BaseResponse{Status: "error", Message: err.Error()})
 		return
@@ -26,7 +26,7 @@ func forwardCore(w http.ResponseWriter, r *http.Request, method, path string, bo
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, BaseResponse{Status: "error", Message: "Core API request failed: " + err.Error()})
+		writeJSON(w, http.StatusBadGateway, BaseResponse{Status: "error", Message: "Service API request failed: " + err.Error()})
 		return
 	}
 	defer resp.Body.Close()
@@ -36,17 +36,17 @@ func forwardCore(w http.ResponseWriter, r *http.Request, method, path string, bo
 	_, _ = io.Copy(w, resp.Body)
 }
 
-// ListWebsites proxies website list to Rust Core.
+// ListWebsites proxies website list to the panel service.
 func ListWebsites(w http.ResponseWriter, r *http.Request) {
-	forwardCore(w, r, http.MethodGet, "/api/v1/vhost/list", nil)
+	forwardService(w, r, http.MethodGet, "/api/v1/vhost/list", nil)
 }
 
-// CreateWebsite proxies website creation to Rust Core.
+// CreateWebsite proxies website creation to the panel service.
 func CreateWebsite(w http.ResponseWriter, r *http.Request) {
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, BaseResponse{Status: "error", Message: "invalid body"})
 		return
 	}
-	forwardCore(w, r, http.MethodPost, "/api/v1/vhost", bytes.NewReader(payload))
+	forwardService(w, r, http.MethodPost, "/api/v1/vhost", bytes.NewReader(payload))
 }

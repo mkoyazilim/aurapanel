@@ -9,11 +9,8 @@ pnpm-debug.log*
 
 # Go
 api-gateway.exe
+panel-service.exe
 *.exe
-
-# Rust
-target/
-Cargo.lock
 
 # Environment
 .env.local

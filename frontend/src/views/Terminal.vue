@@ -30,6 +30,15 @@ const connected = ref(false)
 let term = null
 let fitAddon = null
 let ws = null
+let resizeHandler = null
+let dataDisposable = null
+
+function buildTerminalUrl() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const isDevPort = window.location.port === '5173'
+  const host = isDevPort ? `${window.location.hostname}:8090` : window.location.host
+  return `${protocol}//${host}/api/v1/terminal/ws?token=${encodeURIComponent(authStore.token || '')}`
+}
 
 function connectTerminal() {
   if (connected.value) return;
@@ -46,10 +55,18 @@ function connectTerminal() {
     term.loadAddon(fitAddon);
     term.open(terminalContainer.value);
     fitAddon.fit();
+    dataDisposable = term.onData(data => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+      }
+    });
+    resizeHandler = () => {
+      if (fitAddon) fitAddon.fit();
+    };
+    window.addEventListener('resize', resizeHandler);
   }
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/api/v1/terminal/ws?token=${authStore.token}`;
+  const wsUrl = buildTerminalUrl();
   
   term.writeln(t('terminal.connecting'));
   
@@ -68,16 +85,6 @@ function connectTerminal() {
     connected.value = false;
     term.writeln('\r\n' + t('terminal.disconnected') + '\r\n');
   };
-
-  term.onData(data => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    if (fitAddon) fitAddon.fit();
-  });
 }
 
 onMounted(() => {
@@ -86,6 +93,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (ws) ws.close();
+  if (dataDisposable) dataDisposable.dispose();
+  if (resizeHandler) window.removeEventListener('resize', resizeHandler);
   if (term) term.dispose();
 });
 </script>

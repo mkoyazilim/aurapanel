@@ -153,13 +153,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, status int, code, messag
 // AuthMiddleware validates JWT coming from headers.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			WriteError(w, r, http.StatusUnauthorized, "AUTH_MISSING_TOKEN", "Authorization token is required")
-			return
-		}
-
-		tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		tokenString := extractToken(r)
 		if tokenString == "" {
 			WriteError(w, r, http.StatusUnauthorized, "AUTH_MISSING_TOKEN", "Authorization token is required")
 			return
@@ -199,6 +193,28 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func extractToken(r *http.Request) string {
+	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+	}
+
+	if isWebsocketUpgrade(r) {
+		return strings.TrimSpace(r.URL.Query().Get("token"))
+	}
+
+	return ""
+}
+
+func isWebsocketUpgrade(r *http.Request) bool {
+	if strings.HasSuffix(strings.TrimSpace(r.URL.Path), "/terminal/ws") {
+		return true
+	}
+	upgrade := strings.ToLower(strings.TrimSpace(r.Header.Get("Upgrade")))
+	connection := strings.ToLower(strings.TrimSpace(r.Header.Get("Connection")))
+	return upgrade == "websocket" || strings.Contains(connection, "upgrade")
 }
 
 func GetAuthUser(ctx context.Context) (AuthUser, bool) {

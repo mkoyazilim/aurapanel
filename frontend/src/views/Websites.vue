@@ -242,9 +242,6 @@
               <td class="py-3 px-2 text-gray-400">{{ formatUnix(l.linked_at) }}</td>
               <td class="py-3 px-2 text-right">
                 <div class="flex justify-end gap-2">
-                  <button class="btn-secondary px-2 py-1" @click="openAuraDbForLink(l)">
-                    AuraDB
-                  </button>
                   <button class="btn-danger px-2 py-1" @click="detachDbLink(l)">
                     <Trash2 class="w-4 h-4" />
                   </button>
@@ -1189,23 +1186,6 @@ async function detachDbLink(link) {
     await loadDbLinks()
   } catch (e) {
     error.value = apiErrorMessage(e, 'DB baglantisi kaldirilamadi')
-  }
-}
-
-async function openAuraDbForLink(link) {
-  error.value = ''
-  try {
-    const res = await api.post('/db/explorer/bridge', {
-      domain: link.domain,
-      engine: link.engine,
-      db_name: link.db_name,
-      db_user: link.db_user,
-    })
-    const url = res.data?.data?.url
-    if (!url) throw new Error('AuraDB bridge URL bulunamadi')
-    router.push(url)
-  } catch (e) {
-    error.value = apiErrorMessage(e, 'AuraDB bridge baslatilamadi')
   }
 }
 

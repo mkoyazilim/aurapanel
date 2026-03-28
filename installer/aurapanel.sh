@@ -14,7 +14,7 @@ NC='\033[0m'
 PROJECT_DIR="/opt/aurapanel"
 GATEWAY_ENV_DIR="/etc/aurapanel"
 GATEWAY_ENV_FILE="${GATEWAY_ENV_DIR}/aurapanel.env"
-CORE_ENV_FILE="${GATEWAY_ENV_DIR}/aurapanel-core.env"
+SERVICE_ENV_FILE="${GATEWAY_ENV_DIR}/aurapanel-service.env"
 OLS_ADMIN_STATE_FILE="${GATEWAY_ENV_DIR}/aurapanel-ols-admin.env"
 MINIO_ENV_FILE="/etc/default/minio"
 CREDENTIALS_SUMMARY_FILE="/root/aurapanel_credentials.txt"
@@ -30,7 +30,6 @@ SOURCE_ARCHIVE_SHA256_URL="${AURAPANEL_SOURCE_ARCHIVE_SHA256_URL:-${SOURCE_ARCHI
 AURAPANEL_ALLOW_GIT_FALLBACK="${AURAPANEL_ALLOW_GIT_FALLBACK:-1}"
 
 NODE_SETUP_URL="${AURAPANEL_NODE_SETUP_URL:-https://deb.nodesource.com/setup_20.x}"
-RUSTUP_INIT_SCRIPT_URL="${AURAPANEL_RUSTUP_INIT_SCRIPT_URL:-https://sh.rustup.rs}"
 GO_VERSION="${AURAPANEL_GO_VERSION:-1.22.1}"
 GO_TARBALL="go${GO_VERSION}.linux-amd64.tar.gz"
 GO_TARBALL_URL="${AURAPANEL_GO_TARBALL_URL:-https://go.dev/dl/${GO_TARBALL}}"
@@ -385,8 +384,8 @@ EOF
 
   chown -R "${webmail_owner}:${webmail_group}" "${webmail_dir}" >/dev/null 2>&1 || true
   chmod 750 "${webmail_dir}/logs" "${webmail_dir}/temp" >/dev/null 2>&1 || true
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
-  delete_env "${CORE_ENV_FILE}" "AURAPANEL_WEBMAIL_BASE_URL"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
+  delete_env "${SERVICE_ENV_FILE}" "AURAPANEL_WEBMAIL_BASE_URL"
 
   rm -rf "${tmpdir}"
   ok "Roundcube setup completed at ${webmail_dir}"
@@ -477,18 +476,6 @@ ensure_node20() {
   curl -fsSL "${NODE_SETUP_URL}" | bash -
   install_packages nodejs
   ok "Node.js installed: $(node -v)"
-}
-
-ensure_rust() {
-  log "Ensuring Rust toolchain..."
-  if ! command -v cargo >/dev/null 2>&1; then
-    curl --proto '=https' --tlsv1.2 -sSf "${RUSTUP_INIT_SCRIPT_URL}" | sh -s -- -y
-  fi
-
-  if [ -f "${HOME}/.cargo/env" ]; then
-    # shellcheck disable=SC1090
-    source "${HOME}/.cargo/env"
-  fi
 }
 
 ensure_go() {
@@ -824,10 +811,12 @@ ensure_minio_binaries() {
   fi
 }
 
-write_core_env_defaults() {
+write_service_env_defaults() {
   mkdir -p "${GATEWAY_ENV_DIR}" "${PROJECT_DIR}/logs"
   chmod 700 "${GATEWAY_ENV_DIR}"
   local shared_jwt_secret=""
+  local legacy_gateway_core_url_key="AURAPANEL_""CORE_URL"
+  local legacy_service_bind_key="AURAPANEL_""CORE_BIND_ADDR"
 
   if [ ! -f "${GATEWAY_ENV_FILE}" ]; then
     local admin_pass jwt_secret
@@ -842,7 +831,7 @@ AURAPANEL_JWT_SECRET=${jwt_secret}
 AURAPANEL_JWT_ISSUER=aurapanel-gateway
 AURAPANEL_JWT_AUDIENCE=aurapanel-ui
 AURAPANEL_ALLOWED_ORIGINS=http://127.0.0.1:${PANEL_PORT_DEFAULT},http://localhost:${PANEL_PORT_DEFAULT}
-AURAPANEL_CORE_URL=http://127.0.0.1:8000
+AURAPANEL_SERVICE_URL=http://127.0.0.1:8081
 AURAPANEL_GATEWAY_ONLY=1
 AURAPANEL_GATEWAY_ADDR=:${PANEL_PORT_DEFAULT}
 AURAPANEL_PANEL_DIST=/opt/aurapanel/frontend/dist
@@ -858,18 +847,18 @@ EOF
     shared_jwt_secret="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_JWT_SECRET")"
   fi
 
-  if [ ! -f "${CORE_ENV_FILE}" ]; then
+  if [ ! -f "${SERVICE_ENV_FILE}" ]; then
     local restic_pass minio_access minio_secret
     restic_pass="$(openssl rand -hex 24 | tr -d '\n')"
     minio_access="backup$(openssl rand -hex 3 | tr -d '\n')"
     minio_secret="$(openssl rand -hex 24 | tr -d '\n')"
 
-    cat <<EOF > "${CORE_ENV_FILE}"
+    cat <<EOF > "${SERVICE_ENV_FILE}"
 AURAPANEL_RUNTIME_MODE=production
 AURAPANEL_SECURITY_POLICY=fail-closed
 AURAPANEL_GATEWAY_ONLY=1
 AURAPANEL_JWT_SECRET=${shared_jwt_secret}
-AURAPANEL_CORE_BIND_ADDR=127.0.0.1:8000
+AURAPANEL_SERVICE_ADDR=127.0.0.1:8081
 AURAPANEL_FEDERATION_MODE=active-passive
 AURAPANEL_FEDERATION_PRIMARY=1
 AURAPANEL_BACKUP_TARGET=internal-minio
@@ -884,41 +873,43 @@ AURAPANEL_MAIL_VMAIL_GID=5000
 AURAPANEL_MAIL_VMAIL_BASE=/var/mail/vhosts
 EOF
 
-    chmod 600 "${CORE_ENV_FILE}"
+    chmod 600 "${SERVICE_ENV_FILE}"
   fi
 
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_GATEWAY_ONLY" "1"
-  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_CORE_URL" "http://127.0.0.1:8000"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_SERVICE_URL" "http://127.0.0.1:8081"
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_GATEWAY_ADDR" ":${PANEL_PORT_DEFAULT}"
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_PANEL_DIST" "${PROJECT_DIR}/frontend/dist"
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_ALLOWED_ORIGINS" "http://127.0.0.1:${PANEL_PORT_DEFAULT},http://localhost:${PANEL_PORT_DEFAULT}"
+  delete_env "${GATEWAY_ENV_FILE}" "${legacy_gateway_core_url_key}"
 
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_RUNTIME_MODE" "production"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_SECURITY_POLICY" "fail-closed"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_GATEWAY_ONLY" "1"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_RUNTIME_MODE" "production"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_SECURITY_POLICY" "fail-closed"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_GATEWAY_ONLY" "1"
   if [ -n "${shared_jwt_secret}" ]; then
-    upsert_env "${CORE_ENV_FILE}" "AURAPANEL_JWT_SECRET" "${shared_jwt_secret}"
+    upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_JWT_SECRET" "${shared_jwt_secret}"
   fi
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_CORE_BIND_ADDR" "127.0.0.1:8000"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_FEDERATION_MODE" "active-passive"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_FEDERATION_PRIMARY" "1"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_BACKUP_TARGET" "internal-minio"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_ENDPOINT" "http://127.0.0.1:9000"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_BUCKET" "aurapanel-backups"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
-  delete_env "${CORE_ENV_FILE}" "AURAPANEL_WEBMAIL_BASE_URL"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_UID" "5000"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_GID" "5000"
-  upsert_env "${CORE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_BASE" "/var/mail/vhosts"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_SERVICE_ADDR" "127.0.0.1:8081"
+  delete_env "${SERVICE_ENV_FILE}" "${legacy_service_bind_key}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_FEDERATION_MODE" "active-passive"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_FEDERATION_PRIMARY" "1"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_TARGET" "internal-minio"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_ENDPOINT" "http://127.0.0.1:9000"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_BUCKET" "aurapanel-backups"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
+  delete_env "${SERVICE_ENV_FILE}" "AURAPANEL_WEBMAIL_BASE_URL"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_UID" "5000"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_GID" "5000"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_BASE" "/var/mail/vhosts"
 
-  chmod 600 "${GATEWAY_ENV_FILE}" "${CORE_ENV_FILE}"
+  chmod 600 "${GATEWAY_ENV_FILE}" "${SERVICE_ENV_FILE}"
 }
 
 configure_minio_service() {
   ensure_minio_binaries
 
   # shellcheck disable=SC1090
-  source "${CORE_ENV_FILE}"
+  source "${SERVICE_ENV_FILE}"
 
   id -u minio-user >/dev/null 2>&1 || useradd --system --home /var/lib/minio --shell /sbin/nologin minio-user
   mkdir -p /var/lib/minio /etc/minio
@@ -982,13 +973,14 @@ sync_project() {
   log "Preparing project directory at ${PROJECT_DIR}..."
   mkdir -p "${PROJECT_DIR}"
 
-  if [ -d "$(pwd)/core" ] && [ -d "$(pwd)/api-gateway" ] && [ -d "$(pwd)/frontend" ]; then
+  if [ -d "$(pwd)/panel-service" ] && [ -d "$(pwd)/api-gateway" ] && [ -d "$(pwd)/frontend" ]; then
     log "Copying current workspace into ${PROJECT_DIR}..."
     rsync -a --delete \
       --exclude '.git' \
-      --exclude 'core/target' \
       --exclude 'frontend/node_modules' \
       --exclude 'api-gateway/apigw' \
+      --exclude 'panel-service/panel-service' \
+      --exclude 'panel-service/panel-service.exe' \
       "$(pwd)/" "${PROJECT_DIR}/"
   else
     if [ "${AURAPANEL_INSTALL_SOURCE:-archive}" = "archive" ]; then
@@ -1040,9 +1032,10 @@ sync_project() {
 }
 
 build_components() {
-  log "Building Rust core..."
-  cd "${PROJECT_DIR}/core"
-  cargo build --release
+  log "Building Go panel service..."
+  cd "${PROJECT_DIR}/panel-service"
+  /usr/local/go/bin/go mod tidy
+  /usr/local/go/bin/go build -o panel-service .
 
   log "Building Go API gateway..."
   cd "${PROJECT_DIR}/api-gateway"
@@ -1058,19 +1051,18 @@ build_components() {
 configure_systemd_services() {
   log "Configuring systemd services..."
 
-  cat <<EOF > /etc/systemd/system/aurapanel-core.service
+  cat <<EOF > /etc/systemd/system/aurapanel-service.service
 [Unit]
-Description=AuraPanel Core (Rust)
+Description=AuraPanel Panel Service (Go)
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=${PROJECT_DIR}/core
-ExecStart=${PROJECT_DIR}/core/target/release/aurapanel-core
+WorkingDirectory=${PROJECT_DIR}/panel-service
+ExecStart=${PROJECT_DIR}/panel-service/panel-service
 Restart=on-failure
-Environment=RUST_LOG=info
-EnvironmentFile=-${CORE_ENV_FILE}
+EnvironmentFile=-${SERVICE_ENV_FILE}
 
 [Install]
 WantedBy=multi-user.target
@@ -1079,8 +1071,8 @@ EOF
   cat <<EOF > /etc/systemd/system/aurapanel-api.service
 [Unit]
 Description=AuraPanel API Gateway (Go + Panel Static)
-After=network.target aurapanel-core.service
-Requires=aurapanel-core.service
+After=network.target aurapanel-service.service
+Requires=aurapanel-service.service
 
 [Service]
 Type=simple
@@ -1095,8 +1087,8 @@ WantedBy=multi-user.target
 EOF
 
   systemctl daemon-reload
-  systemctl enable aurapanel-core aurapanel-api
-  systemctl restart aurapanel-core aurapanel-api
+  systemctl enable aurapanel-service aurapanel-api
+  systemctl restart aurapanel-service aurapanel-api
 }
 
 smoke_check() {
@@ -1104,7 +1096,7 @@ smoke_check() {
   local panel_port
   panel_port="$(gateway_port)"
 
-  systemctl is-active --quiet aurapanel-core || fail "aurapanel-core is not active"
+  systemctl is-active --quiet aurapanel-service || fail "aurapanel-service is not active"
   systemctl is-active --quiet aurapanel-api || fail "aurapanel-api is not active"
   systemctl is-active --quiet lshttpd || fail "lshttpd is not active"
   systemctl is-active --quiet minio || fail "minio is not active"
@@ -1112,7 +1104,7 @@ smoke_check() {
     systemctl is-active --quiet pure-ftpd || fail "pure-ftpd is not active"
   fi
 
-  curl -fsS http://127.0.0.1:8000/api/v1/health >/dev/null || fail "Core health check failed"
+  curl -fsS http://127.0.0.1:8081/api/v1/health >/dev/null || fail "Panel service health check failed"
   curl -fsS "http://127.0.0.1:${panel_port}/api/health" >/dev/null || fail "Gateway health check failed"
   curl -fsS "http://127.0.0.1:${panel_port}/" >/dev/null || fail "Panel static endpoint failed"
   curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || fail "MinIO health check failed"
@@ -1149,7 +1141,6 @@ main() {
 
   install_optional_packages restic mariadb-server postgresql redis-server redis docker docker.io fail2ban powerdns pdns pure-ftpd postfix dovecot-core dovecot-imapd
 
-  ensure_rust
   ensure_go
   ensure_node20
   ensure_openlitespeed
@@ -1162,7 +1153,7 @@ main() {
   configure_pureftpd
 
   sync_project
-  write_core_env_defaults
+  write_service_env_defaults
   configure_minio_service
   configure_roundcube
   configure_mail_stack_vmail
@@ -1177,7 +1168,7 @@ main() {
   ok "AuraPanel deployment is complete."
   ok "Panel URL: http://YOUR_SERVER_IP:${panel_port}"
   ok "API Health: http://YOUR_SERVER_IP:${panel_port}/api/health"
-  ok "Core Health (internal): http://127.0.0.1:8000/api/v1/health"
+  ok "Panel Service Health (internal): http://127.0.0.1:8081/api/v1/health"
   ok "OpenLiteSpeed Web: http://YOUR_SERVER_IP (80/443)"
   ok "OpenLiteSpeed Admin: https://YOUR_SERVER_IP:7080"
   write_access_summary

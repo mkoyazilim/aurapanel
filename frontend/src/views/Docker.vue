@@ -234,8 +234,8 @@ const newContainer = ref({
   cpu_limit: '',
 })
 
-const runningCount = computed(() => containers.value.filter(container => container.status.includes('Up')).length)
-const stoppedCount = computed(() => containers.value.filter(container => !container.status.includes('Up')).length)
+const runningCount = computed(() => (Array.isArray(containers.value) ? containers.value : []).filter(container => String(container.status || '').includes('Up')).length)
+const stoppedCount = computed(() => (Array.isArray(containers.value) ? containers.value : []).filter(container => !String(container.status || '').includes('Up')).length)
 
 const showNotif = (message, type = 'success') => {
   notification.value = { message, type }
@@ -247,7 +247,7 @@ const showNotif = (message, type = 'success') => {
 const refreshContainers = async () => {
   try {
     const { data } = await api.get('/docker/containers')
-    containers.value = data.data || []
+    containers.value = Array.isArray(data.data) ? data.data : []
   } catch (err) {
     showNotif(err.response?.data?.error || t('docker_manager_screen.messages.containers_failed'), 'error')
     containers.value = []
@@ -257,7 +257,7 @@ const refreshContainers = async () => {
 const refreshImages = async () => {
   try {
     const { data } = await api.get('/docker/images')
-    images.value = data.data || []
+    images.value = Array.isArray(data.data) ? data.data : []
   } catch (err) {
     showNotif(err.response?.data?.error || t('docker_manager_screen.messages.images_failed'), 'error')
     images.value = []

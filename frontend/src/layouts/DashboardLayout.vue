@@ -313,9 +313,6 @@
               <router-link v-if="can('/federated')" to="/federated" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.Federated') }}</span>
               </router-link>
-              <router-link v-if="can('/auradb')" to="/auradb" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('routes.AuraDB') }}</span>
-              </router-link>
               <router-link v-if="can('/ops-center')" to="/ops-center" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>Ops Center</span>
               </router-link>
@@ -570,7 +567,6 @@ const routeTitleKeys = {
   CronJobs: 'routes.CronJobs',
   LogViewer: 'routes.LogViewer',
   Federated: 'routes.Federated',
-  AuraDB: 'routes.AuraDB',
   FileManager: 'routes.FileManager',
   PHP: 'routes.PHP',
   ServerStatus: 'routes.ServerStatus',
@@ -620,7 +616,7 @@ const canSecurityGroup = computed(() =>
   ['/security', '/activity-log', '/log-viewer'].some((path) => can(path)),
 )
 const canDevopsGroup = computed(() =>
-  ['/docker/images', '/docker/containers', '/docker/create', '/docker/apps', '/cron-jobs', '/federated', '/auradb', '/ops-center'].some((path) => can(path)),
+  ['/docker/images', '/docker/containers', '/docker/create', '/docker/apps', '/cron-jobs', '/federated', '/ops-center'].some((path) => can(path)),
 )
 const canSystemGroup = computed(() =>
   ['/server-status', '/ols-tuning', '/panel-port'].some((path) => can(path)),
@@ -633,7 +629,6 @@ const commandItems = computed(() => [
   { label: t('routes.Users'), path: '/users' },
   { label: t('routes.Packages'), path: '/packages' },
   { label: t('routes.Databases'), path: '/databases' },
-  { label: t('routes.AuraDB'), path: '/auradb' },
   { label: t('routes.Emails'), path: '/emails' },
   { label: t('routes.FTP'), path: '/ftp' },
   { label: t('routes.SFTP'), path: '/sftp' },
@@ -672,7 +667,7 @@ const isBackupsRoute = computed(() => route.path === '/backups' || route.path ==
 const isLogsRoute = computed(() => route.path === '/activity-log' || route.path === '/log-viewer')
 const isHostingRoute = computed(() => ['/websites', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)))
 const isWebAppsRoute = computed(() =>
-  ['/dns', '/ssl', '/cloudflare', '/wordpress', '/app-runtime', '/php', '/filemanager'].some(prefix => route.path.startsWith(prefix))
+  ['/dns', '/ssl', '/cloudflare', '/wordpress', '/app-runtime', '/php', '/filemanager', '/terminal'].some(prefix => route.path.startsWith(prefix))
 )
 const isDataAccessRoute = computed(() =>
   ['/databases', '/emails', '/ftp', '/sftp', '/backups', '/db-backup', '/minio'].some(prefix => route.path.startsWith(prefix))
@@ -681,7 +676,7 @@ const isSecurityLogsRoute = computed(() =>
   ['/security', '/activity-log', '/log-viewer'].some(prefix => route.path.startsWith(prefix))
 )
 const isDevopsRoute = computed(() =>
-  ['/docker', '/cron-jobs', '/federated', '/auradb', '/ops-center'].some(prefix => route.path.startsWith(prefix))
+  ['/docker', '/cron-jobs', '/federated', '/ops-center'].some(prefix => route.path.startsWith(prefix))
 )
 const isSystemRoute = computed(() =>
   ['/server-status', '/ols-tuning', '/panel-port'].some(prefix => route.path.startsWith(prefix))

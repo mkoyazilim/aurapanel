@@ -189,26 +189,6 @@ const baseEn = {
       network_reconnect: 'Connection was interrupted. The gateway may have restarted, reconnect on the new port: {url}',
     },
   },
-  auradb: {
-    title: 'AuraDB Explorer',
-    subtitle: 'Inspect database tables and run queries.',
-    refresh_tables: 'Refresh Tables',
-    bridge_active: 'Secure Bridge Active',
-    bridge_domain: 'Domain',
-    bridge_engine: 'Engine',
-    bridge_db: 'DB',
-    bridge_user: 'User',
-    connection: 'Connection',
-    bridge_placeholder: 'bridge://ticket',
-    connection_placeholder: 'host=127.0.0.1;db=app',
-    query: 'Query',
-    query_placeholder: 'SELECT * FROM users LIMIT 10;',
-    run_query: 'Run',
-    tables: 'Tables',
-    empty_tables: 'No tables found',
-    bridge_profile_failed: 'Bridge profile could not be loaded.',
-    bridge_validation_failed: 'Bridge validation failed.',
-  },
   database_manager: {
     title: 'Database Manager',
     subtitle: 'Provision, attach and secure MariaDB or PostgreSQL databases.',
@@ -231,7 +211,6 @@ const baseEn = {
     actions: {
       refresh: 'Refresh',
       attach_to_site: 'Attach to Website',
-      auradb: 'AuraDB',
       delete: 'Delete',
       password: 'Password',
       remote_ip: 'Remote IP',
@@ -294,8 +273,6 @@ const baseEn = {
       remote_required: 'MariaDB requires the current password to enable remote access.',
       remote_added: 'Remote access granted for "{user}".',
       remote_failed: 'Remote access rule could not be created.',
-      bridge_missing: 'AuraDB bridge URL was not returned by the API.',
-      bridge_failed: 'AuraDB bridge could not be opened.',
     },
   },
   email_manager: {
@@ -480,7 +457,7 @@ const baseEn = {
   api_messages: { unknown_error: 'Unknown API error', session_expired: 'Session expired', session_ended_title: 'Session Ended', session_ended_message: 'Your session expired. Please sign in again.', network_error: 'Network Error', api_error_title: 'API Error - {status}' },
   layout: { toggle_all_open: 'Open All', toggle_all_close: 'Close All', toggle_all_label: 'Menu Groups', groups: { hosting: 'Hosting', web_apps: 'Web & Apps', data_access: 'Data & Access', security_logs: 'Security & Logs', devops: 'Developer', system: 'System', ftp_sftp: 'FTP / SFTP', backups: 'Backups', logs: 'Logs' }, links: { reseller_acl: 'Reseller & ACL', ssl_manage: 'SSL Management', ssl_hostname: 'Hostname SSL', ssl_mail: 'Mail Server SSL', wordpress_manager: 'WordPress Manager', app_runtime: 'App Runtime', file_manager: 'File Manager', terminal: 'Web Terminal', file_backups: 'File Backups', overview: 'Overview', firewall: 'Firewall', ssh_keys: 'SSH Keys', activity_log: 'Activity Log', log_viewer: 'Log Viewer', image_manager: 'Image Management', container_manager: 'Container Management', create_container: 'Create Container', app_store: 'App Store', installed_apps: 'Installed Apps', docker_packages: 'Docker Packages', cron_jobs: 'Cron Jobs', panel_port: 'Panel Port', ml_waf: 'ML-WAF', totp: '2FA (TOTP)', hardening: 'Hardening' }, labels: { manager: 'Manager', apps: 'Apps' }, notifications: { title: 'Notifications', unread: '{count} unread', mark_all_read: 'Mark all as read', clear: 'Clear', empty: 'No notifications yet.', new: 'NEW' }, user_menu: { secure_logout: 'Secure Logout' }, footer: { zero_trust: 'Zero-Trust Active', server_load: 'Server Load' }, command_palette: { placeholder: 'Quick jump with Ctrl+K... (example: dns, security, logs)' } },
   notifications: { default_title: 'Notification' },
-  routes: { Dashboard: 'Dashboard', Websites: 'Websites', WebsiteManage: 'Website Manager', Packages: 'Packages', Users: 'Users', Databases: 'Databases', Emails: 'Emails', FTP: 'FTP', SFTP: 'SFTP', DNS: 'DNS', SSL: 'SSL', Security: 'Security', AppRuntime: 'App Runtime', WordPressManager: 'WordPress Manager', MinIO: 'MinIO', CronJobs: 'Cron Jobs', LogViewer: 'Log Viewer', Federated: 'Federated', AuraDB: 'AuraDB Explorer', FileManager: 'File Manager', Terminal: 'Web Terminal', PHP: 'PHP Management', ServerStatus: 'Server Status', PanelPort: 'Panel Port', Backups: 'Backups', OlsTuning: 'OLS Tuning', Reseller: 'Reseller & ACL', ActivityLog: 'Activity Log', DbBackup: 'DB Backup', 'Docker Images': 'Docker Images', 'Docker Containers': 'Docker Containers', 'Docker Create': 'Create Container', 'Docker App Store': 'Docker App Store', 'Docker Installed Apps': 'Installed Docker Apps', 'Docker Packages': 'Docker Packages', CloudFlare: 'CloudFlare' }
+  routes: { Dashboard: 'Dashboard', Websites: 'Websites', WebsiteManage: 'Website Manager', Packages: 'Packages', Users: 'Users', Databases: 'Databases', Emails: 'Emails', FTP: 'FTP', SFTP: 'SFTP', DNS: 'DNS', SSL: 'SSL', Security: 'Security', AppRuntime: 'App Runtime', WordPressManager: 'WordPress Manager', MinIO: 'MinIO', CronJobs: 'Cron Jobs', LogViewer: 'Log Viewer', Federated: 'Federated', FileManager: 'File Manager', Terminal: 'Web Terminal', PHP: 'PHP Management', ServerStatus: 'Server Status', PanelPort: 'Panel Port', Backups: 'Backups', OlsTuning: 'OLS Tuning', Reseller: 'Reseller & ACL', ActivityLog: 'Activity Log', DbBackup: 'DB Backup', 'Docker Images': 'Docker Images', 'Docker Containers': 'Docker Containers', 'Docker Create': 'Create Container', 'Docker App Store': 'Docker App Store', 'Docker Installed Apps': 'Installed Docker Apps', 'Docker Packages': 'Docker Packages', CloudFlare: 'CloudFlare' }
 }
 
 const en = deepMerge(baseEn, extraEn)
@@ -647,26 +624,6 @@ const baseTr = deepMerge(en, {
       network_reconnect: 'Baglanti kesildi. Gateway yeniden baslamis olabilir, yeni porttan tekrar baglan: {url}',
     },
   },
-  auradb: {
-    title: 'AuraDB Explorer',
-    subtitle: 'Veritabani tablolarini inceleyin ve sorgu calistirin.',
-    refresh_tables: 'Tablolari Yenile',
-    bridge_active: 'Secure Bridge Aktif',
-    bridge_domain: 'Domain',
-    bridge_engine: 'Engine',
-    bridge_db: 'DB',
-    bridge_user: 'Kullanici',
-    connection: 'Baglanti',
-    bridge_placeholder: 'bridge://ticket',
-    connection_placeholder: 'host=127.0.0.1;db=app',
-    query: 'Sorgu',
-    query_placeholder: 'SELECT * FROM users LIMIT 10;',
-    run_query: 'Calistir',
-    tables: 'Tablolar',
-    empty_tables: 'Tablo yok',
-    bridge_profile_failed: 'Bridge profili alinamadi.',
-    bridge_validation_failed: 'Bridge dogrulamasi basarisiz.',
-  },
   php: { title: 'PHP Yonetimi', subtitle: 'PHP versiyonlari ve ayarlari', versions_tab: 'Versiyonlar', sites_tab: 'Site Atamalari', extensions_tab: 'Extensionlar', ini_tab: 'php.ini', installed: 'Kurulu', not_installed: 'Kurulu Degil', eol: 'EOL', install: 'Kur', remove: 'Kaldir', restart: 'Restart', install_success: 'PHP kuruldu', remove_success: 'PHP kaldirildi', save_ini_success: 'php.ini kaydedildi', supported: 'Destekleniyor', domain: 'Domain', current_php: 'Mevcut PHP', change_php: 'Degistir', site_not_found: 'Site bulunamadi', read_ini: 'Oku', messages: { load_failed: 'PHP verileri alinamadi.', installed: 'PHP {version} kuruldu.', install_failed: 'PHP kurulumu basarisiz.', removed: 'PHP {version} kaldirildi.', remove_failed: 'PHP kaldirma basarisiz.', restarted: 'PHP {version} restart edildi.', restart_failed: 'PHP restart basarisiz.', site_updated: '{domain} icin PHP guncellendi.', site_update_failed: 'Site PHP atamasi basarisiz.', ini_read_failed: 'php.ini okunamadi.', ini_save_failed: 'php.ini kaydedilemedi.' } },
   server_status: { title: 'Sunucu Durumu', subtitle: 'Sunucu metrikleri, servisler ve prosesler', cpu: 'CPU Kullanim', ram: 'RAM Kullanim', disk: 'Disk Kullanim', uptime: 'Uptime', services_tab: 'Servisler', processes_tab: 'Prosesler', network_tab: 'Ag', start: 'Baslat', stop: 'Durdur', restart: 'Restart', running: 'Calisiyor', stopped: 'Durdu', kill_process: 'Oldur', refresh: 'Yenile', user: 'Kullanici', command: 'Komut', action: 'Islem', load_avg: 'Load: {value}', messages: { service_done: '{name} {action} tamamlandi', service_failed: 'Servis aksiyonu basarisiz', process_killed: 'PID {pid} sonlandirildi', process_failed: 'Proses sonlandirma basarisiz', updated: 'Veriler guncellendi' } },
   layout: { toggle_all_open: 'Tumunu Ac', toggle_all_close: 'Tumunu Kapat', toggle_all_label: 'Menu Gruplari', groups: { web_apps: 'Web ve Uygulamalar', data_access: 'Veri ve Erisim', security_logs: 'Guvenlik ve Kayitlar', devops: 'Gelistirici', system: 'Sistem', backups: 'Yedekler', logs: 'Kayitlar' }, links: { reseller_acl: 'Bayi ve ACL', ssl_manage: 'SSL Yonetimi', ssl_hostname: 'Hostname SSL', ssl_mail: 'Mail Sunucusu SSL', wordpress_manager: 'WordPress Yoneticisi', app_runtime: 'Uygulama Ortami', file_manager: 'Dosya Yoneticisi', terminal: 'Web Terminal', file_backups: 'Dosya Yedekleri', overview: 'Genel Bakis', firewall: 'Guvenlik Duvari', ssh_keys: 'SSH Anahtarlari', activity_log: 'Etkinlik Kayitlari', log_viewer: 'Log Goruntuleyici', image_manager: 'Imaj Yonetimi', container_manager: 'Konteyner Yonetimi', create_container: 'Konteyner Olustur', app_store: 'Uygulama Magazasi', installed_apps: 'Kurulu Uygulamalar', docker_packages: 'Docker Paketleri', cron_jobs: 'Cron Gorevleri', panel_port: 'Panel Portu', ml_waf: 'ML-WAF', totp: '2FA (TOTP)', hardening: 'Hardening' }, labels: { manager: 'Yonetim', apps: 'Uygulamalar' }, notifications: { title: 'Bildirimler', unread: '{count} okunmamis', mark_all_read: 'Tumunu okundu yap', clear: 'Temizle', empty: 'Henuz bildirim yok.', new: 'YENI' }, user_menu: { secure_logout: 'Guvenli Cikis' }, footer: { zero_trust: 'Zero-Trust Aktif', server_load: 'Sunucu Yuku' }, command_palette: { placeholder: 'Ctrl+K ile hizli gecis... (ornek: dns, guvenlik, log)' } },
@@ -693,7 +650,6 @@ const baseTr = deepMerge(en, {
     actions: {
       refresh: 'Yenile',
       attach_to_site: 'Siteye Bagla',
-      auradb: 'AuraDB',
       delete: 'Sil',
       password: 'Sifre',
       remote_ip: 'Uzak IP',
@@ -756,8 +712,6 @@ const baseTr = deepMerge(en, {
       remote_required: 'MariaDB uzak erisim acmak icin mevcut sifreyi ister.',
       remote_added: '"{user}" icin uzak erisim verildi.',
       remote_failed: 'Uzak erisim kurali olusturulamadi.',
-      bridge_missing: 'API AuraDB bridge URL donmedi.',
-      bridge_failed: 'AuraDB bridge acilamadi.',
     },
   },
   email_manager: {

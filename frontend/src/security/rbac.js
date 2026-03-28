@@ -13,7 +13,6 @@ const PATH_RULES = [
   { prefix: '/federated', roles: [ROLE_ADMIN] },
   { prefix: '/ops-center', roles: [ROLE_ADMIN] },
   { prefix: '/cloudflare', roles: [ROLE_ADMIN] },
-  { prefix: '/auradb', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/migration', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/cron-jobs', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/db-backup', roles: [ROLE_ADMIN, ROLE_RESELLER] },
@@ -48,7 +47,8 @@ export function normalizeRole(role) {
 }
 
 export function canAccessPath(path, role) {
-  const normalizedPath = String(path || '/').trim() || '/'
+  const rawPath = String(path || '/').trim() || '/'
+  const normalizedPath = rawPath.split('?')[0].split('#')[0] || '/'
   const normalizedRole = normalizeRole(role)
   if (normalizedRole === ROLE_ADMIN) return true
 

@@ -79,7 +79,6 @@
               </td>
               <td class="px-4 py-3 text-right space-x-2">
                 <button @click="goAttachToWebsite(db)" class="px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs hover:bg-blue-600/40 transition">{{ t('database_manager.actions.attach_to_site') }}</button>
-                <button @click="openAuraDb(db)" class="px-2 py-1 bg-indigo-600/20 text-indigo-300 rounded text-xs hover:bg-indigo-600/40 transition">{{ t('database_manager.actions.auradb') }}</button>
                 <button @click="dropDatabase(db.name)" class="px-2 py-1 bg-red-600/20 text-red-400 rounded text-xs hover:bg-red-600/40 transition">{{ t('database_manager.actions.delete') }}</button>
               </td>
             </tr>
@@ -602,20 +601,6 @@ const goAttachToWebsite = (db) => {
       db_name: db.name,
     },
   })
-}
-
-const openAuraDb = async (db) => {
-  try {
-    const res = await api.post('/db/explorer/bridge', {
-      engine: db.engine,
-      db_name: db.name,
-    })
-    const url = res.data?.data?.url
-    if (!url) throw new Error(t('database_manager.notifications.bridge_missing'))
-    router.push(url)
-  } catch (error) {
-    showNotif(apiErrorMessage(error, 'database_manager.notifications.bridge_failed'), 'error')
-  }
 }
 
 watch(engine, (value) => {

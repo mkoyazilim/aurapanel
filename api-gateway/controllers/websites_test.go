@@ -9,11 +9,11 @@ import (
 	"testing"
 )
 
-func TestListWebsitesForwardsToCoreContract(t *testing.T) {
+func TestListWebsitesForwardsToServiceContract(t *testing.T) {
 	var gotPath string
 	var gotAuth string
 
-	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotAuth = r.Header.Get("Authorization")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -21,9 +21,9 @@ func TestListWebsitesForwardsToCoreContract(t *testing.T) {
 			"data":   []interface{}{},
 		})
 	}))
-	defer core.Close()
+	defer service.Close()
 
-	t.Setenv("AURAPANEL_CORE_URL", core.URL)
+	t.Setenv("AURAPANEL_SERVICE_URL", service.URL)
 	req := httptest.NewRequest(http.MethodGet, "/api/websites", nil)
 	req.Header.Set("Authorization", "Bearer test-token")
 	rec := httptest.NewRecorder()
@@ -40,12 +40,12 @@ func TestListWebsitesForwardsToCoreContract(t *testing.T) {
 	}
 }
 
-func TestCreateWebsiteForwardsPayloadToCoreContract(t *testing.T) {
+func TestCreateWebsiteForwardsPayloadToServiceContract(t *testing.T) {
 	var gotPath string
 	var gotMethod string
 	var gotBody string
 
-	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotMethod = r.Method
 		body, _ := io.ReadAll(r.Body)
@@ -54,9 +54,9 @@ func TestCreateWebsiteForwardsPayloadToCoreContract(t *testing.T) {
 			"status": "success",
 		})
 	}))
-	defer core.Close()
+	defer service.Close()
 
-	t.Setenv("AURAPANEL_CORE_URL", core.URL)
+	t.Setenv("AURAPANEL_SERVICE_URL", service.URL)
 
 	payload := `{"domain":"example.com","owner":"admin","php_version":"8.3"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/websites", strings.NewReader(payload))

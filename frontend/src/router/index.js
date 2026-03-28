@@ -109,11 +109,6 @@ const routes = [
         component: () => import('../views/Federated.vue')
       },
       {
-        path: 'auradb',
-        name: 'AuraDB',
-        component: () => import('../views/AuraDB.vue')
-      },
-      {
         path: 'ops-center',
         name: 'OpsCenter',
         component: () => import('../views/OpsCenter.vue'),

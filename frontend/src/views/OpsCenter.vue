@@ -133,9 +133,10 @@ const notify = (message, type = 'success') => {
 const loadHealth = async () => {
   try {
     const { data } = await api.get('/health')
-    health.status = data.status || ''
-    health.version = data.version || ''
-    health.uptime = data.uptime ?? 0
+    const payload = data.data || data
+    health.status = payload.status || data.status || ''
+    health.version = payload.version || payload.architecture || ''
+    health.uptime = payload.uptime ?? 0
   } catch (err) {
     notify(err.response?.data?.message || err.message || 'Health check failed.', 'error')
   }
@@ -144,7 +145,8 @@ const loadHealth = async () => {
 const loadPrediction = async () => {
   try {
     const { data } = await api.get('/monitor/sre')
-    prediction.value = data.prediction || data.message || 'No prediction returned.'
+    const payload = data.data || data
+    prediction.value = payload.prediction || data.message || 'No prediction returned.'
   } catch (err) {
     notify(err.response?.data?.message || err.message || 'SRE prediction failed.', 'error')
   }
@@ -157,7 +159,7 @@ const runSreQuery = async () => {
   }
   try {
     const { data } = await api.post('/monitor/sre/log-query', { query: sreQuery.value.trim() })
-    const payload = data.data || {}
+    const payload = data.data || data
     sreAnswer.answer = payload.answer || ''
     sreAnswer.confidence = payload.confidence ?? ''
     sreAnswer.matched_sources = payload.matched_sources || []
@@ -169,7 +171,8 @@ const runSreQuery = async () => {
 const loadOptimizations = async () => {
   try {
     const { data } = await api.get('/monitor/sre/optimize')
-    optimizations.value = data.actions || []
+    const payload = data.data || data
+    optimizations.value = payload.actions || []
   } catch (err) {
     notify(err.response?.data?.message || err.message || 'SRE optimization failed.', 'error')
   }
