@@ -685,6 +685,14 @@ func (s *service) handleVhostCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Domain is required.")
 		return
 	}
+	if payload.ApacheBackend && !apacheBackendAvailable() {
+		writeError(w, http.StatusBadRequest, "Apache backend is not available on this server.")
+		return
+	}
+	if payload.MailDomain && !collectSecuritySnapshot().MailDomainAvailable {
+		writeError(w, http.StatusBadRequest, "Mail domain stack is not active on this server.")
+		return
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -718,7 +726,7 @@ func (s *service) handleVhostCreate(w http.ResponseWriter, r *http.Request) {
 	s.state.Websites = append(s.state.Websites, site)
 	s.ensureUserLocked(owner, fmt.Sprintf("%s@example.com", owner), "user", "default", "")
 	s.recountSitesLocked()
-	s.ensureDefaultSiteArtifactsLocked(site.Domain)
+	s.provisionWebsiteArtifactsLocked(site)
 
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Website created.", Data: site})
 }
@@ -1282,42 +1290,33 @@ func (s *service) handleAliasesList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) handleMetrics(w http.ResponseWriter) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	uptime := time.Since(s.startedAt)
-	siteCount := len(s.state.Websites)
-	dbCount := len(s.state.MariaDBs) + len(s.state.PostgresDBs)
+	metrics := collectHostMetrics(s.startedAt)
 
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status: "success",
 		Data: map[string]interface{}{
-			"cpu_usage":      18 + siteCount,
-			"cpu_cores":      4,
-			"cpu_model":      "AuraPanel Virtual CPU",
-			"ram_usage":      34 + minInt(20, dbCount*3),
-			"ram_used":       "1.7 GB",
-			"ram_total":      "4 GB",
-			"disk_usage":     41 + minInt(20, siteCount*4),
-			"disk_used":      "8.2 GB",
-			"disk_total":     "20 GB",
-			"uptime_seconds": int(uptime.Seconds()),
-			"uptime_human":   uptime.Round(time.Second).String(),
-			"load_avg":       fmt.Sprintf("%.2f %.2f %.2f", 0.45+float64(siteCount)/20.0, 0.39, 0.31),
+			"cpu_usage":      metrics.CPUUsage,
+			"cpu_cores":      metrics.CPUCores,
+			"cpu_model":      metrics.CPUModel,
+			"ram_usage":      metrics.RAMUsage,
+			"ram_used":       metrics.RAMUsed,
+			"ram_total":      metrics.RAMTotal,
+			"disk_usage":     metrics.DiskUsage,
+			"disk_used":      metrics.DiskUsed,
+			"disk_total":     metrics.DiskTotal,
+			"uptime_seconds": metrics.UptimeSeconds,
+			"uptime_human":   metrics.UptimeHuman,
+			"load_avg":       metrics.LoadAvg,
 		},
 	})
 }
 
 func (s *service) handleServices(w http.ResponseWriter) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.state.Services})
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: collectHostServices()})
 }
 
 func (s *service) handleProcesses(w http.ResponseWriter) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.state.Processes})
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: collectHostProcesses(20)})
 }
 
 func (s *service) handleServiceControl(w http.ResponseWriter, r *http.Request) {
@@ -1330,40 +1329,29 @@ func (s *service) handleServiceControl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	name := strings.TrimSpace(payload.Name)
 	action := strings.ToLower(strings.TrimSpace(payload.Action))
 	if action == "kill" {
 		pid, _ := strconv.Atoi(name)
-		for i := range s.state.Processes {
-			if s.state.Processes[i].PID == pid {
-				s.state.Processes = append(s.state.Processes[:i], s.state.Processes[i+1:]...)
-				writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Process terminated."})
-				return
-			}
+		if err := terminateProcess(pid); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
 		}
-		writeError(w, http.StatusNotFound, "Process not found.")
+		writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Process terminated."})
 		return
 	}
 
-	for i := range s.state.Services {
-		if s.state.Services[i].Name == name {
-			switch action {
-			case "start", "restart":
-				s.state.Services[i].Status = "running"
-			case "stop":
-				s.state.Services[i].Status = "stopped"
-			default:
-				writeError(w, http.StatusBadRequest, "Unsupported action.")
-				return
-			}
-			writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Service action applied."})
-			return
-		}
+	switch action {
+	case "start", "restart", "stop":
+	default:
+		writeError(w, http.StatusBadRequest, "Unsupported action.")
+		return
 	}
-	writeError(w, http.StatusNotFound, "Service not found.")
+	if err := executeServiceAction(name, action); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Service action applied."})
 }
 
 func (s *service) handlePanelPortGet(w http.ResponseWriter) {
@@ -1414,18 +1402,27 @@ func (s *service) handlePanelPortSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) handleSecurityStatus(w http.ResponseWriter) {
+	snapshot := collectSecuritySnapshot()
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status: "success",
 		Data: map[string]interface{}{
-			"ebpf_monitoring":      true,
-			"ml_waf":               true,
-			"totp_2fa":             true,
-			"wireguard_federation": false,
-			"immutable_os_support": false,
-			"live_patching":        true,
-			"one_click_hardening":  true,
-			"nft_firewall":         true,
-			"ssh_key_manager":      true,
+			"ebpf_monitoring":          snapshot.EBPFMonitoring,
+			"ml_waf":                   snapshot.MLWAFActive,
+			"totp_2fa":                 true,
+			"wireguard_federation":     snapshot.WireGuardActive,
+			"immutable_os_support":     snapshot.ImmutableOS,
+			"live_patching":            snapshot.LivePatchingActive,
+			"one_click_hardening":      snapshot.OneClickHardening,
+			"nft_firewall":             snapshot.FirewallActive,
+			"ssh_key_manager":          snapshot.SSHKeyManager,
+			"firewall_active":          snapshot.FirewallActive,
+			"firewall_manager":         snapshot.FirewallManager,
+			"firewall_open_ports":      snapshot.FirewallOpenPorts,
+			"apache_backend_available": snapshot.ApacheBackendAvailable,
+			"mail_domain_available":    snapshot.MailDomainAvailable,
+			"detected_mail_stack":      snapshot.DetectedMailStack,
+			"detected_web_stack":       snapshot.DetectedWebStack,
+			"server_ip":                snapshot.ServerIP,
 		},
 	})
 }
@@ -1729,6 +1726,131 @@ func (s *service) ensureDefaultSiteArtifactsLocked(domain string) {
 			VhostConfig:  fmt.Sprintf("vhDomain %s", key),
 		}
 	}
+}
+
+func (s *service) provisionWebsiteArtifactsLocked(site Website) {
+	s.ensureDefaultSiteArtifactsLocked(site.Domain)
+	s.ensureDNSArtifactsLocked(site.Domain, site.MailDomain)
+	if site.MailDomain {
+		s.ensureMailArtifactsLocked(site)
+	}
+}
+
+func (s *service) ensureDNSArtifactsLocked(domain string, mailDomain bool) {
+	normalizedDomain := normalizeDomain(domain)
+	if normalizedDomain == "" {
+		return
+	}
+
+	serverIP := detectPrimaryIPv4()
+	if serverIP == "" {
+		serverIP = "127.0.0.1"
+	}
+
+	zoneIndex := -1
+	for i := range s.modules.DNSZones {
+		if s.modules.DNSZones[i].Name == normalizedDomain {
+			zoneIndex = i
+			break
+		}
+	}
+	if zoneIndex == -1 {
+		s.modules.DNSZones = append(s.modules.DNSZones, DNSZone{
+			ID:            generateSecret(6),
+			Name:          normalizedDomain,
+			Kind:          "native",
+			Records:       0,
+			DNSSECEnabled: false,
+		})
+	}
+
+	if s.modules.DNSRecords == nil {
+		s.modules.DNSRecords = map[string][]DNSRecord{}
+	}
+	if _, ok := s.modules.DNSRecords[normalizedDomain]; !ok {
+		s.modules.DNSRecords[normalizedDomain] = []DNSRecord{}
+	}
+
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: normalizedDomain, Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "www", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "panel", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "TXT", Name: normalizedDomain, Content: "v=spf1 mx a ~all", TTL: 3600})
+
+	if mailDomain {
+		s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "mail", Content: serverIP, TTL: 3600})
+		s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "MX", Name: normalizedDomain, Content: fmt.Sprintf("mail.%s", normalizedDomain), TTL: 3600})
+	}
+
+	s.recalcDNSZoneLocked(normalizedDomain)
+	if s.modules.DefaultNameservers.NS1 == "" && s.modules.DefaultNameservers.NS2 == "" {
+		s.modules.DefaultNameservers = DefaultNameservers{
+			NS1: fmt.Sprintf("ns1.%s", normalizedDomain),
+			NS2: fmt.Sprintf("ns2.%s", normalizedDomain),
+		}
+	}
+}
+
+func (s *service) upsertDNSRecordLocked(domain string, record DNSRecord) {
+	items := s.modules.DNSRecords[domain]
+	for i := range items {
+		if strings.EqualFold(items[i].RecordType, record.RecordType) && items[i].Name == record.Name {
+			items[i].Content = record.Content
+			items[i].TTL = record.TTL
+			s.modules.DNSRecords[domain] = items
+			return
+		}
+	}
+	s.modules.DNSRecords[domain] = append(items, record)
+}
+
+func (s *service) ensureMailArtifactsLocked(site Website) {
+	normalizedDomain := normalizeDomain(site.Domain)
+	if normalizedDomain == "" {
+		return
+	}
+
+	addMailbox := func(address, user string, quotaMB int) {
+		for _, mailbox := range s.modules.Mailboxes {
+			if mailbox.Address == address {
+				return
+			}
+		}
+		s.modules.Mailboxes = append(s.modules.Mailboxes, Mailbox{
+			Address: address,
+			Domain:  normalizedDomain,
+			User:    user,
+			Owner:   site.Owner,
+			QuotaMB: quotaMB,
+			UsedMB:  0,
+		})
+	}
+
+	addMailbox(fmt.Sprintf("postmaster@%s", normalizedDomain), "postmaster", 1024)
+	addMailbox(fmt.Sprintf("webmaster@%s", normalizedDomain), "webmaster", 1024)
+
+	if s.modules.MailCatchAll == nil {
+		s.modules.MailCatchAll = map[string]MailCatchAll{}
+	}
+	if _, ok := s.modules.MailCatchAll[normalizedDomain]; !ok {
+		s.modules.MailCatchAll[normalizedDomain] = MailCatchAll{
+			Domain:  normalizedDomain,
+			Enabled: false,
+			Target:  fmt.Sprintf("postmaster@%s", normalizedDomain),
+		}
+	}
+
+	if s.modules.MailDKIM == nil {
+		s.modules.MailDKIM = map[string]DKIMRecord{}
+	}
+	if _, ok := s.modules.MailDKIM[normalizedDomain]; !ok {
+		s.modules.MailDKIM[normalizedDomain] = DKIMRecord{
+			Domain:    normalizedDomain,
+			Selector:  "selector1",
+			PublicKey: fmt.Sprintf("v=DKIM1; k=rsa; p=%s", generateSecret(48)),
+		}
+	}
+
+	s.recordIssuedCertificateLocked(fmt.Sprintf("mail.%s", normalizedDomain), "Let's Encrypt", false)
 }
 
 func (s *service) removeSiteArtifactsLocked(domain string) {

@@ -35,6 +35,19 @@
 
     <div v-if="activeTab === 'firewall'" class="aura-card space-y-4">
       <h2 class="text-lg font-bold text-white">{{ t('security_center.firewall.title') }}</h2>
+      <div class="rounded-xl border border-panel-border bg-panel-dark p-4">
+        <div class="flex flex-wrap items-center gap-3 text-sm">
+          <span class="font-semibold text-white">Durum:</span>
+          <span :class="status.firewall_active ? 'text-emerald-400' : 'text-yellow-400'">
+            {{ status.firewall_active ? 'Aktif' : 'Pasif / Tespit edilemedi' }}
+          </span>
+          <span v-if="status.firewall_manager" class="text-gray-400">Yonetici: {{ status.firewall_manager }}</span>
+          <span v-if="status.server_ip" class="text-gray-400">Sunucu IP: {{ status.server_ip }}</span>
+        </div>
+        <p v-if="(status.firewall_open_ports || []).length" class="mt-3 text-xs text-gray-400">
+          Acik portlar: {{ status.firewall_open_ports.join(', ') }}
+        </p>
+      </div>
       <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
         <input v-model="firewallForm.ip_address" class="aura-input" :placeholder="t('security_center.firewall.ip')" />
         <input v-model="firewallForm.reason" class="aura-input" :placeholder="t('security_center.firewall.reason')" />

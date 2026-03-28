@@ -361,13 +361,33 @@
               <input v-model="siteForm.email" type="email" class="aura-input w-full" placeholder="admin@example.com" />
             </div>
             <label class="inline-flex items-center gap-2 text-sm text-gray-300">
-              <input v-model="siteForm.mail_domain" type="checkbox" class="w-4 h-4 rounded border-panel-border bg-panel-hover" />
+              <input
+                v-model="siteForm.mail_domain"
+                type="checkbox"
+                class="w-4 h-4 rounded border-panel-border bg-panel-hover"
+                :disabled="!platformStatus.mail_domain_available"
+              />
               Mail domain acilisi yap
             </label>
+            <p class="text-xs" :class="platformStatus.mail_domain_available ? 'text-emerald-300' : 'text-yellow-300'">
+              {{ platformStatus.mail_domain_available
+                ? `Mail stack aktif: ${(platformStatus.detected_mail_stack || []).join(', ') || 'hazir'}`
+                : 'Mail stack aktif degil. Bu secenek su an kullanilamaz.' }}
+            </p>
             <label class="inline-flex items-center gap-2 text-sm text-gray-300">
-              <input v-model="siteForm.apache_backend" type="checkbox" class="w-4 h-4 rounded border-panel-border bg-panel-hover" />
+              <input
+                v-model="siteForm.apache_backend"
+                type="checkbox"
+                class="w-4 h-4 rounded border-panel-border bg-panel-hover"
+                :disabled="!platformStatus.apache_backend_available"
+              />
               Apache backend kullan
             </label>
+            <p class="text-xs" :class="platformStatus.apache_backend_available ? 'text-emerald-300' : 'text-yellow-300'">
+              {{ platformStatus.apache_backend_available
+                ? 'Apache backend bu sunucuda kullanilabilir.'
+                : 'Bu sunucuda Apache backend tespit edilmedi.' }}
+            </p>
           </div>
           <div class="flex gap-3 mt-8">
             <button class="btn-secondary flex-1" @click="showAddSiteModal = false">{{ t('common.cancel') }}</button>
@@ -598,6 +618,11 @@ const customSslForm = ref({
 const siteLogsDomain = ref('')
 const siteLogsKind = ref('access')
 const siteLogsLines = ref([])
+const platformStatus = ref({
+  mail_domain_available: false,
+  apache_backend_available: false,
+  detected_mail_stack: [],
+})
 
 const filteredSites = computed(() => sites.value)
 
@@ -826,11 +851,28 @@ async function loadDatabases() {
   postgresUsers.value = pgUsersRes.data?.data || []
 }
 
+async function loadPlatformStatus() {
+  try {
+    const res = await api.get('/security/status')
+    platformStatus.value = {
+      mail_domain_available: !!res.data?.data?.mail_domain_available,
+      apache_backend_available: !!res.data?.data?.apache_backend_available,
+      detected_mail_stack: Array.isArray(res.data?.data?.detected_mail_stack) ? res.data.data.detected_mail_stack : [],
+    }
+  } catch {
+    platformStatus.value = {
+      mail_domain_available: false,
+      apache_backend_available: false,
+      detected_mail_stack: [],
+    }
+  }
+}
+
 async function refreshAll() {
   loading.value = true
   error.value = ''
   try {
-    await Promise.all([loadSites(), loadUsers(), loadSubdomains(), loadDbLinks(), loadDatabases(), loadPackages()])
+    await Promise.all([loadSites(), loadUsers(), loadSubdomains(), loadDbLinks(), loadDatabases(), loadPackages(), loadPlatformStatus()])
     if (!advancedDomain.value) {
       advancedDomain.value = parentDomains.value[0] || ''
     }
