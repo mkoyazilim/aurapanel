@@ -58,13 +58,9 @@ func NewServiceProxy() (http.Handler, error) {
 		req.Host = target.Host
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		
-		// Ensure Websocket headers pass through correctly
-		if isWebsocketUpgrade(req) {
-			req.URL.Scheme = "ws"
-			if target.Scheme == "https" {
-				req.URL.Scheme = "wss"
-			}
-		}
+		// The standard ReverseProxy handles websockets automatically in Go 1.12+,
+		// we just need to make sure we don't accidentally buffer or block the upgrade.
+		// DO NOT rewrite scheme to ws/wss, as http.Transport doesn't support them.
 	}
 	
 	// Add websocket explicit support to proxy transport if needed

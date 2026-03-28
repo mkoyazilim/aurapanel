@@ -78,6 +78,7 @@ function connectTerminal() {
   ws.onopen = () => {
     connected.value = true;
     term.writeln('\r\n' + t('terminal.connected_msg') + '\r\n');
+    term.focus();
   };
 
   ws.onmessage = (event) => {
