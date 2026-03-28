@@ -105,6 +105,13 @@ func panelAdminEmailValue() string {
 
 func issueLetsEncryptCertificate(domains []string, webroot string, dnsChallenge bool) error {
 	args := []string{"certonly", "--non-interactive", "--agree-tos", "-m", panelAdminEmailValue(), "--keep-until-expiring"}
+	
+	// Use staging API if AURAPANEL_DEV_SIMULATION is enabled to avoid rate limits
+	if strings.ToLower(strings.TrimSpace(os.Getenv("AURAPANEL_DEV_SIMULATION"))) == "1" || 
+	   strings.ToLower(strings.TrimSpace(os.Getenv("AURAPANEL_DEV_SIMULATION"))) == "true" {
+		args = append(args, "--test-cert")
+	}
+
 	if dnsChallenge {
 		credentialsPath := "/etc/letsencrypt/cloudflare.ini"
 		if err := writeCloudflareCertbotCredentials(credentialsPath); err != nil {
