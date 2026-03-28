@@ -30,7 +30,7 @@
         </router-link>
 
         <div v-if="canHostingGroup" class="mt-3">
-          <button @click="hostingMenuOpen = !hostingMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isHostingRoute }">
+          <button @click="hostingMenuOpen = !hostingMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isHostingRoute }">
             <div class="flex items-center">
               <Box class="w-5 h-5 mr-3" />
               <span>{{ t('layout.groups.hosting') }}</span>
@@ -60,7 +60,7 @@
         </div>
 
         <div v-if="canWebAppsGroup" class="mt-2">
-          <button @click="webAppsMenuOpen = !webAppsMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isWebAppsRoute }">
+          <button @click="webAppsMenuOpen = !webAppsMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isWebAppsRoute }">
             <div class="flex items-center">
               <Globe class="w-5 h-5 mr-3" />
               <span>{{ t('layout.groups.web_apps') }}</span>
@@ -134,7 +134,7 @@
         </div>
 
         <div v-if="canDataAccessGroup" class="mt-2">
-          <button @click="dataAccessMenuOpen = !dataAccessMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isDataAccessRoute }">
+          <button @click="dataAccessMenuOpen = !dataAccessMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isDataAccessRoute }">
             <div class="flex items-center">
               <Database class="w-5 h-5 mr-3" />
               <span>{{ t('layout.groups.data_access') }}</span>
@@ -196,7 +196,7 @@
         </div>
 
         <div v-if="canSecurityGroup" class="mt-2">
-          <button @click="securityLogsMenuOpen = !securityLogsMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isSecurityLogsRoute }">
+          <button @click="securityLogsMenuOpen = !securityLogsMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isSecurityLogsRoute }">
             <div class="flex items-center">
               <Shield class="w-5 h-5 mr-3" />
               <span>{{ t('layout.groups.security_logs') }}</span>
@@ -260,7 +260,7 @@
         </div>
 
         <div v-if="canDevopsGroup" class="mt-2">
-          <button @click="devopsMenuOpen = !devopsMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isDevopsRoute }">
+          <button @click="devopsMenuOpen = !devopsMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isDevopsRoute }">
             <div class="flex items-center">
               <Container class="w-5 h-5 mr-3" />
               <span>{{ t('layout.groups.devops') }}</span>
@@ -321,7 +321,7 @@
         </div>
 
         <div v-if="canSystemGroup" class="mt-2">
-          <button @click="systemMenuOpen = !systemMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'text-blue-400': isSystemRoute }">
+          <button @click="systemMenuOpen = !systemMenuOpen" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isSystemRoute }">
             <div class="flex items-center">
               <Settings2 class="w-5 h-5 mr-3" />
               <span>{{ t('layout.groups.system') }}</span>
@@ -849,19 +849,23 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .sidebar-link {
-  @apply flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-gray-400 hover:text-white hover:bg-panel-card transition-all duration-200;
+  @apply flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-[#e7e0ce] hover:text-[#fff7e8] hover:bg-panel-card transition-all duration-200;
 }
 
 .sidebar-link-active {
   @apply bg-brand-500/10 text-brand-400 hover:bg-brand-500/10 hover:text-brand-400 border border-brand-500/20 shadow-[inset_0_0_12px_rgba(16,185,129,0.1)];
 }
 
+.sidebar-link-section-active {
+  @apply text-[#fff4dd] bg-white/[0.04];
+}
+
 .sidebar-sub-link {
-  @apply flex items-center px-2 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-all duration-150;
+  @apply flex items-center px-2 py-1.5 text-[13px] leading-5 font-medium rounded-md text-[#d9d1bf] hover:text-[#fff7e8] hover:bg-white/5 transition-all duration-150;
 }
 
 .sidebar-sub-link-active {
-  @apply text-blue-400 bg-blue-500/10 hover:text-blue-400;
+  @apply text-[#fff4dd] bg-white/[0.06] hover:text-[#fff4dd];
 }
 
 .accordion-enter-active,
