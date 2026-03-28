@@ -59,16 +59,35 @@ fail() {
 }
 
 package_manager_busy() {
+  local lock
+
   if [ "${PKG_MGR}" = "apt" ]; then
-    if pgrep -fa 'apt|apt-get|dpkg|unattended-upgrade|unattended-upgrades' >/dev/null 2>&1; then
-      return 0
-    fi
+    for lock in \
+      /var/lib/dpkg/lock-frontend \
+      /var/lib/dpkg/lock \
+      /var/lib/apt/lists/lock \
+      /var/cache/apt/archives/lock; do
+      if [ -e "${lock}" ] && command -v fuser >/dev/null 2>&1; then
+        if fuser "${lock}" >/dev/null 2>&1; then
+          return 0
+        fi
+      fi
+    done
   fi
 
   if [ "${PKG_MGR}" = "dnf" ]; then
-    if pgrep -fa 'dnf|yum|rpm' >/dev/null 2>&1; then
-      return 0
-    fi
+    for lock in \
+      /var/run/dnf.pid \
+      /run/dnf.pid \
+      /var/cache/dnf/metadata_lock.pid \
+      /var/lib/dnf/rpmdb_lock.pid \
+      /var/lib/rpm/.rpm.lock; do
+      if [ -e "${lock}" ] && command -v fuser >/dev/null 2>&1; then
+        if fuser "${lock}" >/dev/null 2>&1; then
+          return 0
+        fi
+      fi
+    done
   fi
 
   return 1
@@ -628,7 +647,7 @@ EOF
   chmod 644 "${intl_ini}" >/dev/null 2>&1 || true
 
   local ext_dir
-  ext_dir="$(/usr/local/lsws/lsphp83/bin/lsphp -i 2>/dev/null | awk -F'=> ' '/^extension_dir =>/{print $2; exit}' | awk '{print $1}')"
+  ext_dir="$({ /usr/local/lsws/lsphp83/bin/lsphp -i 2>/dev/null | awk -F'=> ' '/^extension_dir =>/{print $2; exit}' | awk '{print $1}'; } || true)"
   if [ -n "${ext_dir}" ]; then
     local missing=()
     for so in pdo_mysql.so pdo_pgsql.so pdo_sqlite.so; do
@@ -672,7 +691,7 @@ ensure_ioncube_loader() {
     return
   fi
 
-  ext_dir="$("${lsphp_bin}" -i 2>/dev/null | awk -F'=> ' '/^extension_dir =>/{print $2; exit}' | awk '{print $1}')"
+  ext_dir="$({ "${lsphp_bin}" -i 2>/dev/null | awk -F'=> ' '/^extension_dir =>/{print $2; exit}' | awk '{print $1}'; } || true)"
   if [ -z "${ext_dir}" ]; then
     warn "Unable to detect lsphp83 extension_dir; ionCube install skipped."
     return
