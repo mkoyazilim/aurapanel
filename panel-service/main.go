@@ -1918,12 +1918,79 @@ func (s *service) ensureMailArtifactsLocked(site Website) {
 	s.recordIssuedCertificateLocked(fmt.Sprintf("mail.%s", normalizedDomain), "Let's Encrypt", false)
 }
 
+func (s *service) removeDNSArtifactsLocked(domain string) {
+	filteredZones := s.modules.DNSZones[:0]
+	for _, zone := range s.modules.DNSZones {
+		if zone.Name != domain {
+			filteredZones = append(filteredZones, zone)
+		}
+	}
+	s.modules.DNSZones = filteredZones
+	delete(s.modules.DNSRecords, domain)
+}
+
+func (s *service) removeMailArtifactsLocked(domain string) {
+	delete(s.modules.MailCatchAll, domain)
+	delete(s.modules.MailDKIM, domain)
+	
+	// Remove mailboxes associated with this domain
+	filteredMailboxes := s.modules.Mailboxes[:0]
+	for _, mb := range s.modules.Mailboxes {
+		if !strings.HasSuffix(mb.Address, "@"+domain) {
+			filteredMailboxes = append(filteredMailboxes, mb)
+		} else {
+			_ = deleteSystemMailbox(mb.Address)
+		}
+	}
+	s.modules.Mailboxes = filteredMailboxes
+	
+	// Remove forwarders
+	filteredForwards := s.modules.MailForwards[:0]
+	for _, fw := range s.modules.MailForwards {
+		if fw.Domain != domain {
+			filteredForwards = append(filteredForwards, fw)
+		} else {
+			_ = deleteSystemForward(fw.Domain, fw.Source)
+		}
+	}
+	s.modules.MailForwards = filteredForwards
+	
+	// Remove routing
+	filteredRouting := s.modules.MailRouting[:0]
+	for _, rt := range s.modules.MailRouting {
+		if rt.Domain != domain {
+			filteredRouting = append(filteredRouting, rt)
+		}
+	}
+	s.modules.MailRouting = filteredRouting
+
+	// Remove physical mail directory if using standard postfix/dovecot path
+	_ = exec.Command("rm", "-rf", fmt.Sprintf("/var/vmail/%s", domain)).Run()
+}
+
 func (s *service) removeSiteArtifactsLocked(domain string) error {
 	delete(s.state.AdvancedConfig, domain)
 	delete(s.state.CustomSSL, domain)
 	s.state.Aliases = removeAliasesByDomain(s.state.Aliases, domain)
 	s.state.Subdomains = removeSubdomainsByParent(s.state.Subdomains, domain)
 	s.state.DBLinks = removeDBLinksByDomain(s.state.DBLinks, domain)
+	
+	// Remove DNS Zones and Records
+	s.removeDNSArtifactsLocked(domain)
+	
+	// Remove Mail Configurations and Directories
+	s.removeMailArtifactsLocked(domain)
+	
+	// Remove physical document root directory
+	docroot := domainDocroot(domain)
+	_ = exec.Command("rm", "-rf", docroot).Run()
+	
+	// Ensure we remove the user's home directory if it's completely empty and user only had one site
+	homeDir := fmt.Sprintf("/home/%s", domain)
+	if docroot != homeDir {
+		_ = exec.Command("rm", "-rf", homeDir).Run()
+	}
+
 	return s.syncOLSVhostsLocked()
 }
 
