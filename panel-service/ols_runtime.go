@@ -159,7 +159,37 @@ func ensureOLSManagedFilesystem(item olsManagedSite) error {
 	}
 	indexPath := filepath.Join(docroot, "index.html")
 	if !fileExists(indexPath) {
-		placeholder := fmt.Sprintf("<!doctype html><html><head><meta charset=\"utf-8\"><title>%s</title></head><body><h1>%s</h1><p>Served by AuraPanel OpenLiteSpeed runtime.</p></body></html>\n", item.Site.Domain, item.Site.Domain)
+		placeholder := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>%s - Başarıyla Kuruldu</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; }
+        .container { background-color: #1e293b; padding: 3rem; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5); border: 1px solid #334155; max-width: 600px; width: 90%%; }
+        h1 { color: #f97316; font-size: 2.25rem; margin-top: 0; margin-bottom: 1rem; }
+        p { color: #94a3b8; font-size: 1.125rem; line-height: 1.75; margin-bottom: 2rem; }
+        .domain { font-weight: bold; color: #38bdf8; }
+        .footer { margin-top: 3rem; color: #64748b; font-size: 0.875rem; }
+        .footer a { color: #f97316; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.2); color: #f97316; font-size: 0.875rem; font-weight: 600; margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="badge">AuraPanel Web Server</div>
+        <h1>Web Siteniz Hazır!</h1>
+        <p><span class="domain">%s</span> alanı için hosting hesabınız ve web sunucunuz başarıyla oluşturuldu ve şu an aktif olarak çalışıyor.</p>
+        <p>AuraPanel üzerinden dosyalarınızı yükleyebilir, veritabanı oluşturabilir veya tek tıkla WordPress kurabilirsiniz.</p>
+    </div>
+    <div class="footer">
+        Powered by <a href="https://aurapanel.com" target="_blank">AuraPanel</a> & OpenLiteSpeed
+    </div>
+</body>
+</html>
+`, item.Site.Domain, item.Site.Domain)
 		if err := os.WriteFile(indexPath, []byte(placeholder), 0o644); err != nil {
 			return err
 		}
