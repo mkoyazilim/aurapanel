@@ -1643,6 +1643,16 @@ func (s *service) handleSSLIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Failed to create docroot for SSL validation.")
 		return
 	}
+	
+	// Ensure user exists and owns the directory
+	s.mu.Lock()
+	siteOwner := "aura"
+	if site := s.findWebsiteLocked(domain); site != nil {
+		siteOwner = firstNonEmpty(site.Owner, site.User, "aura")
+	}
+	s.mu.Unlock()
+	
+	_ = exec.Command("chown", "-R", siteOwner+":"+siteOwner, filepath.Dir(docroot)).Run()
 
 	if err := issueLetsEncryptCertificate(domains, docroot, false); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
