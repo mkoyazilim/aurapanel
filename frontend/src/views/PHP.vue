@@ -149,7 +149,10 @@ async function installPhp(version) {
   try {
     const res = await api.post('/php/install', { version })
     success.value = res.data?.message || t('php.messages.installed', { version })
-    await loadData()
+    // Do not immediately reload, let the background job run
+    setTimeout(() => {
+      loadData()
+    }, 5000)
   } catch (e) {
     error.value = apiErrorMessage(e, 'php.messages.install_failed')
   }
@@ -158,10 +161,13 @@ async function installPhp(version) {
 async function removePhp(version) {
   error.value = ''
   success.value = ''
+  if (!confirm(`PHP ${version} kaldirmak istediginize emin misiniz?`)) return
   try {
     const res = await api.post('/php/remove', { version })
     success.value = res.data?.message || t('php.messages.removed', { version })
-    await loadData()
+    setTimeout(() => {
+      loadData()
+    }, 5000)
   } catch (e) {
     error.value = apiErrorMessage(e, 'php.messages.remove_failed')
   }

@@ -41,18 +41,25 @@ func (s *service) handlePHPInstall(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "PHP version is required.")
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := installPHPVersion(version); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	s.modules.PHPVersions = discoverPHPVersions()
-	if _, err := os.Stat(detectPHPIniPath(version)); err != nil {
-		_ = writeManagedFile(detectPHPIniPath(version), defaultPHPIni(version))
-	}
-	s.appendActivityLocked("system", "php_install", fmt.Sprintf("PHP %s installed.", version), "")
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: fmt.Sprintf("PHP %s installed.", version)})
+
+	// Kurulum uzun sürebilir, arkada plan işlemi olarak başlatıyoruz
+	go func(v string) {
+		err := installPHPVersion(v)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err != nil {
+			s.appendActivityLocked("system", "php_install_error", fmt.Sprintf("PHP %s kurulumu başarisiz: %v", v, err), "")
+			return
+		}
+		s.modules.PHPVersions = discoverPHPVersions()
+		if _, err := os.Stat(detectPHPIniPath(v)); err != nil {
+			_ = writeManagedFile(detectPHPIniPath(v), defaultPHPIni(v))
+		}
+		s.appendActivityLocked("system", "php_install", fmt.Sprintf("PHP %s installed.", v), "")
+		s.saveRuntimeStateLocked()
+	}(version)
+
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: fmt.Sprintf("PHP %s kurulumu arka planda başladi. Bu işlem birkaç dakika sürebilir.", version)})
 }
 
 func (s *service) handlePHPRemove(w http.ResponseWriter, r *http.Request) {
@@ -69,36 +76,41 @@ func (s *service) handlePHPRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := removePHPVersion(version); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	replacement := ""
-	for _, item := range discoverPHPVersions() {
-		if item.Version != version && item.Installed {
-			replacement = item.Version
-			break
+	go func(v string) {
+		err := removePHPVersion(v)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err != nil {
+			s.appendActivityLocked("system", "php_remove_error", fmt.Sprintf("PHP %s kaldirilamadi: %v", v, err), "")
+			return
 		}
-	}
-	if replacement == "" {
-		replacement = "8.3"
-	}
-	s.modules.PHPVersions = discoverPHPVersions()
-	for i := range s.state.Websites {
-		if s.state.Websites[i].PHPVersion == version || s.state.Websites[i].PHP == version {
-			s.state.Websites[i].PHPVersion = replacement
-			s.state.Websites[i].PHP = replacement
+		replacement := ""
+		for _, item := range discoverPHPVersions() {
+			if item.Version != v && item.Installed {
+				replacement = item.Version
+				break
+			}
 		}
-	}
-	for i := range s.state.Subdomains {
-		if s.state.Subdomains[i].PHPVersion == version {
-			s.state.Subdomains[i].PHPVersion = replacement
+		if replacement == "" {
+			replacement = "8.3"
 		}
-	}
-	s.appendActivityLocked("system", "php_remove", fmt.Sprintf("PHP %s removed.", version), "")
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: fmt.Sprintf("PHP %s removed.", version)})
+		s.modules.PHPVersions = discoverPHPVersions()
+		for i := range s.state.Websites {
+			if s.state.Websites[i].PHPVersion == v || s.state.Websites[i].PHP == v {
+				s.state.Websites[i].PHPVersion = replacement
+				s.state.Websites[i].PHP = replacement
+			}
+		}
+		for i := range s.state.Subdomains {
+			if s.state.Subdomains[i].PHPVersion == v {
+				s.state.Subdomains[i].PHPVersion = replacement
+			}
+		}
+		s.appendActivityLocked("system", "php_remove", fmt.Sprintf("PHP %s removed.", v), "")
+		s.saveRuntimeStateLocked()
+	}(version)
+
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: fmt.Sprintf("PHP %s kaldirma işlemi arka planda başladi.", version)})
 }
 
 func (s *service) handlePHPRestart(w http.ResponseWriter, r *http.Request) {
