@@ -1212,8 +1212,16 @@ Object.assign(extraEn, {
       waf: 'ML-WAF',
       twofa: '2FA',
       ssh: 'SSH Keys',
+      ssh_config: 'SSH Config',
       hardening: 'Hardening',
-      kernel: 'Kernel Security',
+      kernel: 'Live Patching',
+    },
+    ssh_config: {
+      title: 'SSH Configuration',
+      desc: 'Manage SSH port and Root login access.',
+      port_desc: 'Default is 22. Make sure you open the new port in your firewall first.',
+      root_desc: 'Disabling root login enhances security.',
+      save: 'Save & Restart SSH'
     },
     overview: { active: 'Active', partial: 'Partial' },
     firewall: {
@@ -1498,6 +1506,13 @@ Object.assign(extraTr, {
       add_key: 'Key Ekle',
       list: 'Listele',
       delete: 'Sil',
+    },
+    ssh_config: {
+      title: 'SSH Yapilandirmasi',
+      desc: 'SSH portunu ve Root erisimini yonetin.',
+      port_desc: 'Varsayilan 22. Degistirmeden once yeni portu guvenlik duvarinda actiginizdan emin olun.',
+      root_desc: 'Root girisini kapatmak guvenligi artirir.',
+      save: 'Kaydet ve SSH Servisini Yeniden Baslat'
     },
     hardening: {
       title: 'One-Click Hardening',

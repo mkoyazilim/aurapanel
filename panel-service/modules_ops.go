@@ -587,6 +587,86 @@ func (s *service) handleCloudflareServerAuth(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// SSH Configuration Management
+
+func (s *service) handleSSHConfigGet(w http.ResponseWriter) {
+	configPath := "/etc/ssh/sshd_config"
+	data := map[string]string{
+		"port":              "22",
+		"permit_root_login": "yes",
+	}
+
+	content, err := os.ReadFile(configPath)
+	if err == nil {
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "Port ") {
+				data["port"] = strings.TrimSpace(strings.TrimPrefix(trimmed, "Port "))
+			} else if strings.HasPrefix(trimmed, "PermitRootLogin ") {
+				data["permit_root_login"] = strings.TrimSpace(strings.TrimPrefix(trimmed, "PermitRootLogin "))
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: data})
+}
+
+func (s *service) handleSSHConfigSet(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Port            string `json:"port"`
+		PermitRootLogin string `json:"permit_root_login"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid SSH config payload.")
+		return
+	}
+
+	configPath := "/etc/ssh/sshd_config"
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to read sshd_config")
+		return
+	}
+
+	lines := strings.Split(string(content), "\n")
+	portFound := false
+	rootLoginFound := false
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Port ") {
+			lines[i] = fmt.Sprintf("Port %s", payload.Port)
+			portFound = true
+		} else if strings.HasPrefix(trimmed, "PermitRootLogin ") {
+			lines[i] = fmt.Sprintf("PermitRootLogin %s", payload.PermitRootLogin)
+			rootLoginFound = true
+		}
+	}
+
+	if !portFound {
+		lines = append(lines, fmt.Sprintf("Port %s", payload.Port))
+	}
+	if !rootLoginFound {
+		lines = append(lines, fmt.Sprintf("PermitRootLogin %s", payload.PermitRootLogin))
+	}
+
+	if err := os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to write sshd_config")
+		return
+	}
+
+	// Restart SSH service (sshd on EL, ssh on Ubuntu/Debian)
+	_ = exec.Command("systemctl", "restart", "sshd").Run()
+	_ = exec.Command("systemctl", "restart", "ssh").Run()
+
+	s.mu.Lock()
+	s.appendActivityLocked("system", "ssh_config", "SSH Port and Root Login configuration updated.", "")
+	s.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "SSH configuration updated successfully."})
+}
+
 func (s *service) handleCloudflareDNSList(w http.ResponseWriter, r *http.Request) {
 	var payload map[string]interface{}
 	if err := decodeJSON(r, &payload); err != nil {

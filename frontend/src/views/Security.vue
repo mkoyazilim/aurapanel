@@ -192,6 +192,41 @@
       </div>
     </div>
 
+    <div v-if="activeTab === 'ssh_config'" class="aura-card space-y-4">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">{{ t('security_center.ssh_config.title') || 'SSH Configuration' }}</h2>
+          <p class="text-sm text-gray-400">{{ t('security_center.ssh_config.desc') || 'Manage SSH port and Root login access.' }}</p>
+        </div>
+        <button class="btn-secondary" @click="loadSshConfig" :disabled="sshConfigLoading">
+          {{ sshConfigLoading ? t('common.loading') : (t('common.refresh') || 'Yenile') }}
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">SSH Port</label>
+          <input v-model="sshConfig.port" type="number" class="aura-input w-full" placeholder="22" />
+          <p class="text-xs text-gray-500 mt-1">{{ t('security_center.ssh_config.port_desc') || 'Default is 22. Make sure you open the new port in your firewall first.' }}</p>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Root Login (PermitRootLogin)</label>
+          <select v-model="sshConfig.permit_root_login" class="aura-input w-full">
+            <option value="yes">Yes (Erişime Açık)</option>
+            <option value="prohibit-password">Prohibit Password (Sadece SSH Key)</option>
+            <option value="no">No (Tamamen Kapalı)</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">{{ t('security_center.ssh_config.root_desc') || 'Disabling root login enhances security.' }}</p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <button class="btn-primary" @click="saveSshConfig" :disabled="sshConfigSaving">
+          {{ sshConfigSaving ? t('common.loading') : (t('security_center.ssh_config.save') || 'Save & Restart SSH') }}
+        </button>
+      </div>
+    </div>
+
     <div v-if="activeTab === 'malware'" class="space-y-4">
       <div class="aura-card space-y-4">
         <h2 class="text-lg font-bold text-white">Malware Scanner</h2>
@@ -332,6 +367,7 @@ const tabs = [
   { id: 'waf', label: t('security_center.tabs.waf') },
   { id: '2fa', label: t('security_center.tabs.twofa') },
   { id: 'ssh', label: t('security_center.tabs.ssh') },
+  { id: 'ssh_config', label: t('security_center.tabs.ssh_config') || 'SSH Config' },
   { id: 'malware', label: 'Malware Scanner' },
   { id: 'hardening', label: t('security_center.tabs.hardening') },
   { id: 'kernel', label: t('security_center.tabs.kernel') },
@@ -396,6 +432,10 @@ const totp = ref({
 const ssh = ref({ user: 'root', title: '', public_key: '' })
 const hardening = ref({ stack: 'wordpress', domain: '' })
 
+const sshConfig = ref({ port: '22', permit_root_login: 'yes' })
+const sshConfigLoading = ref(false)
+const sshConfigSaving = ref(false)
+
 const statusCards = computed(() => [
   { key: 'ebpf', label: 'eBPF Monitoring', value: status.value.ebpf_monitoring },
   { key: 'waf', label: 'ML-WAF', value: status.value.ml_waf },
@@ -412,12 +452,14 @@ function setTab(tab) {
   activeTab.value = tab
   router.replace({ query: { ...route.query, tab } })
   if (tab === 'fail2ban') loadFail2ban()
+  if (tab === 'ssh_config') loadSshConfig()
 }
 
 watch(
   () => route.query.tab,
   tab => {
     activeTab.value = tab || 'overview'
+    if (tab === 'ssh_config') loadSshConfig()
   },
 )
 
@@ -461,6 +503,32 @@ async function verify2fa() {
   if (totp.value.verifyResult) {
     authStore.updateUser({ two_fa_enabled: true })
     await loadStatus()
+  }
+}
+
+async function loadSshConfig() {
+  sshConfigLoading.value = true
+  try {
+    const res = await api.get('/security/ssh/config')
+    if (res.data?.data) {
+      sshConfig.value = res.data.data
+    }
+  } catch (err) {
+    alert('SSH ayarları okunamadı: ' + err.message)
+  } finally {
+    sshConfigLoading.value = false
+  }
+}
+
+async function saveSshConfig() {
+  sshConfigSaving.value = true
+  try {
+    await api.post('/security/ssh/config', sshConfig.value)
+    alert('SSH ayarları başarıyla kaydedildi ve servis yeniden başlatıldı.')
+  } catch (err) {
+    alert('Hata: ' + (err.response?.data?.message || err.message))
+  } finally {
+    sshConfigSaving.value = false
   }
 }
 
