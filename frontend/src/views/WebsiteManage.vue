@@ -7,23 +7,18 @@
         <div class="absolute inset-0 bg-[linear-gradient(120deg,rgba(16,185,129,0.14),transparent_38%,rgba(6,182,212,0.14))]"></div>
       </div>
 
-      <div class="relative space-y-6">
-        <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="relative space-y-8">
+        <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="space-y-2">
-            <span class="inline-flex items-center gap-2 rounded-full border border-brand-500/25 bg-brand-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-200">
-              {{ t('website_manage.hero_badge') }}
-            </span>
-            <div>
-              <div class="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-500">
-                <span>{{ t('website_manage.title') }}</span>
-                <ChevronRight class="h-3.5 w-3.5" />
-                <span class="text-brand-300">{{ domain }}</span>
-              </div>
-              <h1 class="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ domain }}</h1>
-              <p class="mt-3 max-w-3xl text-sm leading-6 text-gray-300 sm:text-base">
-                {{ t('website_manage.subtitle') }}
-              </p>
+            <div class="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-500">
+              <span>{{ t('website_manage.title') }}</span>
+              <ChevronRight class="h-3.5 w-3.5" />
+              <span class="text-brand-300">{{ domain }}</span>
             </div>
+            <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ domain }}</h1>
+            <p class="max-w-3xl text-sm leading-6 text-gray-300 sm:text-base">
+              {{ t('website_manage.launcher_subtitle') }}
+            </p>
           </div>
 
           <div class="flex flex-wrap gap-2">
@@ -38,102 +33,61 @@
           </div>
         </div>
 
-        <div class="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
-          <div class="space-y-5">
-            <p class="max-w-2xl text-sm text-gray-400">{{ t('website_manage.hero_body') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium"
+            :class="isSuspended ? 'border-amber-400/25 bg-amber-400/10 text-amber-200' : 'border-brand-500/25 bg-brand-500/10 text-brand-100'"
+          >
+            <span class="h-2 w-2 rounded-full" :class="isSuspended ? 'bg-amber-300' : 'bg-brand-300'"></span>
+            {{ t('website_manage.status') }}: {{ isSuspended ? t('website_manage.suspended') : t('website_manage.active') }}
+          </span>
+          <span
+            class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium"
+            :class="site.ssl ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-100' : 'border-amber-400/25 bg-amber-400/10 text-amber-200'"
+          >
+            <ShieldCheck class="h-4 w-4" />
+            {{ t('website_manage.ssl') }}: {{ site.ssl ? t('website_manage.ssl_active') : t('website_manage.ssl_missing') }}
+          </span>
+          <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-gray-200">
+            <Server class="h-4 w-4 text-brand-300" />
+            PHP {{ form.php_version }}
+          </span>
+          <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-gray-200">
+            <Link2 class="h-4 w-4 text-cyan-300" />
+            {{ aliases.length }} {{ t('website_manage.summary.aliases') }}
+          </span>
+        </div>
 
-            <div class="flex flex-wrap gap-2">
-              <span
-                class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium"
-                :class="isSuspended ? 'border-amber-400/25 bg-amber-400/10 text-amber-200' : 'border-brand-500/25 bg-brand-500/10 text-brand-100'"
-              >
-                <span class="h-2 w-2 rounded-full" :class="isSuspended ? 'bg-amber-300' : 'bg-brand-300'"></span>
-                {{ t('website_manage.status') }}: {{ isSuspended ? t('website_manage.suspended') : t('website_manage.active') }}
-              </span>
-              <span
-                class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium"
-                :class="site.ssl ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-100' : 'border-amber-400/25 bg-amber-400/10 text-amber-200'"
-              >
-                <ShieldCheck class="h-4 w-4" />
-                {{ t('website_manage.ssl') }}: {{ site.ssl ? t('website_manage.ssl_active') : t('website_manage.ssl_missing') }}
-              </span>
-              <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-gray-200">
-                <Server class="h-4 w-4 text-brand-300" />
-                PHP {{ form.php_version }}
-              </span>
-              <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-gray-200">
-                <Link2 class="h-4 w-4 text-cyan-300" />
-                {{ aliases.length }} {{ t('website_manage.summary.aliases') }}
-              </span>
-            </div>
-
-            <div class="space-y-3">
-              <div class="flex items-center justify-between gap-3">
-                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">{{ t('website_manage.quick_actions') }}</p>
-                <p class="text-xs text-gray-500">{{ t('website_manage.jump_to') }}</p>
-              </div>
-
-              <div class="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-                <button
-                  v-for="action in quickActions"
-                  :key="action.key"
-                  class="group flex h-full flex-col items-start gap-3 rounded-2xl border px-4 py-4 text-left transition-all duration-300 hover:-translate-y-0.5"
-                  :class="quickActionClass(action.key)"
-                  @click="action.handler"
-                >
-                  <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white shadow-inner shadow-white/5">
-                    <component :is="action.icon" class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p class="font-semibold text-white">{{ action.label }}</p>
-                    <p class="mt-1 text-sm text-gray-300">{{ action.description }}</p>
-                  </div>
-                </button>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <a
-                  v-for="section in sectionLinks"
-                  :key="section.id"
-                  :href="`#${section.id}`"
-                  class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm font-medium text-gray-300 transition hover:border-brand-500/40 hover:text-white"
-                >
-                  <component :is="section.icon" class="h-4 w-4 text-brand-300" />
-                  {{ section.label }}
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-[28px] border border-white/10 bg-slate-950/45 p-5 backdrop-blur-sm">
-            <div class="flex items-center justify-between gap-3">
+        <div class="space-y-6">
+          <div v-for="group in launcherGroups" :key="group.key" class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">{{ t('website_manage.live_snapshot') }}</p>
-                <p class="mt-2 text-lg font-semibold text-white">{{ form.owner || 'aura' }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">{{ group.label }}</p>
+                <p class="mt-1 text-sm text-gray-400">{{ group.description }}</p>
               </div>
-              <div class="rounded-2xl border border-brand-500/20 bg-brand-500/10 px-3 py-2 text-right">
-                <p class="text-[11px] uppercase tracking-[0.18em] text-brand-200">{{ t('website_manage.package') }}</p>
-                <p class="mt-1 text-sm font-semibold text-white">{{ form.package || 'default' }}</p>
-              </div>
+              <span class="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-gray-400">
+                {{ group.items.length }} {{ t('website_manage.launcher_items') }}
+              </span>
             </div>
 
-            <div class="mt-5 grid grid-cols-2 gap-3">
-              <div
-                v-for="card in summaryCards"
-                :key="card.label"
-                class="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <component
+                :is="item.href ? 'a' : 'button'"
+                v-for="item in group.items"
+                :key="item.key"
+                :href="item.href"
+                class="group flex min-h-[110px] items-center gap-4 rounded-[24px] border border-white/10 bg-slate-950/35 px-4 py-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/35 hover:bg-slate-950/55"
+                @click="item.action ? item.action() : null"
               >
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">{{ card.label }}</p>
-                  <component :is="card.icon" class="h-4 w-4" :class="card.iconClass" />
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
+                  <component :is="item.icon" class="h-7 w-7" :class="item.iconClass || 'text-brand-300'" />
                 </div>
-                <p class="mt-3 text-base font-semibold text-white">{{ card.value }}</p>
-              </div>
-            </div>
-
-            <div class="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">{{ t('website_manage.admin_email') }}</p>
-              <p class="mt-2 break-all text-sm font-semibold text-white">{{ adminEmail }}</p>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-base font-semibold text-white">{{ item.label }}</p>
+                  <p class="mt-1 text-sm leading-5 text-gray-400">{{ item.description }}</p>
+                  <p v-if="item.badge" class="mt-2 text-xs font-medium text-brand-200">{{ item.badge }}</p>
+                </div>
+              </component>
             </div>
           </div>
         </div>
@@ -587,6 +541,118 @@ const trafficRanges = computed(() => [
   { value: 24, label: t('website_manage.insights.last_24_hours') },
   { value: 72, label: t('website_manage.insights.last_3_days') },
   { value: 168, label: t('website_manage.insights.last_7_days') },
+])
+
+const launcherGroups = computed(() => [
+  {
+    key: 'site',
+    label: t('website_manage.launcher.site_title'),
+    description: t('website_manage.launcher.site_body'),
+    items: [
+      {
+        key: 'profile',
+        label: t('website_manage.sections.profile_title'),
+        description: t('website_manage.launcher.profile_desc'),
+        href: '#profile',
+        icon: Settings2,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'aliases',
+        label: t('website_manage.alias_title'),
+        description: t('website_manage.launcher.alias_desc'),
+        href: '#domain',
+        icon: Link2,
+        iconClass: 'text-brand-300',
+        badge: `${aliases.value.length} ${t('website_manage.summary.aliases')}`,
+      },
+      {
+        key: 'traffic',
+        label: t('website_manage.insights.hourly_traffic'),
+        description: t('website_manage.launcher.traffic_desc'),
+        href: '#observability',
+        icon: Activity,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'logs',
+        label: t('website_manage.insights.logs'),
+        description: t('website_manage.launcher.logs_desc'),
+        href: '#observability',
+        icon: ScrollText,
+        iconClass: 'text-amber-300',
+      },
+    ],
+  },
+  {
+    key: 'security',
+    label: t('website_manage.launcher.security_title'),
+    description: t('website_manage.launcher.security_body'),
+    items: [
+      {
+        key: 'ssl',
+        label: t('website_manage.issue_ssl'),
+        description: t('website_manage.launcher.ssl_desc'),
+        href: '#security',
+        icon: ShieldCheck,
+      },
+      {
+        key: 'open_basedir',
+        label: t('website_manage.open_basedir'),
+        description: t('website_manage.launcher.open_basedir_desc'),
+        href: '#security',
+        icon: Lock,
+        iconClass: 'text-cyan-300',
+        badge: advanced.value.open_basedir ? t('website_manage.enabled') : 'Off',
+      },
+      {
+        key: 'custom_ssl',
+        label: t('website_manage.custom_ssl'),
+        description: t('website_manage.launcher.custom_ssl_desc'),
+        href: '#security',
+        icon: ShieldCheck,
+        iconClass: 'text-brand-300',
+      },
+    ],
+  },
+  {
+    key: 'server',
+    label: t('website_manage.launcher.server_title'),
+    description: t('website_manage.launcher.server_body'),
+    items: [
+      {
+        key: 'rewrite',
+        label: t('website_manage.rewrite'),
+        description: t('website_manage.launcher.rewrite_desc'),
+        href: '#server',
+        icon: ScrollText,
+      },
+      {
+        key: 'vhost',
+        label: t('website_manage.vhost_config'),
+        description: t('website_manage.launcher.vhost_desc'),
+        href: '#server',
+        icon: Server,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'save',
+        label: t('website_manage.save'),
+        description: t('website_manage.quick_action_save'),
+        action: saveWebsite,
+        icon: Save,
+        iconClass: 'text-brand-300',
+      },
+      {
+        key: 'suspend',
+        label: isSuspended.value ? t('website_manage.unsuspend') : t('website_manage.suspend'),
+        description: isSuspended.value ? t('website_manage.quick_action_unsuspend') : t('website_manage.quick_action_suspend'),
+        action: toggleSuspend,
+        icon: isSuspended.value ? PlayCircle : PauseCircle,
+        iconClass: 'text-amber-300',
+      },
+    ],
+  },
 ])
 
 function quickActionClass(key) {
