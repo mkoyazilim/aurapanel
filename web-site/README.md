@@ -10,7 +10,7 @@ Community form submissions are handled by:
 
 Required server-side environment file:
 
-- `/etc/aurapanel/community-site.env`
+- `/home/aurapanel.info/.config/community-site.env`
 
 Reference template:
 

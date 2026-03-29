@@ -29,7 +29,16 @@ function envFilePath(): string
     if (is_string($path) && trim($path) !== '') {
         return trim($path);
     }
-    return '/etc/aurapanel/community-site.env';
+    $candidates = [
+        '/home/aurapanel.info/.config/community-site.env',
+        '/etc/aurapanel/community-site.env',
+    ];
+    foreach ($candidates as $candidate) {
+        if (is_file($candidate)) {
+            return $candidate;
+        }
+    }
+    return $candidates[0];
 }
 
 function loadEnvFile(string $path): array
