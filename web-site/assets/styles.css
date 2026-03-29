@@ -125,16 +125,12 @@ a {
   color: var(--primary-strong);
 }
 
-.nav-cta {
+.nav-join {
   white-space: nowrap;
 }
 
-.nav-mobile-cta {
-  display: none;
-}
-
 .menu-toggle {
-  display: none;
+  display: none !important;
   align-items: center;
   gap: 0.45rem;
   border: 1px solid #bdd5ff;
@@ -672,7 +668,7 @@ a {
 
 @media (max-width: 720px) {
   .menu-toggle {
-    display: inline-flex;
+    display: inline-flex !important;
   }
 
   .main-nav {
@@ -706,15 +702,11 @@ a {
     background: #eef5ff;
   }
 
-  .nav-mobile-cta {
+  .nav-join {
     display: inline-flex;
     margin-top: 0.35rem;
     width: 100%;
     justify-content: center;
-  }
-
-  .nav-cta {
-    display: none;
   }
 
   .section {
