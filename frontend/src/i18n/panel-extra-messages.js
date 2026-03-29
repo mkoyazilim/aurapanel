@@ -1267,6 +1267,14 @@ Object.assign(extraEn, {
       list: 'List Keys',
       delete: 'Delete',
     },
+    fail2ban: {
+      title: 'Fail2Ban Manager',
+      desc: 'Detect and block bruteforce and unauthorized access attempts.',
+      status_label: 'Service Status',
+      logs_title: 'Fail2Ban Logs / Status Output',
+      unban_title: 'Unban IP Address',
+      unban_btn: 'Unban IP',
+    },
     hardening: {
       title: 'One-Click Hardening',
       stack: 'Stack',
@@ -1506,6 +1514,14 @@ Object.assign(extraTr, {
       add_key: 'Key Ekle',
       list: 'Listele',
       delete: 'Sil',
+    },
+    fail2ban: {
+      title: 'Fail2Ban Yoneticisi',
+      desc: 'Bruteforce ve yetkisiz erisim denemelerini tespit edip engeller.',
+      status_label: 'Servis Durumu',
+      logs_title: 'Fail2Ban Loglari / Durum Ciktisi',
+      unban_title: 'IP Engeli Kaldir (Unban)',
+      unban_btn: 'Unban IP',
     },
     ssh_config: {
       title: 'SSH Yapilandirmasi',
