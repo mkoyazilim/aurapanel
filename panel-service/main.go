@@ -24,8 +24,10 @@ import (
 )
 
 const (
-	defaultServiceAddr = ":8081"
-	defaultGatewayPort = 8090
+	defaultServiceAddr  = ":8081"
+	defaultGatewayPort  = 8090
+	currentPanelVersion = "Aura Panel V1"
+	updateCacheTTL      = 15 * time.Minute
 )
 
 type apiResponse struct {
@@ -175,6 +177,24 @@ type FirewallRule struct {
 	Reason    string `json:"reason"`
 }
 
+type UpdateStatus struct {
+	CurrentVersion  string `json:"current_version"`
+	LatestVersion   string `json:"latest_version,omitempty"`
+	UpdateAvailable bool   `json:"update_available"`
+	ReleaseName     string `json:"release_name,omitempty"`
+	ReleaseURL      string `json:"release_url,omitempty"`
+	ReleaseNotes    string `json:"release_notes,omitempty"`
+	PublishedAt     string `json:"published_at,omitempty"`
+	Source          string `json:"source"`
+	CheckedAt       string `json:"checked_at,omitempty"`
+	Error           string `json:"error,omitempty"`
+}
+
+type updateStatusCache struct {
+	Data      UpdateStatus
+	CheckedAt time.Time
+}
+
 type SSHKey struct {
 	ID        string `json:"id"`
 	User      string `json:"user"`
@@ -243,6 +263,7 @@ type service struct {
 	startedAt time.Time
 	state     appState
 	modules   moduleState
+	update    updateStatusCache
 }
 
 type jwtClaims struct {
@@ -534,6 +555,8 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleServices(w)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/processes":
 		s.handleProcesses(w)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/update":
+		s.handleUpdateStatus(w)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/service/control":
 		s.handleServiceControl(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/panel-port":
@@ -590,11 +613,131 @@ func (s *service) handleHealth(w http.ResponseWriter) {
 		Data: map[string]interface{}{
 			"name":         "AuraPanel Go Service",
 			"architecture": "vue -> go-gateway -> go-service",
-			"version":      "2026.03-go",
+			"version":      currentPanelVersion,
 			"status":       "ok",
 			"uptime":       time.Since(s.startedAt).Round(time.Second).String(),
 		},
 	})
+}
+
+func (s *service) handleUpdateStatus(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, apiResponse{
+		Status: "success",
+		Data:   s.getUpdateStatus(),
+	})
+}
+
+func (s *service) getUpdateStatus() UpdateStatus {
+	s.mu.RLock()
+	cached := s.update
+	s.mu.RUnlock()
+
+	if !cached.CheckedAt.IsZero() && time.Since(cached.CheckedAt) < updateCacheTTL {
+		return cached.Data
+	}
+
+	status := fetchLatestReleaseStatus()
+
+	s.mu.Lock()
+	s.update = updateStatusCache{
+		Data:      status,
+		CheckedAt: time.Now().UTC(),
+	}
+	s.mu.Unlock()
+
+	return status
+}
+
+func fetchLatestReleaseStatus() UpdateStatus {
+	status := UpdateStatus{
+		CurrentVersion: currentPanelVersion,
+		Source:         "GitHub Releases",
+		CheckedAt:      time.Now().UTC().Format(time.RFC3339),
+	}
+
+	owner := envOr("AURAPANEL_GH_OWNER", "mkoyazilim")
+	repo := envOr("AURAPANEL_GH_REPO", "aurapanel")
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		status.Error = err.Error()
+		return status
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "aurapanel-panel-service")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		status.Error = err.Error()
+		return status
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		status.Error = fmt.Sprintf("GitHub release check returned HTTP %d", resp.StatusCode)
+		return status
+	}
+
+	var payload struct {
+		TagName     string `json:"tag_name"`
+		Name        string `json:"name"`
+		HTMLURL     string `json:"html_url"`
+		Body        string `json:"body"`
+		PublishedAt string `json:"published_at"`
+		Draft       bool   `json:"draft"`
+		PreRelease  bool   `json:"prerelease"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		status.Error = err.Error()
+		return status
+	}
+
+	if payload.Draft {
+		status.Error = "Latest GitHub release is still marked as draft."
+		return status
+	}
+
+	status.ReleaseName = strings.TrimSpace(payload.Name)
+	status.LatestVersion = firstNonEmpty(strings.TrimSpace(payload.Name), strings.TrimSpace(payload.TagName))
+	status.ReleaseURL = strings.TrimSpace(payload.HTMLURL)
+	status.PublishedAt = strings.TrimSpace(payload.PublishedAt)
+	status.ReleaseNotes = summarizeReleaseNotes(payload.Body)
+
+	currentComparable := normalizeComparableVersion(status.CurrentVersion)
+	latestComparable := normalizeComparableVersion(status.LatestVersion)
+	status.UpdateAvailable = latestComparable != "" && latestComparable != currentComparable
+	return status
+}
+
+func summarizeReleaseNotes(body string) string {
+	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(strings.TrimLeft(line, "-*# "))
+		if trimmed == "" {
+			continue
+		}
+		if len(trimmed) > 180 {
+			return trimmed[:180] + "..."
+		}
+		return trimmed
+	}
+	return ""
+}
+
+func normalizeComparableVersion(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	replacer := strings.NewReplacer(
+		"aurapanel", "",
+		"aura panel", "",
+		"release", "",
+		"version", "",
+		" ", "",
+		"_", "",
+		"-", "",
+	)
+	return replacer.Replace(normalized)
 }
 
 func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {

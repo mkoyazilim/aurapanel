@@ -59,6 +59,7 @@ func resellerAllowed(path string) bool {
 		"/api/v1/status/metrics",
 		"/api/v1/status/services",
 		"/api/v1/status/processes",
+		"/api/v1/status/update",
 		"/api/v1/analytics/website-traffic",
 	}
 
@@ -71,7 +72,7 @@ func resellerAllowed(path string) bool {
 }
 
 func userAllowed(method, path string) bool {
-	if path == "/api/v1/auth/me" || path == "/api/v1/status/metrics" || path == "/api/v1/status/services" {
+	if path == "/api/v1/auth/me" || path == "/api/v1/status/metrics" || path == "/api/v1/status/services" || path == "/api/v1/status/update" {
 		return true
 	}
 

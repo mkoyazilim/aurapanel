@@ -4,6 +4,59 @@
       {{ error }}
     </div>
 
+    <div class="aura-card border border-panel-border/80 bg-panel-card/95">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <div class="flex items-center gap-3">
+            <ArrowUpCircle class="h-6 w-6" :class="updateStatus.update_available ? 'text-amber-400' : 'text-brand-400'" />
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Release Channel</p>
+              <h2 class="text-xl font-bold text-white">{{ updateStatus.current_version }}</h2>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-gray-400">
+            {{ updateStatus.update_available ? 'A newer GitHub release is available for this panel.' : 'This server is currently running the configured panel version.' }}
+          </p>
+        </div>
+
+        <div class="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold"
+          :class="updateStatus.update_available ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-brand-500/10 text-brand-300 border border-brand-500/20'">
+          {{ updateStatus.update_available ? 'Update Available' : 'Up to Date' }}
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="rounded-xl border border-panel-border/70 bg-panel-darker/60 p-4">
+          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Current Version</p>
+          <p class="mt-2 text-lg font-semibold text-white">{{ updateStatus.current_version }}</p>
+        </div>
+        <div class="rounded-xl border border-panel-border/70 bg-panel-darker/60 p-4">
+          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Latest Release</p>
+          <p class="mt-2 text-lg font-semibold text-white">{{ updateStatus.latest_version || 'Not checked yet' }}</p>
+          <p v-if="updateStatus.published_at" class="mt-1 text-xs text-gray-500">{{ formatReleaseDate(updateStatus.published_at) }}</p>
+        </div>
+        <div class="rounded-xl border border-panel-border/70 bg-panel-darker/60 p-4">
+          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Source</p>
+          <p class="mt-2 text-lg font-semibold text-white">{{ updateStatus.source || 'GitHub Releases' }}</p>
+          <p v-if="updateStatus.checked_at" class="mt-1 text-xs text-gray-500">Last checked: {{ formatReleaseDate(updateStatus.checked_at) }}</p>
+        </div>
+      </div>
+
+      <div v-if="updateStatus.release_notes || updateStatus.error || updateStatus.release_url" class="mt-4 rounded-xl border border-panel-border/60 bg-black/10 p-4">
+        <p v-if="updateStatus.release_notes" class="text-sm text-gray-300">{{ updateStatus.release_notes }}</p>
+        <p v-if="updateStatus.error" class="text-sm text-yellow-300">{{ updateStatus.error }}</p>
+        <a
+          v-if="updateStatus.release_url"
+          :href="updateStatus.release_url"
+          target="_blank"
+          rel="noreferrer"
+          class="mt-3 inline-flex items-center text-sm font-medium text-brand-300 hover:text-brand-200 transition"
+        >
+          View GitHub release
+        </a>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
       <div
         v-for="card in serverStatusCards"
@@ -73,7 +126,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Server, Globe, Database, ShieldCheck, Activity, Cpu, MemoryStick, HardDrive, Clock } from 'lucide-vue-next'
+import { Server, Globe, Database, ShieldCheck, Activity, Cpu, MemoryStick, HardDrive, Clock, ArrowUpCircle } from 'lucide-vue-next'
 import api from '../services/api'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -97,6 +150,18 @@ const stats = ref([
 ])
 
 const logs = ref([])
+const updateStatus = ref({
+  current_version: 'Aura Panel V1',
+  latest_version: '',
+  update_available: false,
+  release_name: '',
+  release_url: '',
+  release_notes: '',
+  published_at: '',
+  source: 'GitHub Releases',
+  checked_at: '',
+  error: '',
+})
 
 function summarizeTime(value) {
   if (!value) return t('dashboard.na')
@@ -108,6 +173,15 @@ function summarizeLine(value, max = 42) {
   if (!value) return t('dashboard.na')
   const text = String(value)
   return text.length > max ? `${text.slice(0, max)}...` : text
+}
+
+function formatReleaseDate(value) {
+  if (!value) return t('dashboard.na')
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return date.toLocaleString()
 }
 
 async function loadDashboard() {
@@ -209,6 +283,24 @@ async function loadDashboard() {
     }
 
     logs.value = [...ebpfLog, ...serviceLog].slice(0, 5)
+
+    try {
+      const updateRes = await api.get('/status/update', {
+        headers: {
+          'X-Aura-Silent-Error': '1',
+        },
+      })
+      updateStatus.value = {
+        ...updateStatus.value,
+        ...(updateRes.data?.data || {}),
+      }
+    } catch {
+      updateStatus.value = {
+        ...updateStatus.value,
+        current_version: updateStatus.value.current_version || 'Aura Panel V1',
+        error: 'Unable to check GitHub releases right now.',
+      }
+    }
   } catch (err) {
     error.value = err?.response?.data?.message || err?.message || t('dashboard.load_failed')
   } finally {
