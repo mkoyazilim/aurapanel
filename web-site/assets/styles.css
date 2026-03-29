@@ -61,13 +61,16 @@ a {
   gap: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.2px;
+  line-height: 1;
 }
 
 .brand-logo {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
   object-fit: contain;
-  border-radius: 10px;
+  border-radius: 12px;
+  display: block;
 }
 
 .brand-dot {
