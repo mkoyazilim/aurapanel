@@ -33,7 +33,7 @@ func TestLoadAdminCredentialsReadsGatewayEnvFile(t *testing.T) {
 	}
 }
 
-func TestLoadAdminCredentialsPrefersExplicitEnvPasswordOverGatewayFileHash(t *testing.T) {
+func TestLoadAdminCredentialsPrefersGatewayFilePasswordOverProcessEnv(t *testing.T) {
 	tmp := t.TempDir()
 	envPath := filepath.Join(tmp, "aurapanel.env")
 	rawHash, err := bcrypt.GenerateFromPassword([]byte("old-secret"), bcrypt.DefaultCost)
@@ -58,13 +58,16 @@ func TestLoadAdminCredentialsPrefersExplicitEnvPasswordOverGatewayFileHash(t *te
 	if err != nil {
 		t.Fatalf("loadAdminCredentials returned error: %v", err)
 	}
-	if creds.passwordHash != "" {
-		t.Fatalf("expected explicit env password to bypass file hash, got %q", creds.passwordHash)
+	if creds.passwordHash == "" {
+		t.Fatalf("expected gateway env file hash to be used")
 	}
-	if creds.passwordText != "new-secret" {
-		t.Fatalf("expected explicit env password, got %q", creds.passwordText)
+	if creds.passwordText != "" {
+		t.Fatalf("expected plaintext password to be ignored when hash exists, got %q", creds.passwordText)
 	}
-	if !verifyPassword("new-secret", creds) {
-		t.Fatalf("expected explicit env password to authenticate successfully")
+	if !verifyPassword("old-secret", creds) {
+		t.Fatalf("expected gateway env file hash to authenticate successfully")
+	}
+	if verifyPassword("new-secret", creds) {
+		t.Fatalf("expected process env plaintext password to be ignored when file hash exists")
 	}
 }

@@ -98,22 +98,22 @@ func loadAdminCredentials() (adminCredentials, error) {
 	envEmail := strings.TrimSpace(os.Getenv("AURAPANEL_ADMIN_EMAIL"))
 	envPasswordHash := strings.TrimSpace(os.Getenv("AURAPANEL_ADMIN_PASSWORD_BCRYPT"))
 	envPasswordText := strings.TrimSpace(os.Getenv("AURAPANEL_ADMIN_PASSWORD"))
+	fileEmail := strings.TrimSpace(readEnvFileValue(gatewayEnvPath(), "AURAPANEL_ADMIN_EMAIL"))
+	filePasswordHash := strings.TrimSpace(readEnvFileValue(gatewayEnvPath(), "AURAPANEL_ADMIN_PASSWORD_BCRYPT"))
+	filePasswordText := strings.TrimSpace(readEnvFileValue(gatewayEnvPath(), "AURAPANEL_ADMIN_PASSWORD"))
 	creds := adminCredentials{
-		email:        envEmail,
-		passwordHash: envPasswordHash,
-		passwordText: envPasswordText,
+		email:        firstNonEmpty(fileEmail, envEmail),
+		passwordHash: firstNonEmpty(filePasswordHash, envPasswordHash),
+		passwordText: firstNonEmpty(filePasswordText, envPasswordText),
 	}
 
 	if creds.email == "" {
-		creds.email = readEnvFileValue(gatewayEnvPath(), "AURAPANEL_ADMIN_EMAIL")
-	}
-	if envPasswordHash == "" && envPasswordText == "" {
-		creds.passwordHash = readEnvFileValue(gatewayEnvPath(), "AURAPANEL_ADMIN_PASSWORD_BCRYPT")
-		creds.passwordText = readEnvFileValue(gatewayEnvPath(), "AURAPANEL_ADMIN_PASSWORD")
+		creds.email = defaultAdminEmail()
 	}
 
-	if creds.email == "" {
-		creds.email = "admin@server.com"
+	// When both are present, hashed value is authoritative.
+	if creds.passwordHash != "" {
+		creds.passwordText = ""
 	}
 
 	if creds.passwordHash == "" && creds.passwordText == "" {
@@ -132,6 +132,19 @@ func loadAdminCredentials() (adminCredentials, error) {
 	}
 
 	return creds, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func defaultAdminEmail() string {
+	return "admin@server.com"
 }
 
 func verifyPassword(input string, creds adminCredentials) bool {
