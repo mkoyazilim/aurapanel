@@ -5,6 +5,8 @@
   }
 
   var message = document.getElementById("formMessage");
+  var submitButton = form.querySelector("button[type='submit']");
+  var endpoint = form.getAttribute("data-endpoint") || "./api/community_join.php";
 
   function setMessage(text, ok) {
     if (!message) {
@@ -12,6 +14,15 @@
     }
     message.textContent = text;
     message.style.color = ok ? "#0d8a58" : "#be3a17";
+  }
+
+  function setSubmitting(active) {
+    if (!submitButton) {
+      return;
+    }
+    submitButton.disabled = active;
+    submitButton.textContent = active ? "Sending..." : "Send Join Request";
+    submitButton.style.opacity = active ? "0.8" : "1";
   }
 
   function isEmail(value) {
@@ -23,18 +34,43 @@
     return node ? node.value.trim() : "";
   }
 
-  form.addEventListener("submit", function (event) {
+  async function submitRequest(payload) {
+    var response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    var data = null;
+    try {
+      data = await response.json();
+    } catch (_err) {
+      data = { message: "Unexpected response." };
+    }
+
+    if (!response.ok || !data || data.status !== "success") {
+      var reason = data && data.message ? data.message : "Request could not be submitted right now.";
+      throw new Error(reason);
+    }
+  }
+
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
+    setMessage("", false);
 
     var payload = {
-      fullName: readValue("fullName"),
+      full_name: readValue("fullName"),
       email: readValue("email"),
+      company: readValue("company"),
       role: readValue("role"),
       focus: readValue("focus"),
-      submittedAt: new Date().toISOString()
+      website_url: readValue("websiteUrl")
     };
 
-    if (!payload.fullName || payload.fullName.length < 2) {
+    if (!payload.full_name || payload.full_name.length < 2) {
       setMessage("Please enter a valid full name.", false);
       return;
     }
@@ -51,21 +87,15 @@
       return;
     }
 
-    var storageKey = "aurapanel_community_requests";
-    var list = [];
+    setSubmitting(true);
     try {
-      var existing = localStorage.getItem(storageKey);
-      list = existing ? JSON.parse(existing) : [];
-      if (!Array.isArray(list)) {
-        list = [];
-      }
-    } catch (_err) {
-      list = [];
+      await submitRequest(payload);
+      form.reset();
+      setMessage("Request submitted successfully. We will contact you through your work email.", true);
+    } catch (error) {
+      setMessage(error && error.message ? error.message : "Request could not be submitted right now.", false);
+    } finally {
+      setSubmitting(false);
     }
-
-    list.push(payload);
-    localStorage.setItem(storageKey, JSON.stringify(list));
-    form.reset();
-    setMessage("Request saved. Thank you. We will contact you through your work email.", true);
   });
 })();

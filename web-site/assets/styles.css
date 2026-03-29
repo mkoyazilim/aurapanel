@@ -421,6 +421,15 @@ a {
   min-height: 1.3rem;
 }
 
+.bot-trap {
+  position: absolute !important;
+  left: -10000px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+}
+
 .fine-print {
   font-size: 0.86rem;
   color: #6e809b;

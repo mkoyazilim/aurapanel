@@ -137,14 +137,17 @@
           <p class="eyebrow">Join Program</p>
           <h2>Request community access.</h2>
           <p>Submit your details and we will follow up with onboarding steps and channel invites.</p>
-          <p class="fine-print">Note: This first version stores your request in browser storage for quick demo flow.</p>
+          <p class="fine-print">Requests are submitted to our community intake database. We do not share your information with third parties.</p>
         </div>
-        <form id="joinForm" class="join-form reveal" novalidate>
+        <form id="joinForm" class="join-form reveal" data-endpoint="./api/community_join.php" novalidate>
           <label for="fullName">Full Name</label>
           <input id="fullName" name="fullName" type="text" autocomplete="name" required>
 
           <label for="email">Work Email</label>
           <input id="email" name="email" type="email" autocomplete="email" required>
+
+          <label for="company">Company (Optional)</label>
+          <input id="company" name="company" type="text" autocomplete="organization">
 
           <label for="role">Role</label>
           <select id="role" name="role" required>
@@ -158,6 +161,9 @@
           <label for="focus">Focus Area</label>
           <textarea id="focus" name="focus" rows="4" placeholder="Security hardening, migration, DNS, mail, monitoring..." required></textarea>
 
+          <label class="bot-trap" for="websiteUrl">Website URL</label>
+          <input class="bot-trap" id="websiteUrl" name="websiteUrl" type="text" autocomplete="off" tabindex="-1">
+
           <button class="btn btn-primary" type="submit">Send Join Request</button>
           <p id="formMessage" class="form-message" aria-live="polite"></p>
         </form>
@@ -167,7 +173,7 @@
 
   <footer class="site-footer">
     <div class="container footer-wrap">
-      <p>© <span id="year"></span> AuraPanel Community.</p>
+      <p>(c) <span id="year"></span> AuraPanel Community.</p>
       <div class="footer-links">
         <a href="./index.html">Home</a>
         <a href="./community.html">Community</a>
