@@ -79,20 +79,29 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
 
+const route = useRoute()
+const router = useRouter()
 const { t } = useI18n({ useScope: 'global' })
 
-const tab = ref('versions')
+const normalizeTab = (query) => {
+  const value = String(query?.tab || '').trim().toLowerCase()
+  if (value === 'sites' || value === 'config') return value
+  return 'versions'
+}
+
+const tab = ref(normalizeTab(route.query))
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
 
 const phpVersions = ref([])
 const siteAssignments = ref([])
-const selectedConfigVersion = ref('')
+const selectedConfigVersion = ref(typeof route.query.version === 'string' ? route.query.version : '')
 const phpIniContent = ref('')
 
 const installedVersions = computed(() => phpVersions.value.filter(v => v.installed).map(v => v.version))
@@ -127,11 +136,11 @@ async function loadData() {
       email: site.email || '',
     }))
 
-    if (!selectedConfigVersion.value) {
+    if (!selectedConfigVersion.value || !installedVersions.value.includes(selectedConfigVersion.value)) {
       selectedConfigVersion.value = installedVersions.value[0] || ''
     }
 
-    if (selectedConfigVersion.value) {
+    if (selectedConfigVersion.value && tab.value === 'config') {
       await loadPhpIni()
     } else {
       phpIniContent.value = ''
@@ -231,7 +240,58 @@ async function savePhpIni() {
   }
 }
 
-onMounted(loadData)
+function syncRouteQuery() {
+  const nextQuery = {}
+  if (tab.value === 'sites') {
+    nextQuery.tab = 'sites'
+  }
+  if (tab.value === 'config') {
+    nextQuery.tab = 'config'
+  }
+  if (tab.value === 'config' && selectedConfigVersion.value) {
+    nextQuery.version = selectedConfigVersion.value
+  }
+
+  const currentTab = typeof route.query.tab === 'string' ? route.query.tab : ''
+  const currentVersion = typeof route.query.version === 'string' ? route.query.version : ''
+  const sameQuery = currentTab === (nextQuery.tab || '') && currentVersion === (nextQuery.version || '')
+  if (!sameQuery) {
+    router.replace({ path: '/php', query: nextQuery })
+  }
+}
+
+watch(
+  () => route.query,
+  (query) => {
+    const nextTab = normalizeTab(query)
+    const nextVersion = typeof query.version === 'string' ? query.version : ''
+    if (tab.value !== nextTab) {
+      tab.value = nextTab
+    }
+    if (selectedConfigVersion.value !== nextVersion && nextVersion) {
+      selectedConfigVersion.value = nextVersion
+    }
+  },
+  { immediate: true },
+)
+
+watch(tab, () => {
+  if (tab.value === 'config' && selectedConfigVersion.value) {
+    loadPhpIni()
+  }
+  syncRouteQuery()
+})
+
+watch(selectedConfigVersion, () => {
+  if (tab.value === 'config' && selectedConfigVersion.value) {
+    syncRouteQuery()
+  }
+})
+
+onMounted(async () => {
+  await loadData()
+  syncRouteQuery()
+})
 </script>
 
 <style scoped>

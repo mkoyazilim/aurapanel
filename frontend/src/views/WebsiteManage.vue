@@ -132,7 +132,9 @@
 
             <label class="block">
               <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">{{ t('website_manage.package') }}</span>
-              <input v-model="form.package" class="aura-input" :placeholder="t('website_manage.package')" />
+              <select v-model="form.package" class="aura-input">
+                <option v-for="pkg in packageOptions" :key="`manage-package-${pkg}`" :value="pkg">{{ pkg }}</option>
+              </select>
             </label>
 
             <label class="block">
@@ -454,6 +456,7 @@ const router = useRouter()
 
 const domain = computed(() => String(route.params.domain || '').toLowerCase())
 const phpVersions = ref([])
+const hostingPackages = ref([])
 
 const error = ref('')
 const site = ref({})
@@ -479,6 +482,21 @@ const adminEmail = computed(() => form.value.email || `webmaster@${domain.value}
 const isSuspended = computed(() => String(site.value?.status || 'active').toLowerCase() === 'suspended')
 const recentTrafficSeries = computed(() => (traffic.value.series || []).slice(-12))
 const recentMaxTrafficHit = computed(() => Math.max(1, ...recentTrafficSeries.value.map(item => Number(item.hits || 0))))
+const packageOptions = computed(() => {
+  const names = new Set(['default'])
+
+  for (const pkg of hostingPackages.value || []) {
+    const name = String(pkg?.name || '').trim()
+    if (name) names.add(name)
+  }
+
+  const currentPackage = String(form.value.package || site.value?.package || '').trim()
+  if (currentPackage) names.add(currentPackage)
+
+  const ordered = Array.from(names).filter(Boolean)
+  const tail = ordered.filter(name => name !== 'default').sort((a, b) => a.localeCompare(b))
+  return ['default', ...tail]
+})
 
 const insightRequestConfig = {
   timeout: 30000,
@@ -709,6 +727,15 @@ async function loadPhpVersions() {
   }
 }
 
+async function loadPackages() {
+  try {
+    const res = await api.get('/packages/list')
+    hostingPackages.value = res.data?.data || []
+  } catch {
+    hostingPackages.value = []
+  }
+}
+
 async function loadAliases() {
   const res = await api.get('/websites/aliases', { params: { domain: domain.value } })
   aliases.value = res.data?.data || []
@@ -792,7 +819,7 @@ async function refreshAll() {
   error.value = ''
   insightError.value = ''
   try {
-    await Promise.all([loadSite(), loadAliases(), loadAdvanced()])
+    await Promise.all([loadSite(), loadAliases(), loadAdvanced(), loadPackages()])
     await refreshInsights()
   } catch (err) {
     error.value = msg(err, 'website_manage.messages.load_failed')
@@ -921,6 +948,13 @@ function goBack() {
 watch(insightTab, async () => {
   await refreshInsights()
 })
+
+watch(packageOptions, (options) => {
+  if (!options.length) return
+  if (!options.includes(form.value.package)) {
+    form.value.package = options[0]
+  }
+}, { immediate: true })
 
 onMounted(() => {
   loadPhpVersions()

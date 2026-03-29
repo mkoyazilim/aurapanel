@@ -192,6 +192,12 @@ const routes = [
         component: () => import('../views/OlsTuning.vue')
       },
       {
+        path: 'mail-tuning',
+        name: 'MailTuning',
+        component: () => import('../views/MailTuning.vue'),
+        meta: { title: 'Mail Tuning' }
+      },
+      {
         path: 'reseller',
         name: 'Reseller',
         component: () => import('../views/Reseller.vue')

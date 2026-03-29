@@ -377,16 +377,25 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Database, Plus, Settings2 } from 'lucide-vue-next'
 import api from '../services/api'
 
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n({ useScope: 'global' })
 
-const engine = ref('mariadb')
-const tuningEngine = ref('mariadb') // Default tuning engine
+const normalizeMainEngine = (query) => {
+  if (query?.tab === 'tuning') return 'tuning'
+  return query?.engine === 'postgresql' ? 'postgresql' : 'mariadb'
+}
+
+const normalizeTuningEngine = (query) =>
+  query?.tuning_engine === 'postgresql' ? 'postgresql' : 'mariadb'
+
+const engine = ref(normalizeMainEngine(route.query))
+const tuningEngine = ref(normalizeTuningEngine(route.query))
 const showCreateModal = ref(false)
 const notification = ref(null)
 
@@ -546,6 +555,26 @@ const showNotif = (message, type = 'success') => {
   setTimeout(() => {
     notification.value = null
   }, 3500)
+}
+
+function syncRouteQuery() {
+  const nextQuery = engine.value === 'tuning'
+    ? { tab: 'tuning', tuning_engine: tuningEngine.value }
+    : engine.value === 'postgresql'
+      ? { engine: 'postgresql' }
+      : {}
+
+  const currentTab = typeof route.query.tab === 'string' ? route.query.tab : ''
+  const currentEngine = typeof route.query.engine === 'string' ? route.query.engine : ''
+  const currentTuningEngine = typeof route.query.tuning_engine === 'string' ? route.query.tuning_engine : ''
+
+  const sameQuery = currentTab === (nextQuery.tab || '')
+    && currentEngine === (nextQuery.engine || '')
+    && currentTuningEngine === (nextQuery.tuning_engine || '')
+
+  if (!sameQuery) {
+    router.replace({ path: '/databases', query: nextQuery })
+  }
 }
 
 function resetCreateForm() {
@@ -764,7 +793,30 @@ watch(engine, (value) => {
   } else {
     createForm.value.engine = value
   }
+  syncRouteQuery()
 })
+
+watch(tuningEngine, () => {
+  if (engine.value === 'tuning') {
+    loadTuning()
+  }
+  syncRouteQuery()
+})
+
+watch(
+  () => route.query,
+  (query) => {
+    const nextEngine = normalizeMainEngine(query)
+    const nextTuningEngine = normalizeTuningEngine(query)
+    if (engine.value !== nextEngine) {
+      engine.value = nextEngine
+    }
+    if (tuningEngine.value !== nextTuningEngine) {
+      tuningEngine.value = nextTuningEngine
+    }
+  },
+  { immediate: true },
+)
 
 watch(showCreateModal, (open) => {
   if (open && !createForm.value.site_domain && siteOptions.value.length > 0) {
@@ -782,5 +834,9 @@ watch(websitePackageOptions, (options) => {
 onMounted(async () => {
   await loadData()
   resetCreateForm()
+  if (engine.value === 'tuning') {
+    await loadTuning()
+  }
+  syncRouteQuery()
 })
 </script>

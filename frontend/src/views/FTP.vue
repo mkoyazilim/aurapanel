@@ -186,7 +186,7 @@ const showCreate = ref(false)
 const showReset = ref(false)
 const selectedDomain = ref(typeof route.query.domain === 'string' ? route.query.domain : '')
 
-const activeTab = ref('ftp')
+const activeTab = ref(route.query.tab === 'tuning' ? 'tuning' : 'ftp')
 const tuningForm = ref({
   PassivePortRange: '',
   MaxClientsNumber: '',
@@ -222,7 +222,10 @@ async function saveTuning() {
 watch(activeTab, (newVal) => {
   if (newVal === 'tuning') {
     loadTuning()
+  } else {
+    loadFtpUsers()
   }
+  syncRouteQuery()
 })
 
 const createForm = ref({
@@ -243,8 +246,21 @@ watch(
   () => route.query.domain,
   (value) => {
     selectedDomain.value = typeof value === 'string' ? value : ''
-    loadFtpUsers()
+    if (activeTab.value === 'ftp') {
+      loadFtpUsers()
+    }
   }
+)
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    const nextTab = value === 'tuning' ? 'tuning' : 'ftp'
+    if (activeTab.value !== nextTab) {
+      activeTab.value = nextTab
+    }
+  },
+  { immediate: true },
 )
 
 function formatTime(ts) {
@@ -271,10 +287,24 @@ function onCreateDomainChange() {
 }
 
 function onDomainFilterChange() {
-  router.replace({
-    path: '/ftp',
-    query: selectedDomain.value ? { domain: selectedDomain.value } : {},
-  })
+  syncRouteQuery()
+}
+
+function syncRouteQuery() {
+  const nextQuery = {}
+  if (activeTab.value === 'tuning') {
+    nextQuery.tab = 'tuning'
+  }
+  if (selectedDomain.value) {
+    nextQuery.domain = selectedDomain.value
+  }
+
+  const currentTab = typeof route.query.tab === 'string' ? route.query.tab : ''
+  const currentDomain = typeof route.query.domain === 'string' ? route.query.domain : ''
+  const sameQuery = currentTab === (nextQuery.tab || '') && currentDomain === (nextQuery.domain || '')
+  if (!sameQuery) {
+    router.replace({ path: '/ftp', query: nextQuery })
+  }
 }
 
 async function loadSites() {
@@ -370,6 +400,12 @@ async function removeUser(username) {
 
 onMounted(async () => {
   createForm.value.home_dir = defaultHome(createForm.value.domain)
-  await Promise.all([loadSites(), loadFtpUsers()])
+  await loadSites()
+  if (activeTab.value === 'tuning') {
+    await loadTuning()
+  } else {
+    await loadFtpUsers()
+  }
+  syncRouteQuery()
 })
 </script>

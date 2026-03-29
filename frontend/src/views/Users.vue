@@ -83,7 +83,10 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('users.package') }}</label>
-              <input v-model="form.package" type="text" class="aura-input w-full" placeholder="Başlangıç Hosting" />
+              <select v-model="form.package" class="aura-input w-full">
+                <option v-for="pkg in packageOptions" :key="`user-package-${pkg}`" :value="pkg">{{ pkg }}</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500">Rol ile uyumlu paketler listelenir.</p>
             </div>
           </div>
           <div class="flex gap-3 mt-8">
@@ -123,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UserPlus, UserMinus, Globe, Loader2, KeyRound } from 'lucide-vue-next'
 import api from '../services/api'
@@ -137,7 +140,26 @@ const addLoading = ref(false)
 const showPasswordModal = ref(false)
 const passwordLoading = ref(false)
 const passwordForm = ref({ username: '', new_password: '' })
-const form = ref({ username: '', email: '', password: '', role: 'user', package: '' })
+const hostingPackages = ref([])
+const form = ref({ username: '', email: '', password: '', role: 'user', package: 'default' })
+
+const packageOptions = computed(() => {
+  const names = new Set(['default'])
+  const wantsResellerPackage = form.value.role === 'reseller'
+
+  for (const pkg of hostingPackages.value || []) {
+    const name = String(pkg?.name || '').trim()
+    const planType = String(pkg?.plan_type || 'hosting').trim().toLowerCase()
+    if (!name) continue
+    if (wantsResellerPackage && planType !== 'reseller') continue
+    if (!wantsResellerPackage && form.value.role !== 'admin' && planType === 'reseller') continue
+    names.add(name)
+  }
+
+  const ordered = Array.from(names).filter(Boolean)
+  const tail = ordered.filter(name => name !== 'default').sort((a, b) => a.localeCompare(b))
+  return ['default', ...tail]
+})
 
 async function loadUsers() {
   loading.value = true
@@ -152,13 +174,22 @@ async function loadUsers() {
   }
 }
 
+async function loadPackages() {
+  try {
+    const res = await api.get('/packages/list')
+    hostingPackages.value = res.data?.data || []
+  } catch {
+    hostingPackages.value = []
+  }
+}
+
 async function addUser() {
   if (!form.value.username || !form.value.email) return
   addLoading.value = true
   try {
     await api.post('/users/create', form.value)
     showAddModal.value = false
-    form.value = { username: '', email: '', password: '', role: 'user', package: '' }
+    form.value = { username: '', email: '', password: '', role: 'user', package: packageOptions.value[0] || 'default' }
     await loadUsers()
   } catch (e) {
     error.value = t('common.error')
@@ -206,5 +237,14 @@ async function changePassword() {
   }
 }
 
-onMounted(loadUsers)
+watch(packageOptions, (options) => {
+  if (!options.length) return
+  if (!options.includes(form.value.package)) {
+    form.value.package = options[0]
+  }
+}, { immediate: true })
+
+onMounted(async () => {
+  await Promise.all([loadUsers(), loadPackages()])
+})
 </script>

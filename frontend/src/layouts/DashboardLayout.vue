@@ -158,6 +158,69 @@
           </transition>
         </div>
 
+        <div v-if="canTuningGroup" class="mt-2">
+          <button @click="toggleTopLevelMenu('tuning')" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isTuningRoute }">
+            <div class="flex items-center">
+              <Activity class="w-5 h-5 mr-3" />
+              <span>Tuning</span>
+            </div>
+            <ChevronDown class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': tuningMenuOpen }" />
+          </button>
+
+          <transition name="accordion">
+            <div v-show="tuningMenuOpen" class="ml-4 mt-1 space-y-0.5 border-l border-panel-border/50 pl-3">
+              <router-link
+                v-if="can('/ols-tuning')"
+                to="/ols-tuning"
+                class="sidebar-sub-link"
+                :class="{ 'sidebar-sub-link-active': route.path === '/ols-tuning' }"
+              >
+                <span>{{ t('routes.OlsTuning') }}</span>
+              </router-link>
+              <router-link
+                v-if="can('/databases')"
+                :to="{ path: '/databases', query: { tab: 'tuning', tuning_engine: 'mariadb' } }"
+                class="sidebar-sub-link"
+                :class="{ 'sidebar-sub-link-active': isDatabaseTuningActive('mariadb') }"
+              >
+                <span>MariaDB Tuning</span>
+              </router-link>
+              <router-link
+                v-if="can('/databases')"
+                :to="{ path: '/databases', query: { tab: 'tuning', tuning_engine: 'postgresql' } }"
+                class="sidebar-sub-link"
+                :class="{ 'sidebar-sub-link-active': isDatabaseTuningActive('postgresql') }"
+              >
+                <span>PostgreSQL Tuning</span>
+              </router-link>
+              <router-link
+                v-if="can('/ftp')"
+                :to="{ path: '/ftp', query: { tab: 'tuning' } }"
+                class="sidebar-sub-link"
+                :class="{ 'sidebar-sub-link-active': isFtpTuningRoute }"
+              >
+                <span>FTP Tuning</span>
+              </router-link>
+              <router-link
+                v-if="can('/php')"
+                :to="{ path: '/php', query: { tab: 'config' } }"
+                class="sidebar-sub-link"
+                :class="{ 'sidebar-sub-link-active': isPhpTuningRoute }"
+              >
+                <span>PHP Config</span>
+              </router-link>
+              <router-link
+                v-if="can('/mail-tuning')"
+                to="/mail-tuning"
+                class="sidebar-sub-link"
+                :class="{ 'sidebar-sub-link-active': route.path === '/mail-tuning' }"
+              >
+                <span>Mail Tuning</span>
+              </router-link>
+            </div>
+          </transition>
+        </div>
+
         <div v-if="canSecurityGroup" class="mt-2">
           <button @click="toggleTopLevelMenu('securityLogs')" class="sidebar-link w-full justify-between" :class="{ 'sidebar-link-section-active': isSecurityLogsRoute }">
             <div class="flex items-center">
@@ -333,9 +396,6 @@
             <div v-show="systemMenuOpen" class="ml-4 mt-1 space-y-0.5 border-l border-panel-border/50 pl-3">
               <router-link v-if="can('/server-status')" to="/server-status" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.ServerStatus') }}</span>
-              </router-link>
-              <router-link v-if="can('/ols-tuning')" to="/ols-tuning" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('routes.OlsTuning') }}</span>
               </router-link>
               <router-link v-if="can('/panel-port')" to="/panel-port" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('layout.links.panel_port') }}</span>
@@ -532,6 +592,7 @@ const toggleMenu = ref(false)
 const hostingMenuOpen = ref(false)
 const webAppsMenuOpen = ref(false)
 const dataAccessMenuOpen = ref(false)
+const tuningMenuOpen = ref(false)
 const securityLogsMenuOpen = ref(false)
 const devopsMenuOpen = ref(false)
 const systemMenuOpen = ref(false)
@@ -573,6 +634,7 @@ const routeTitleKeys = {
   PanelPort: 'routes.PanelPort',
   Backups: 'routes.Backups',
   OlsTuning: 'routes.OlsTuning',
+  MailTuning: 'Mail Tuning',
   Reseller: 'routes.Reseller',
   ActivityLog: 'routes.ActivityLog',
   DbBackup: 'routes.DbBackup',
@@ -587,6 +649,8 @@ const routeTitleKeys = {
 }
 
 const pageTitle = computed(() => {
+  const metaTitle = typeof route.meta?.title === 'string' ? route.meta.title : ''
+  if (metaTitle) return metaTitle
   const routeName = String(route.name || '')
   const key = routeTitleKeys[routeName]
   return key ? t(key) : routeName
@@ -612,6 +676,9 @@ const canWebAppsGroup = computed(() =>
 const canDataAccessGroup = computed(() =>
   ['/databases', '/emails', '/minio', '/ftp', '/sftp', '/backups', '/db-backup'].some((path) => can(path)),
 )
+const canTuningGroup = computed(() =>
+  ['/ols-tuning', '/databases', '/ftp', '/php', '/mail-tuning'].some((path) => can(path)),
+)
 const canSecurityGroup = computed(() =>
   ['/ssl', '/security', '/activity-log', '/log-viewer'].some((path) => can(path)),
 )
@@ -619,7 +686,7 @@ const canDevopsGroup = computed(() =>
   ['/docker/images', '/docker/containers', '/docker/create', '/docker/apps', '/cron-jobs', '/federated', '/ops-center'].some((path) => can(path)),
 )
 const canSystemGroup = computed(() =>
-  ['/server-status', '/ols-tuning', '/panel-port'].some((path) => can(path)),
+  ['/server-status', '/panel-port'].some((path) => can(path)),
 )
 
 const commandItems = computed(() => [
@@ -648,6 +715,11 @@ const commandItems = computed(() => [
   { label: 'Ops Center', path: '/ops-center' },
   { label: t('routes.PHP'), path: '/php' },
   { label: t('routes.OlsTuning'), path: '/ols-tuning' },
+  { label: 'MariaDB Tuning', path: '/databases?tab=tuning&tuning_engine=mariadb' },
+  { label: 'PostgreSQL Tuning', path: '/databases?tab=tuning&tuning_engine=postgresql' },
+  { label: 'FTP Tuning', path: '/ftp?tab=tuning' },
+  { label: 'PHP Config', path: '/php?tab=config' },
+  { label: 'Mail Tuning', path: '/mail-tuning' },
   { label: t('layout.links.reseller_acl'), path: '/reseller' },
   { label: t('routes.ServerStatus'), path: '/server-status' },
   { label: t('layout.links.panel_port'), path: '/panel-port' },
@@ -659,18 +731,31 @@ const commandItems = computed(() => [
 ])
 const roleFilteredCommandItems = computed(() => commandItems.value.filter((item) => can(item.path)))
 
+const isDatabaseTuningRoute = computed(() => route.path === '/databases' && route.query.tab === 'tuning')
+const isFtpTuningRoute = computed(() => route.path === '/ftp' && route.query.tab === 'tuning')
+const isPhpTuningRoute = computed(() => route.path === '/php' && route.query.tab === 'config')
 const isDockerRoute = computed(() => route.path.startsWith('/docker'))
 const isSecurityRoute = computed(() => route.path.startsWith('/security'))
 const isSslRoute = computed(() => route.path.startsWith('/ssl'))
-const isFtpRoute = computed(() => route.path === '/ftp' || route.path === '/sftp')
+const isFtpRoute = computed(() => route.path === '/sftp' || (route.path === '/ftp' && !isFtpTuningRoute.value))
 const isBackupsRoute = computed(() => route.path === '/backups' || route.path === '/db-backup')
 const isLogsRoute = computed(() => route.path === '/activity-log' || route.path === '/log-viewer')
 const isHostingRoute = computed(() => ['/websites', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)))
 const isWebAppsRoute = computed(() =>
   ['/dns', '/cloudflare', '/wordpress', '/app-runtime', '/php', '/filemanager', '/terminal'].some(prefix => route.path.startsWith(prefix))
+    && !isPhpTuningRoute.value
 )
 const isDataAccessRoute = computed(() =>
   ['/databases', '/emails', '/ftp', '/sftp', '/backups', '/db-backup', '/minio'].some(prefix => route.path.startsWith(prefix))
+    && !isDatabaseTuningRoute.value
+    && !isFtpTuningRoute.value
+)
+const isTuningRoute = computed(() =>
+  route.path === '/ols-tuning' ||
+  route.path === '/mail-tuning' ||
+  isDatabaseTuningRoute.value ||
+  isFtpTuningRoute.value ||
+  isPhpTuningRoute.value
 )
 const isSecurityLogsRoute = computed(() =>
   ['/ssl', '/security', '/activity-log', '/log-viewer'].some(prefix => route.path.startsWith(prefix))
@@ -679,12 +764,13 @@ const isDevopsRoute = computed(() =>
   ['/docker', '/cron-jobs', '/federated', '/ops-center'].some(prefix => route.path.startsWith(prefix))
 )
 const isSystemRoute = computed(() =>
-  ['/server-status', '/ols-tuning', '/panel-port'].some(prefix => route.path.startsWith(prefix))
+  ['/server-status', '/panel-port'].some(prefix => route.path.startsWith(prefix))
 )
 const topLevelMenus = {
   hosting: hostingMenuOpen,
   webApps: webAppsMenuOpen,
   dataAccess: dataAccessMenuOpen,
+  tuning: tuningMenuOpen,
   securityLogs: securityLogsMenuOpen,
   devops: devopsMenuOpen,
   system: systemMenuOpen,
@@ -693,6 +779,7 @@ const activeTopLevelMenu = computed(() => {
   if (isHostingRoute.value) return 'hosting'
   if (isWebAppsRoute.value) return 'webApps'
   if (isDataAccessRoute.value) return 'dataAccess'
+  if (isTuningRoute.value) return 'tuning'
   if (isSecurityLogsRoute.value) return 'securityLogs'
   if (isDevopsRoute.value) return 'devops'
   if (isSystemRoute.value) return 'system'
@@ -702,6 +789,7 @@ const allMenusExpanded = computed(() =>
   hostingMenuOpen.value &&
   webAppsMenuOpen.value &&
   dataAccessMenuOpen.value &&
+  tuningMenuOpen.value &&
   securityLogsMenuOpen.value &&
   devopsMenuOpen.value &&
   systemMenuOpen.value &&
@@ -716,6 +804,11 @@ const isSslTabActive = (tab) => {
   if (!isSslRoute.value) return false
   const selectedTab = typeof route.query.tab === 'string' ? route.query.tab : 'manage'
   return selectedTab === tab
+}
+const isDatabaseTuningActive = (value) => {
+  if (!isDatabaseTuningRoute.value) return false
+  const selected = typeof route.query.tuning_engine === 'string' ? route.query.tuning_engine : 'mariadb'
+  return selected === value
 }
 const filteredCommandItems = computed(() => {
   const q = commandQuery.value.trim().toLowerCase()
@@ -761,6 +854,9 @@ const syncMenuState = () => {
     backupsMenuOpen.value = true
     dataAccessMenuOpen.value = true
   }
+  if (isTuningRoute.value) {
+    tuningMenuOpen.value = true
+  }
   if (isLogsRoute.value) {
     logsMenuOpen.value = true
     securityLogsMenuOpen.value = true
@@ -773,6 +869,7 @@ const setAllMenus = (value) => {
   hostingMenuOpen.value = value
   webAppsMenuOpen.value = value
   dataAccessMenuOpen.value = value
+  tuningMenuOpen.value = value
   securityLogsMenuOpen.value = value
   devopsMenuOpen.value = value
   systemMenuOpen.value = value

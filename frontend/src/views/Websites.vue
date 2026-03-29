@@ -374,20 +374,6 @@
                 ? `Mail stack aktif: ${(platformStatus.detected_mail_stack || []).join(', ') || 'hazir'}`
                 : 'Mail stack aktif degil. Bu secenek su an kullanilamaz.' }}
             </p>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-300">
-              <input
-                v-model="siteForm.apache_backend"
-                type="checkbox"
-                class="w-4 h-4 rounded border-panel-border bg-panel-hover"
-                :disabled="!platformStatus.apache_backend_available"
-              />
-              Apache backend kullan
-            </label>
-            <p class="text-xs" :class="platformStatus.apache_backend_available ? 'text-emerald-300' : 'text-yellow-300'">
-              {{ platformStatus.apache_backend_available
-                ? 'Apache backend bu sunucuda kullanilabilir.'
-                : 'Bu sunucuda Apache backend tespit edilmedi.' }}
-            </p>
           </div>
           <div class="flex gap-3 mt-8">
             <button class="btn-secondary flex-1" @click="showAddSiteModal = false">{{ t('common.cancel') }}</button>
@@ -592,7 +578,6 @@ const siteForm = ref({
   package: 'default',
   email: '',
   mail_domain: false,
-  apache_backend: false,
 })
 const editSiteForm = ref({
   domain: '',
@@ -620,7 +605,6 @@ const siteLogsKind = ref('access')
 const siteLogsLines = ref([])
 const platformStatus = ref({
   mail_domain_available: false,
-  apache_backend_available: false,
   detected_mail_stack: [],
 })
 
@@ -869,13 +853,11 @@ async function loadPlatformStatus() {
     const res = await api.get('/security/status')
     platformStatus.value = {
       mail_domain_available: !!res.data?.data?.mail_domain_available,
-      apache_backend_available: !!res.data?.data?.apache_backend_available,
       detected_mail_stack: Array.isArray(res.data?.data?.detected_mail_stack) ? res.data.data.detected_mail_stack : [],
     }
   } catch {
     platformStatus.value = {
       mail_domain_available: false,
-      apache_backend_available: false,
       detected_mail_stack: [],
     }
   }
@@ -955,7 +937,6 @@ async function addSite() {
       package: siteForm.value.package || 'default',
       email: siteForm.value.email || undefined,
       mail_domain: !!siteForm.value.mail_domain,
-      apache_backend: !!siteForm.value.apache_backend,
     })
     showAddSiteModal.value = false
     siteForm.value = {
@@ -965,7 +946,6 @@ async function addSite() {
       package: siteForm.value.package || 'default',
       email: '',
       mail_domain: false,
-      apache_backend: false,
     }
     await refreshAll()
   } catch (e) {

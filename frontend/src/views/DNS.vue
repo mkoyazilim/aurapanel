@@ -112,7 +112,10 @@
           <h2 class="text-xl font-bold text-white mb-6">{{ t('dns.add_zone') }}</h2>
           <div>
             <label class="block text-sm text-gray-400 mb-1">{{ t('dns.zone') }} (Domain)</label>
-            <input v-model="newZone" type="text" class="aura-input w-full" placeholder="example.com" />
+            <input v-model="newZone" list="dns-domain-options" type="text" class="aura-input w-full" placeholder="example.com" />
+            <datalist id="dns-domain-options">
+              <option v-for="domainName in suggestedDomains" :key="`dns-zone-${domainName}`" :value="domainName" />
+            </datalist>
           </div>
           <div class="flex gap-3 mt-8">
             <button class="btn-secondary flex-1" @click="showAddZoneModal = false">{{ t('common.cancel') }}</button>
@@ -175,7 +178,7 @@
             <div>
               <label class="block text-sm text-gray-400 mb-1">Wizard Base Domain</label>
               <div class="flex gap-2">
-                <input v-model="wizardBaseDomain" type="text" class="aura-input w-full" placeholder="example.com" />
+                <input v-model="wizardBaseDomain" list="dns-domain-options" type="text" class="aura-input w-full" placeholder="example.com" />
                 <button class="btn-secondary whitespace-nowrap" :disabled="nsWizardLoading" @click="fillNsByWizard">
                   <Loader2 v-if="nsWizardLoading" class="w-4 h-4 mr-1 inline animate-spin" />
                   Wizard
@@ -209,13 +212,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Network, Plus, Trash2, Loader2, Settings } from 'lucide-vue-next'
 import api from '../services/api'
 
 const { t } = useI18n()
 const zones = ref([])
+const websiteDomains = ref([])
 const loading = ref(true)
 const recordsLoading = ref(false)
 
@@ -247,6 +251,21 @@ const dnssecDomain = ref('')
 const wizardBaseDomain = ref('')
 const nsWizardLoading = ref(false)
 const nsResetLoading = ref(false)
+const suggestedDomains = computed(() => {
+  const names = new Set()
+
+  for (const zone of zones.value || []) {
+    const raw = String(zone?.name || '').replace(/\.$/, '').trim().toLowerCase()
+    if (raw) names.add(raw)
+  }
+
+  for (const domain of websiteDomains.value || []) {
+    const raw = String(domain || '').trim().toLowerCase()
+    if (raw) names.add(raw)
+  }
+
+  return Array.from(names).sort((a, b) => a.localeCompare(b))
+})
 
 async function loadZones() {
   loading.value = true
@@ -255,6 +274,15 @@ async function loadZones() {
     zones.value = res.data.data || []
   } finally {
     loading.value = false
+  }
+}
+
+async function loadWebsiteDomains() {
+  try {
+    const res = await api.get('/vhost/list')
+    websiteDomains.value = (res.data?.data || []).map(item => item?.domain).filter(Boolean)
+  } catch {
+    websiteDomains.value = []
   }
 }
 
@@ -438,6 +466,8 @@ async function resetDefaultNs() {
   }
 }
 
-onMounted(loadZones)
+onMounted(async () => {
+  await Promise.all([loadZones(), loadWebsiteDomains()])
+})
 </script>
 

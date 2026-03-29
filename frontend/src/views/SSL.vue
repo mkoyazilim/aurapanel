@@ -94,7 +94,10 @@
       <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.hostname.hostname') }}</label>
-          <input v-model="hostnameForm.domain" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.hostname')" />
+          <input v-model="hostnameForm.domain" list="ssl-domain-options" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.hostname')" />
+          <datalist id="ssl-domain-options">
+            <option v-for="domainName in domainSuggestions" :key="`ssl-domain-${domainName}`" :value="domainName" />
+          </datalist>
         </div>
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.hostname.email') }}</label>
@@ -117,7 +120,10 @@
       <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.mail.hostname') }}</label>
-          <input v-model="mailForm.domain" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.mail_hostname')" />
+          <input v-model="mailForm.domain" list="ssl-mail-domain-options" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.mail_hostname')" />
+          <datalist id="ssl-mail-domain-options">
+            <option v-for="domainName in mailDomainSuggestions" :key="`ssl-mail-${domainName}`" :value="domainName" />
+          </datalist>
         </div>
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.mail.email') }}</label>
@@ -140,7 +146,7 @@
       <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.wildcard.domain') }}</label>
-          <input v-model="wildcardForm.domain" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.domain')" />
+          <input v-model="wildcardForm.domain" list="ssl-domain-options" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.domain')" />
         </div>
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.wildcard.email') }}</label>
@@ -191,6 +197,34 @@ const mailForm = ref({ domain: '', email: '', webroot: '' })
 const wildcardForm = ref({ domain: '', email: '', webroot: '' })
 
 const domains = computed(() => (sites.value || []).map(site => site.domain).filter(Boolean))
+const domainSuggestions = computed(() => {
+  const names = new Set()
+
+  for (const domain of domains.value || []) {
+    const value = String(domain || '').trim().toLowerCase()
+    if (value) names.add(value)
+  }
+
+  if (bindings.value?.hostname_ssl_domain) {
+    names.add(String(bindings.value.hostname_ssl_domain).trim().toLowerCase())
+  }
+
+  return Array.from(names).sort((a, b) => a.localeCompare(b))
+})
+const mailDomainSuggestions = computed(() => {
+  const names = new Set()
+
+  for (const domain of domains.value || []) {
+    const value = String(domain || '').trim().toLowerCase()
+    if (value) names.add(`mail.${value}`)
+  }
+
+  if (bindings.value?.mail_ssl_domain) {
+    names.add(String(bindings.value.mail_ssl_domain).trim().toLowerCase())
+  }
+
+  return Array.from(names).sort((a, b) => a.localeCompare(b))
+})
 
 watch(
   () => route.query.tab,
@@ -226,6 +260,15 @@ async function loadSites() {
     if (!manageForm.value.domain && sites.value.length > 0) {
       manageForm.value.domain = sites.value[0].domain
       manageForm.value.email = sites.value[0].email || `admin@${sites.value[0].domain}`
+    }
+    if (!hostnameForm.value.domain && sites.value.length > 0) {
+      hostnameForm.value.domain = sites.value[0].domain
+    }
+    if (!mailForm.value.domain && sites.value.length > 0) {
+      mailForm.value.domain = `mail.${sites.value[0].domain}`
+    }
+    if (!wildcardForm.value.domain && sites.value.length > 0) {
+      wildcardForm.value.domain = sites.value[0].domain
     }
   } catch {
     sites.value = []
