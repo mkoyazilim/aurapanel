@@ -89,7 +89,7 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0;
   font-weight: 800;
   letter-spacing: 0.2px;
   line-height: 1;
@@ -97,11 +97,12 @@ a {
 }
 
 .brand-logo {
-  width: 42px;
-  min-width: 42px;
-  height: 42px;
+  width: clamp(138px, 16vw, 238px);
+  min-width: 138px;
+  max-width: 44vw;
+  height: auto;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: 0;
   display: block;
 }
 
