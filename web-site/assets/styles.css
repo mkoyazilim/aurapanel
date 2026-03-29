@@ -63,6 +63,13 @@ a {
   letter-spacing: 0.2px;
 }
 
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
 .brand-dot {
   width: 14px;
   height: 14px;
