@@ -176,12 +176,36 @@ install_packages() {
   fi
 }
 
+package_available() {
+  local pkg="$1"
+  if [ -z "${pkg}" ]; then
+    return 1
+  fi
+
+  if [ "${PKG_MGR}" = "apt" ]; then
+    apt-cache show "${pkg}" >/dev/null 2>&1
+  else
+    dnf list --available "${pkg}" >/dev/null 2>&1 || rpm -q "${pkg}" >/dev/null 2>&1
+  fi
+}
+
 install_optional_packages() {
+  local pkg
+  local missing=()
+
   for pkg in "$@"; do
+    if ! package_available "${pkg}"; then
+      missing+=("${pkg}")
+      continue
+    fi
     if ! install_packages "${pkg}"; then
       warn "Optional package '${pkg}' could not be installed."
     fi
   done
+
+  if [ "${#missing[@]}" -gt 0 ]; then
+    log "Optional packages unavailable in current repositories, skipped: ${missing[*]}"
+  fi
 }
 
 install_pdns_policy_guard() {

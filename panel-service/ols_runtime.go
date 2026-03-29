@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -147,6 +148,9 @@ func olsAliasNames(domain string, aliases []DomainAlias) []string {
 
 func ensureOLSManagedFilesystem(item olsManagedSite) error {
 	docroot := domainDocroot(item.Site.Domain)
+	if err := ensureOLSManagedOwnerAccount(item.Site); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(docroot, 0o755); err != nil {
 		return err
 	}
@@ -196,7 +200,7 @@ func ensureOLSManagedFilesystem(item olsManagedSite) error {
 			return err
 		}
 	}
-	return nil
+	return ensureOLSManagedOwnership(item.Site)
 }
 
 func writeOLSHTAccess(domain, rules string) error {
@@ -292,7 +296,7 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	builder.WriteString("  keepDays                30\n")
 	builder.WriteString("  rollingSize             10M\n")
 	builder.WriteString("}\n\n")
-	
+
 	// Add explicit acme-challenge routing context to ensure Let's Encrypt validation works even with strict rewrites
 	builder.WriteString("context /.well-known/acme-challenge/ {\n")
 	builder.WriteString("  location                " + docroot + "/.well-known/acme-challenge/\n")
@@ -424,8 +428,57 @@ func renderOLSManagedListenerMapBlock(sites []olsManagedSite) string {
 	for _, item := range sites {
 		lines = append(lines, fmt.Sprintf("    map                      %s %s", olsManagedVhostName(item.Site.Domain), strings.Join(item.Aliases, ", ")))
 	}
+	lines = append(lines, "    map                      Example *")
 	lines = append(lines, olsManagedListenerEnd)
 	return strings.Join(lines, "\n")
+}
+
+func siteSystemOwner(site Website) string {
+	return firstNonEmpty(sanitizeName(site.Owner), sanitizeName(site.User), "aura")
+}
+
+func systemNoLoginShell() string {
+	for _, candidate := range []string{"/usr/sbin/nologin", "/sbin/nologin", "/bin/false"} {
+		if fileExists(candidate) {
+			return candidate
+		}
+	}
+	return "/bin/false"
+}
+
+func ensureOLSManagedOwnerAccount(site Website) error {
+	owner := siteSystemOwner(site)
+	if owner == "" || owner == "root" {
+		return nil
+	}
+	if !systemGroupExists(owner) {
+		if output, err := exec.Command("groupadd", "--system", owner).CombinedOutput(); err != nil && !systemGroupExists(owner) {
+			return fmt.Errorf("website owner group %s could not be created: %s", owner, strings.TrimSpace(string(output)))
+		}
+	}
+	if systemUserExists(owner) {
+		return nil
+	}
+	args := []string{"--system", "-M", "-s", systemNoLoginShell(), "-g", owner, owner}
+	if output, err := exec.Command("useradd", args...).CombinedOutput(); err != nil && !systemUserExists(owner) {
+		return fmt.Errorf("website owner user %s could not be created: %s", owner, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func ensureOLSManagedOwnership(site Website) error {
+	owner := siteSystemOwner(site)
+	if owner == "" || owner == "root" {
+		return nil
+	}
+	siteRoot := filepath.Dir(domainDocroot(site.Domain))
+	if !fileExists(siteRoot) {
+		return nil
+	}
+	if output, err := exec.Command("chown", "-R", owner+":"+owner, siteRoot).CombinedOutput(); err != nil {
+		return fmt.Errorf("website ownership sync failed for %s: %s", site.Domain, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 func replaceOrInsertManagedBlock(current, beginMarker, endMarker, replacement, anchor string) string {
