@@ -28,6 +28,9 @@ RELEASE_BASE_URL="${AURAPANEL_RELEASE_BASE_URL:-https://github.com/${AURAPANEL_G
 SOURCE_ARCHIVE_URL="${AURAPANEL_SOURCE_ARCHIVE_URL:-${RELEASE_BASE_URL}/aurapanel-source-latest.tar.gz}"
 SOURCE_ARCHIVE_SHA256_URL="${AURAPANEL_SOURCE_ARCHIVE_SHA256_URL:-${SOURCE_ARCHIVE_URL}.sha256}"
 AURAPANEL_ALLOW_GIT_FALLBACK="${AURAPANEL_ALLOW_GIT_FALLBACK:-1}"
+AURAPANEL_INSTALL_SOURCE="${AURAPANEL_INSTALL_SOURCE:-git}"
+POWERDNS_REPO_KEY_URL="${AURAPANEL_POWERDNS_REPO_KEY_URL:-https://repo.powerdns.com/FD380FBB-pub.asc}"
+POWERDNS_REPO_CHANNEL="${AURAPANEL_POWERDNS_REPO_CHANNEL:-auth-50}"
 
 NODE_SETUP_URL="${AURAPANEL_NODE_SETUP_URL:-https://deb.nodesource.com/setup_20.x}"
 GO_VERSION="${AURAPANEL_GO_VERSION:-1.22.1}"
@@ -159,6 +162,94 @@ install_optional_packages() {
       warn "Optional package '${pkg}' could not be installed."
     fi
   done
+}
+
+setup_powerdns_repo() {
+  if [ "${PKG_MGR}" != "apt" ]; then
+    return 0
+  fi
+
+  if apt-cache show pdns-server >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local repo_domain repo_file repo_line keyring_path distro_channel codename
+  codename="${VERSION_CODENAME:-}"
+  if [ -z "${codename}" ] && command -v lsb_release >/dev/null 2>&1; then
+    codename="$(lsb_release -cs 2>/dev/null || true)"
+  fi
+  if [ -z "${codename}" ]; then
+    warn "Could not determine distro codename for PowerDNS repository setup."
+    return 0
+  fi
+
+  case "${OS_ID}" in
+    ubuntu)
+      repo_domain="ubuntu"
+      ;;
+    debian)
+      repo_domain="debian"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  distro_channel="${codename}-${POWERDNS_REPO_CHANNEL}"
+  repo_file="/etc/apt/sources.list.d/pdns.list"
+  keyring_path="/etc/apt/keyrings/pdns-${POWERDNS_REPO_CHANNEL}.asc"
+  repo_line="deb [signed-by=${keyring_path}] http://repo.powerdns.com/${repo_domain} ${distro_channel} main"
+
+  log "Ensuring PowerDNS authoritative repository..."
+  mkdir -p /etc/apt/keyrings
+  download_file "${POWERDNS_REPO_KEY_URL}" "${keyring_path}" || {
+    warn "PowerDNS repo key download failed."
+    return 0
+  }
+  printf '%s\n' "${repo_line}" > "${repo_file}"
+  wait_for_package_manager
+  apt-get update -y >/dev/null 2>&1 || warn "apt-get update after PowerDNS repo setup failed."
+}
+
+configure_powerdns() {
+  if ! command -v pdns_server >/dev/null 2>&1; then
+    warn "PowerDNS server binary not found; DNS daemon bootstrap skipped."
+    return 0
+  fi
+
+  local schema_file db_path backend_conf
+  db_path="/var/lib/powerdns/aurapanel.sqlite3"
+  backend_conf="/etc/powerdns/pdns.d/aurapanel-gsqlite3.conf"
+
+  mkdir -p /etc/powerdns/pdns.d /var/lib/powerdns
+  if [ ! -f "${db_path}" ]; then
+    schema_file=""
+    for candidate in \
+      /usr/share/pdns-backend-sqlite3/schema/schema.sqlite3.sql \
+      /usr/share/doc/pdns-backend-sqlite3/schema.sqlite3.sql \
+      /usr/share/pdns-backend-sqlite3/schema.sqlite3.sql; do
+      if [ -f "${candidate}" ]; then
+        schema_file="${candidate}"
+        break
+      fi
+    done
+    if [ -n "${schema_file}" ] && command -v sqlite3 >/dev/null 2>&1; then
+      sqlite3 "${db_path}" < "${schema_file}" >/dev/null 2>&1 || warn "PowerDNS SQLite schema bootstrap failed."
+    else
+      warn "PowerDNS SQLite schema file not found; service may require manual backend initialization."
+    fi
+  fi
+
+  cat <<EOF > "${backend_conf}"
+launch=gsqlite3
+gsqlite3-database=${db_path}
+api=no
+EOF
+
+  if systemctl list-unit-files | grep -q '^pdns\.service'; then
+    systemctl enable pdns >/dev/null 2>&1 || true
+    systemctl restart pdns >/dev/null 2>&1 || true
+  fi
 }
 
 download_file() {
@@ -470,6 +561,34 @@ configure_pureftpd() {
   fi
 }
 
+configure_htaccess_watcher() {
+  if ! command -v inotifywait >/dev/null 2>&1; then
+    warn "inotifywait is missing. .htaccess watcher bootstrap skipped."
+    return 0
+  fi
+
+  cat <<'EOF' > /etc/systemd/system/aurapanel-htaccess-watcher.service
+[Unit]
+Description=AuraPanel .htaccess watcher for OpenLiteSpeed
+After=lshttpd.service
+Requires=lshttpd.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -lc 'inotifywait -m -r -e close_write,create,delete,move --format "%w%f" /home | while read -r changed; do case "$changed" in */.htaccess) /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1 || true ;; esac; done'
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable aurapanel-htaccess-watcher >/dev/null 2>&1 || true
+  systemctl restart aurapanel-htaccess-watcher >/dev/null 2>&1 || true
+  ok ".htaccess watcher enabled."
+}
+
 configure_roundcube() {
   if [ "${AURAPANEL_INSTALL_ROUNDCUBE:-1}" != "1" ]; then
     warn "Roundcube install skipped (AURAPANEL_INSTALL_ROUNDCUBE!=1)."
@@ -525,9 +644,13 @@ EOF
 <?php
 \$config['db_dsnw'] = 'mysql://${rc_db_user}:${rc_db_pass}@localhost/${rc_db_name}';
 \$config['default_host'] = '127.0.0.1';
-\$config['default_port'] = 143;
+\$config['default_port'] = 993;
+\$config['imap_conn_options'] = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]];
 \$config['smtp_server'] = '127.0.0.1';
-\$config['smtp_port'] = 25;
+\$config['smtp_port'] = 587;
+\$config['smtp_user'] = '%u';
+\$config['smtp_pass'] = '%p';
+\$config['smtp_conn_options'] = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]];
 \$config['product_name'] = 'AuraPanel Webmail';
 \$config['des_key'] = '$(openssl rand -hex 16 | tr -d '\n')';
 \$config['plugins'] = ['archive', 'zipdownload', 'markasjunk', 'aurapanel_sso'];
@@ -614,6 +737,23 @@ configure_mail_stack_vmail() {
     upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_MASTER_PASS" "${dovecot_master_pass}"
   fi
 
+  if [ -f /etc/dovecot/conf.d/10-auth.conf ]; then
+    sed -i 's/^!include auth-system\.conf\.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf >/dev/null 2>&1 || true
+    if ! grep -q 'auth-passwdfile\.conf\.ext' /etc/dovecot/conf.d/10-auth.conf 2>/dev/null; then
+      printf '\n!include auth-passwdfile.conf.ext\n' >> /etc/dovecot/conf.d/10-auth.conf
+    fi
+  fi
+
+  cat <<'EOF' >/etc/dovecot/conf.d/90-aurapanel-auth-socket.conf
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+EOF
+
   if command -v postmap >/dev/null 2>&1; then
     postmap /etc/postfix/vmailbox_domains >/dev/null 2>&1 || true
     postmap /etc/postfix/vmailbox >/dev/null 2>&1 || true
@@ -640,13 +780,38 @@ userdb {
   args = uid=${vmail_uid} gid=${vmail_gid} home=${vmail_base}/%d/%n allow_all_users=yes
 }
 
-mail_location = maildir:${vmail_base}/%d/%n
+mail_location = maildir:${vmail_base}/%d/%n/Maildir
 
 plugin {
   quota = maildir:User quota
   quota_rule = *:storage=1024M
 }
 EOF
+
+  if [ -f /etc/postfix/master.cf ]; then
+    if ! grep -q '^submission inet' /etc/postfix/master.cf 2>/dev/null; then
+      cat <<'EOF' >> /etc/postfix/master.cf
+
+submission inet n       -       y       -       -       smtpd
+  -o syslog_name=postfix/submission
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
+EOF
+    fi
+    if ! grep -q '^smtps[[:space:]]\+inet' /etc/postfix/master.cf 2>/dev/null; then
+      cat <<'EOF' >> /etc/postfix/master.cf
+
+smtps     inet n       -       y       -       -       smtpd
+  -o syslog_name=postfix/smtps
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
+EOF
+    fi
+  fi
 
   if command -v postconf >/dev/null 2>&1; then
     postconf -e "virtual_mailbox_base = ${vmail_base}" >/dev/null 2>&1 || true
@@ -656,6 +821,12 @@ EOF
     postconf -e "virtual_minimum_uid = ${vmail_uid}" >/dev/null 2>&1 || true
     postconf -e "virtual_uid_maps = static:${vmail_uid}" >/dev/null 2>&1 || true
     postconf -e "virtual_gid_maps = static:${vmail_gid}" >/dev/null 2>&1 || true
+    postconf -e "smtpd_sasl_type = dovecot" >/dev/null 2>&1 || true
+    postconf -e "smtpd_sasl_path = private/auth" >/dev/null 2>&1 || true
+    postconf -e "smtpd_sasl_auth_enable = yes" >/dev/null 2>&1 || true
+    postconf -e "smtpd_tls_security_level = may" >/dev/null 2>&1 || true
+    postconf -e "smtpd_tls_auth_only = no" >/dev/null 2>&1 || true
+    postconf -e "smtpd_recipient_restrictions = permit_mynetworks,permit_sasl_authenticated,reject_unauth_destination" >/dev/null 2>&1 || true
   fi
 
   systemctl restart dovecot >/dev/null 2>&1 || true
@@ -1323,7 +1494,7 @@ EOF
 }
 
 enable_stack_services() {
-  local services=(mariadb postgresql redis-server redis docker fail2ban pdns pure-ftpd postfix dovecot)
+  local services=(mariadb postgresql redis-server redis docker fail2ban pdns pure-ftpd postfix dovecot aurapanel-htaccess-watcher)
 
   for svc in "${services[@]}"; do
     if systemctl list-unit-files | grep -qE "^${svc}\\.service"; then
@@ -1347,7 +1518,7 @@ sync_project() {
       --exclude 'panel-service/panel-service.exe' \
       "$(pwd)/" "${PROJECT_DIR}/"
   else
-    if [ "${AURAPANEL_INSTALL_SOURCE:-archive}" = "archive" ]; then
+    if [ "${AURAPANEL_INSTALL_SOURCE}" = "archive" ]; then
       local archive_file="/tmp/aurapanel-source-latest.tar.gz"
       local checksum_file="${archive_file}.sha256"
 
@@ -1487,7 +1658,7 @@ smoke_check() {
   curl -fsS "http://127.0.0.1:${panel_port}/api/health" >/dev/null || fail "Gateway health check failed"
   curl -fsS "http://127.0.0.1:${panel_port}/" >/dev/null || fail "Panel static endpoint failed"
   curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || fail "MinIO health check failed"
-  curl -fsS http://127.0.0.1/webmail/ >/dev/null 2>&1 || warn "Roundcube endpoint check skipped/failed (non-fatal)."
+  curl -fsS 'http://127.0.0.1/webmail/index.php?_task=login' >/dev/null 2>&1 || warn "Roundcube login endpoint check skipped/failed (non-fatal)."
 
   panel_user="$(panel_admin_email)"
   panel_pass="$(panel_admin_password)"
@@ -1523,6 +1694,14 @@ smoke_check() {
     if ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)443$'; then
       warn "Port 443 listener was not detected. Public HTTPS traffic may fail."
     fi
+    if systemctl list-unit-files | grep -q '^postfix\.service'; then
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)587$' || fail "Postfix submission listener (587) was not detected"
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)465$' || fail "Postfix SMTPS listener (465) was not detected"
+    fi
+    if systemctl list-unit-files | grep -q '^dovecot\.service'; then
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)143$' || fail "Dovecot IMAP listener (143) was not detected"
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)993$' || fail "Dovecot IMAPS listener (993) was not detected"
+    fi
   fi
 
   local waf_status
@@ -1555,7 +1734,8 @@ main() {
     install_packages dnf-plugins-core
   fi
 
-  install_optional_packages restic mariadb-server postgresql redis-server redis docker docker.io fail2ban powerdns pdns pure-ftpd postfix dovecot-core dovecot-imapd
+  setup_powerdns_repo
+  install_optional_packages restic mariadb-server postgresql redis-server redis docker docker.io fail2ban inotify-tools sqlite3 pdns-server pdns-backend-sqlite3 pure-ftpd postfix dovecot-core dovecot-imapd dovecot-pop3d
 
   ensure_go
   ensure_node20
@@ -1575,9 +1755,11 @@ main() {
   sync_project
   write_service_env_defaults
   ensure_firewall_manager_active
+  configure_powerdns
   configure_minio_service
   configure_roundcube
   configure_mail_stack_vmail
+  configure_htaccess_watcher
   build_components
   configure_systemd_services
   enable_stack_services

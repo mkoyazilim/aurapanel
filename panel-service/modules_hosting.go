@@ -543,6 +543,7 @@ func (s *service) handleWebsiteRewriteSet(w http.ResponseWriter, r *http.Request
 	// Write directly to .htaccess as well to ensure immediate application
 	htaccessPath := filepath.Join(domainDocroot(domain), ".htaccess")
 	_ = os.WriteFile(htaccessPath, []byte(payload.Rules), 0o644)
+	_ = reloadOpenLiteSpeed()
 
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Rewrite rules updated.", Data: cfg})
 }

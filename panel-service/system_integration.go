@@ -427,6 +427,10 @@ func postfixVmailboxDomainsPath() string {
 	return envOr("AURAPANEL_POSTFIX_VMAILBOX_DOMAINS_FILE", "/etc/postfix/vmailbox_domains")
 }
 
+func dovecotMasterUsersFilePath() string {
+	return envOr("AURAPANEL_MAIL_MASTER_USERS_FILE", "/etc/dovecot/master-users")
+}
+
 func mailVmailBaseDir() string {
 	return envOr("AURAPANEL_MAIL_VMAIL_BASE", "/var/mail/vhosts")
 }
@@ -445,6 +449,76 @@ func mailVmailGID() int {
 		return 5000
 	}
 	return value
+}
+
+func ensureDovecotPasswdAuthConfig() error {
+	authPath := "/etc/dovecot/conf.d/10-auth.conf"
+	raw, err := os.ReadFile(authPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	content := string(raw)
+	if strings.Contains(content, "!include auth-system.conf.ext") {
+		content = strings.ReplaceAll(content, "!include auth-system.conf.ext", "#!include auth-system.conf.ext")
+	}
+	if !strings.Contains(content, "auth-passwdfile.conf.ext") {
+		content = strings.TrimRight(content, "\n") + "\n!include auth-passwdfile.conf.ext\n"
+	}
+	return os.WriteFile(authPath, []byte(content), 0644)
+}
+
+func ensureDovecotPostfixAuthSocket() error {
+	content := `service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+`
+	return os.WriteFile("/etc/dovecot/conf.d/90-aurapanel-auth-socket.conf", []byte(content), 0644)
+}
+
+func ensurePostfixSubmissionServices() error {
+	const submissionBlock = `submission inet n       -       y       -       -       smtpd
+  -o syslog_name=postfix/submission
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
+`
+	const smtpsBlock = `smtps     inet n       -       y       -       -       smtpd
+  -o syslog_name=postfix/smtps
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
+`
+
+	path := "/etc/postfix/master.cf"
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	content := string(raw)
+	changed := false
+
+	if !strings.Contains(content, "submission inet") {
+		content = strings.TrimRight(content, "\n") + "\n\n" + submissionBlock
+		changed = true
+	}
+	if !strings.Contains(content, "smtps     inet") && !strings.Contains(content, "smtps inet") {
+		content = strings.TrimRight(content, "\n") + "\n\n" + smtpsBlock
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return os.WriteFile(path, []byte(strings.TrimRight(content, "\n")+"\n"), 0644)
 }
 
 func ensureMailRuntimeBaseline() error {
@@ -467,19 +541,28 @@ func ensureMailRuntimeBaseline() error {
 		}
 	}
 
-	for _, path := range []string{vmailUsersFilePath(), "/etc/dovecot/master-users", postfixVmailboxPath(), postfixVmailboxDomainsPath(), postfixVirtualPath(), postfixVirtualRegexpPath()} {
+	for _, path := range []string{vmailUsersFilePath(), dovecotMasterUsersFilePath(), postfixVmailboxPath(), postfixVmailboxDomainsPath(), postfixVirtualPath(), postfixVirtualRegexpPath()} {
 		file, err := os.OpenFile(path, os.O_CREATE, 0640)
 		if err != nil {
 			return err
 		}
 		_ = file.Close()
 	}
+	if err := ensureDovecotPasswdAuthConfig(); err != nil {
+		return err
+	}
+	if err := ensureDovecotPostfixAuthSocket(); err != nil {
+		return err
+	}
+	if err := ensurePostfixSubmissionServices(); err != nil {
+		return err
+	}
 
 	dovecotConf := fmt.Sprintf(`auth_master_user_separator = *
 
 passdb {
   driver = passwd-file
-  args = /etc/dovecot/master-users
+  args = %s
   master = yes
   pass = yes
 }
@@ -489,13 +572,13 @@ passdb {
   args = scheme=SHA512-CRYPT username_format=%%u %s
 }
 
-mail_location = maildir:%s/%%d/%%n
+mail_location = maildir:%s/%%d/%%n/Maildir
 
 userdb {
   driver = static
   args = uid=%d gid=%d home=%s/%%d/%%n allow_all_users=yes
 }
-`, vmailUsersFilePath(), vmailBase, vmailUID, vmailGID, vmailBase)
+`, dovecotMasterUsersFilePath(), vmailUsersFilePath(), vmailBase, vmailUID, vmailGID, vmailBase)
 	if err := os.WriteFile("/etc/dovecot/conf.d/90-aurapanel-vmail.conf", []byte(dovecotConf), 0644); err != nil {
 		return err
 	}
@@ -508,6 +591,12 @@ userdb {
 		fmt.Sprintf("virtual_minimum_uid=%d", vmailUID),
 		fmt.Sprintf("virtual_uid_maps=static:%d", vmailUID),
 		fmt.Sprintf("virtual_gid_maps=static:%d", vmailGID),
+		"smtpd_sasl_type=dovecot",
+		"smtpd_sasl_path=private/auth",
+		"smtpd_sasl_auth_enable=yes",
+		"smtpd_tls_security_level=may",
+		"smtpd_tls_auth_only=no",
+		"smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject_unauth_destination",
 	}
 	for _, setting := range postfixSettings {
 		if err := exec.Command("postconf", "-e", setting).Run(); err != nil {
@@ -597,7 +686,7 @@ func upsertSystemMailbox(address, password string) error {
 		return err
 	}
 
-	if err := upsertSimpleMapLine(vmailUsersFilePath(), address, "{SHA512-CRYPT}"+hashed); err != nil {
+	if err := upsertPasswdFileLine(vmailUsersFilePath(), address, "{SHA512-CRYPT}"+hashed); err != nil {
 		return err
 	}
 	if err := upsertSimpleMapLine(postfixVmailboxPath(), address, fmt.Sprintf("%s/%s/", domain, username)); err != nil {
@@ -612,7 +701,7 @@ func deleteSystemMailbox(address string) error {
 		return nil
 	}
 	address = strings.ToLower(strings.TrimSpace(address))
-	if err := deleteSimpleMapLine(vmailUsersFilePath(), address); err != nil {
+	if err := deletePasswdFileLine(vmailUsersFilePath(), address); err != nil {
 		return err
 	}
 	if err := deleteSimpleMapLine(postfixVmailboxPath(), address); err != nil {
@@ -633,7 +722,7 @@ func updateSystemMailboxPassword(address, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	if err := upsertSimpleMapLine(vmailUsersFilePath(), address, "{SHA512-CRYPT}"+hashed); err != nil {
+	if err := upsertPasswdFileLine(vmailUsersFilePath(), address, "{SHA512-CRYPT}"+hashed); err != nil {
 		return err
 	}
 	return reloadMailRuntime()
@@ -722,16 +811,50 @@ func parseSimpleMapFile(path string) map[string]string {
 	return items
 }
 
+func parsePasswdFile(path string) map[string]string {
+	items := map[string]string{}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return items
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		items[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+	return items
+}
+
 func upsertSimpleMapLine(path, key, value string) error {
 	items := parseSimpleMapFile(path)
 	items[key] = value
 	return writeSimpleMapFile(path, items)
 }
 
+func upsertPasswdFileLine(path, key, value string) error {
+	items := parsePasswdFile(path)
+	items[key] = value
+	return writePasswdFile(path, items)
+}
+
 func deleteSimpleMapLine(path, key string) error {
 	items := parseSimpleMapFile(path)
 	delete(items, key)
 	return writeSimpleMapFile(path, items)
+}
+
+func deletePasswdFileLine(path, key string) error {
+	items := parsePasswdFile(path)
+	delete(items, key)
+	return writePasswdFile(path, items)
 }
 
 func writeSimpleMapFile(path string, items map[string]string) error {
@@ -745,6 +868,27 @@ func writeSimpleMapFile(path string, items map[string]string) error {
 	for _, key := range keys {
 		builder.WriteString(key)
 		builder.WriteByte(' ')
+		builder.WriteString(items[key])
+		builder.WriteByte('\n')
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(builder.String()), 0640)
+}
+
+func writePasswdFile(path string, items map[string]string) error {
+	keys := make([]string, 0, len(items))
+	for key := range items {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var builder strings.Builder
+	for _, key := range keys {
+		builder.WriteString(key)
+		builder.WriteByte(':')
 		builder.WriteString(items[key])
 		builder.WriteByte('\n')
 	}

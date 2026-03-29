@@ -483,6 +483,8 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleVhostList(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost":
 		s.handleVhostCreate(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost/create":
+		s.handleVhostCreate(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost/delete":
 		s.handleVhostDelete(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost/suspend":
