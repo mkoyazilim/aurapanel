@@ -30,7 +30,6 @@ func NewDBToolsProxy() (http.Handler, error) {
 	proxy.Director = func(req *http.Request) {
 		authUser, hasAuthUser := middleware.GetAuthUser(req.Context())
 		incomingHost := strings.TrimSpace(req.Host)
-		incomingRemoteIP := remoteAddrHost(req.RemoteAddr)
 		forwardedProto := firstForwardedValue(req.Header.Get("X-Forwarded-Proto"))
 		if forwardedProto == "" {
 			if req.TLS != nil {
@@ -50,9 +49,9 @@ func NewDBToolsProxy() (http.Handler, error) {
 			req.Header.Set("X-Forwarded-Host", incomingHost)
 		}
 		req.Header.Set("X-Forwarded-Proto", forwardedProto)
-		if incomingRemoteIP != "" {
-			req.Header.Set("X-Forwarded-For", incomingRemoteIP)
-		}
+		// Force loopback identity for db-tools upstream to keep public path blocked
+		// while allowing authenticated gateway traffic.
+		req.Header.Set("X-Forwarded-For", "127.0.0.1")
 
 		req.Header.Del("X-Aura-Auth-Email")
 		req.Header.Del("X-Aura-Auth-Role")
