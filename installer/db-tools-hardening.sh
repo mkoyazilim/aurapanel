@@ -26,7 +26,7 @@ read_env_value() {
   if [ ! -f "${file}" ]; then
     return 0
   fi
-  grep -E "^${key}=" "${file}" 2>/dev/null | tail -n1 | cut -d'=' -f2-
+  grep -E "^${key}=" "${file}" 2>/dev/null | tail -n1 | cut -d'=' -f2- || true
 }
 
 upsert_env() {
