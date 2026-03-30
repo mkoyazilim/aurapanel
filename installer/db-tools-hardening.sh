@@ -75,7 +75,7 @@ merge_allowlist() {
 
 ensure_dbtools_credentials() {
   local env_user env_pass
-  local svc_user svc_pass svc_ips svc_rate svc_runtime_file
+  local svc_user svc_pass svc_ips svc_rate svc_runtime_file svc_reload
 
   env_user="$(read_env_value "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   env_pass="$(read_env_value "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
@@ -84,6 +84,7 @@ ensure_dbtools_credentials() {
   svc_ips="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS")"
   svc_rate="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN")"
   svc_runtime_file="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE")"
+  svc_reload="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE")"
 
   DBTOOLS_AUTH_USER="${AURAPANEL_DBTOOLS_AUTH_USER:-${env_user:-${svc_user:-dbtools}}}"
   DBTOOLS_AUTH_PASS="${AURAPANEL_DBTOOLS_AUTH_PASS:-${env_pass:-${svc_pass:-}}}"
@@ -111,6 +112,7 @@ ensure_dbtools_credentials() {
   DBTOOLS_RUNTIME_ALLOWLIST_FILE="${AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE:-${svc_runtime_file:-${DBTOOLS_RUNTIME_ALLOWLIST_FILE_DEFAULT}}}"
   DBTOOLS_RUNTIME_ALLOWLIST_FILE="$(printf '%s' "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}" | tr -d '\r')"
   [ -n "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}" ] || DBTOOLS_RUNTIME_ALLOWLIST_FILE="${DBTOOLS_RUNTIME_ALLOWLIST_FILE_DEFAULT}"
+  DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE="${AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE:-${svc_reload:-1}}"
 
   mkdir -p "${DBTOOLS_CONF_DIR}" "/usr/local/lsws/conf/vhosts/Example"
   upsert_env "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER" "${DBTOOLS_AUTH_USER}"
@@ -124,11 +126,14 @@ ensure_dbtools_credentials() {
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS" "${DBTOOLS_ALLOWED_IPS}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN" "${DBTOOLS_RATE_LIMIT_PER_MIN}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE" "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE" "${DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PHPMYADMIN_BASE_URL" "/phpmyadmin/index.php"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_BASE_URL" "/pgadmin4/"
   chmod 600 "${SERVICE_ENV_FILE}"
 
   mkdir -p "$(dirname "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}")"
+  chmod 755 "${DBTOOLS_CONF_DIR}" "$(dirname "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}")" >/dev/null 2>&1 || true
+  chmod o+x "${GATEWAY_ENV_DIR}" >/dev/null 2>&1 || true
   touch "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}"
   chmod 644 "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}"
 

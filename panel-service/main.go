@@ -270,13 +270,16 @@ type appState struct {
 }
 
 type service struct {
-	mu        sync.RWMutex
-	startedAt time.Time
-	state     appState
-	modules   moduleState
-	update    updateStatusCache
-	dbAccess  map[string]dbToolSessionGrant
-	dbACLFile string
+	mu                  sync.RWMutex
+	startedAt           time.Time
+	state               appState
+	modules             moduleState
+	update              updateStatusCache
+	dbAccess            map[string]dbToolSessionGrant
+	dbACLFile           string
+	dbACLReloadInFlight bool
+	dbACLReloadNeeded   bool
+	dbACLLastReload     time.Time
 }
 
 type jwtClaims struct {

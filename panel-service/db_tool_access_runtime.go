@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -52,7 +53,7 @@ func (s *service) initializeDBToolAccessRuntime() {
 		path = defaultDBToolsRuntimeAllowlistFile
 	}
 	s.dbACLFile = path
-	_ = s.writeDBToolAllowlistFileLocked(time.Now().UTC())
+	_, _ = s.writeDBToolAllowlistFileLocked(time.Now().UTC())
 }
 
 func (s *service) registerDBToolAccess(email, rawIP string, expiresAt time.Time) {
@@ -67,9 +68,8 @@ func (s *service) registerDBToolAccess(email, rawIP string, expiresAt time.Time)
 		expiresAt = now.Add(defaultJWTSessionTTL)
 	}
 
+	shouldReload := false
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.dbAccess == nil {
 		s.dbAccess = map[string]dbToolSessionGrant{}
 	}
@@ -89,7 +89,17 @@ func (s *service) registerDBToolAccess(email, rawIP string, expiresAt time.Time)
 	grant.UpdatedAt = now
 	s.dbAccess[key] = grant
 
-	_ = s.writeDBToolAllowlistFileLocked(now)
+	changed, err := s.writeDBToolAllowlistFileLocked(now)
+	s.mu.Unlock()
+
+	if err != nil {
+		log.Printf("dbtools allowlist write failed on register: %v", err)
+		return
+	}
+	shouldReload = changed
+	if shouldReload {
+		s.enqueueDBToolAllowlistReload()
+	}
 }
 
 func (s *service) revokeDBToolAccess(email, rawIP string) {
@@ -100,10 +110,10 @@ func (s *service) revokeDBToolAccess(email, rawIP string) {
 	}
 
 	now := time.Now().UTC()
+	shouldReload := false
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.dbAccess == nil {
+		s.mu.Unlock()
 		return
 	}
 	s.cleanupExpiredDBToolAccessLocked(now)
@@ -120,7 +130,17 @@ func (s *service) revokeDBToolAccess(email, rawIP string) {
 		}
 	}
 
-	_ = s.writeDBToolAllowlistFileLocked(now)
+	changed, err := s.writeDBToolAllowlistFileLocked(now)
+	s.mu.Unlock()
+
+	if err != nil {
+		log.Printf("dbtools allowlist write failed on revoke: %v", err)
+		return
+	}
+	shouldReload = changed
+	if shouldReload {
+		s.enqueueDBToolAllowlistReload()
+	}
 }
 
 func (s *service) cleanupExpiredDBToolAccessLocked(now time.Time) {
@@ -134,7 +154,7 @@ func (s *service) cleanupExpiredDBToolAccessLocked(now time.Time) {
 	}
 }
 
-func (s *service) writeDBToolAllowlistFileLocked(now time.Time) error {
+func (s *service) writeDBToolAllowlistFileLocked(now time.Time) (bool, error) {
 	if s.dbACLFile == "" {
 		s.dbACLFile = defaultDBToolsRuntimeAllowlistFile
 	}
@@ -159,13 +179,71 @@ func (s *service) writeDBToolAllowlistFileLocked(now time.Time) error {
 		content = strings.Join(ips, "\n") + "\n"
 	}
 
+	if existing, err := os.ReadFile(s.dbACLFile); err == nil {
+		if string(existing) == content {
+			return false, nil
+		}
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+
 	dir := filepath.Dir(s.dbACLFile)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return err
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return false, err
 	}
 	tmp := s.dbACLFile + ".tmp"
 	if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
-		return err
+		return false, err
 	}
-	return os.Rename(tmp, s.dbACLFile)
+	if err := os.Rename(tmp, s.dbACLFile); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func dbToolAllowlistReloadEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE"))) {
+	case "", "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *service) enqueueDBToolAllowlistReload() {
+	if !dbToolAllowlistReloadEnabled() || !fileExists(olsLSWSControlPath) {
+		return
+	}
+
+	s.mu.Lock()
+	if s.dbACLReloadInFlight {
+		s.dbACLReloadNeeded = true
+		s.mu.Unlock()
+		return
+	}
+	s.dbACLReloadInFlight = true
+	s.mu.Unlock()
+
+	go func() {
+		for {
+			err := reloadOpenLiteSpeed()
+			now := time.Now().UTC()
+			if err != nil {
+				log.Printf("dbtools allowlist reload failed: %v", err)
+			}
+
+			s.mu.Lock()
+			if err == nil {
+				s.dbACLLastReload = now
+			}
+			if s.dbACLReloadNeeded {
+				s.dbACLReloadNeeded = false
+				s.mu.Unlock()
+				continue
+			}
+			s.dbACLReloadInFlight = false
+			s.mu.Unlock()
+			return
+		}
+	}()
 }

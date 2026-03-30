@@ -1768,6 +1768,7 @@ AURAPANEL_DBTOOLS_AUTH_PASS=
 AURAPANEL_DBTOOLS_ALLOWED_IPS=
 AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN=120
 AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE=/etc/aurapanel/db-tools/runtime-allowlist.txt
+AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE=1
 AURAPANEL_PHPMYADMIN_BASE_URL=/phpmyadmin/index.php
 AURAPANEL_PGADMIN_BASE_URL=/pgadmin4/
 AURAPANEL_CLOUDFLARE_EMAIL=
@@ -1822,17 +1823,19 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_TARGET" "internal-minio"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_ENDPOINT" "http://127.0.0.1:9000"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_BUCKET" "aurapanel-backups"
-  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file pma_base pg_base
+  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload pma_base pg_base
   dbtools_auth_user="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   dbtools_auth_pass="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
   dbtools_allowed_ips="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS")"
   dbtools_rate="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN")"
   dbtools_runtime_file="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE")"
+  dbtools_reload="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE")"
   pma_base="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PHPMYADMIN_BASE_URL")"
   pg_base="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_BASE_URL")"
   [ -n "${dbtools_auth_user}" ] || dbtools_auth_user="dbtools"
   [ -n "${dbtools_rate}" ] || dbtools_rate="120"
   [ -n "${dbtools_runtime_file}" ] || dbtools_runtime_file="/etc/aurapanel/db-tools/runtime-allowlist.txt"
+  [ -n "${dbtools_reload}" ] || dbtools_reload="1"
   [ -n "${pma_base}" ] || pma_base="/phpmyadmin/index.php"
   [ -n "${pg_base}" ] || pg_base="/pgadmin4/"
 
@@ -1851,6 +1854,7 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS" "${dbtools_allowed_ips}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN" "${dbtools_rate}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE" "${dbtools_runtime_file}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE" "${dbtools_reload}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PHPMYADMIN_BASE_URL" "${pma_base}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_BASE_URL" "${pg_base}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_EMAIL" "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_EMAIL")"
