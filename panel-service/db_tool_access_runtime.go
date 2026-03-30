@@ -203,7 +203,7 @@ func (s *service) writeDBToolAllowlistFileLocked(now time.Time) (bool, error) {
 
 func dbToolAllowlistReloadEnabled() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE"))) {
-	case "", "1", "true", "yes", "on":
+	case "1", "true", "yes", "on":
 		return true
 	default:
 		return false

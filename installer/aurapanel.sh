@@ -1768,7 +1768,7 @@ AURAPANEL_DBTOOLS_AUTH_PASS=
 AURAPANEL_DBTOOLS_ALLOWED_IPS=
 AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN=120
 AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE=/etc/aurapanel/db-tools/runtime-allowlist.txt
-AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE=1
+AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE=0
 AURAPANEL_PHPMYADMIN_BASE_URL=/phpmyadmin/index.php
 AURAPANEL_PGADMIN_BASE_URL=/pgadmin4/
 AURAPANEL_CLOUDFLARE_EMAIL=
@@ -1835,7 +1835,7 @@ EOF
   [ -n "${dbtools_auth_user}" ] || dbtools_auth_user="dbtools"
   [ -n "${dbtools_rate}" ] || dbtools_rate="120"
   [ -n "${dbtools_runtime_file}" ] || dbtools_runtime_file="/etc/aurapanel/db-tools/runtime-allowlist.txt"
-  [ -n "${dbtools_reload}" ] || dbtools_reload="1"
+  [ -n "${dbtools_reload}" ] || dbtools_reload="0"
   [ -n "${pma_base}" ] || pma_base="/phpmyadmin/index.php"
   [ -n "${pg_base}" ] || pg_base="/pgadmin4/"
 

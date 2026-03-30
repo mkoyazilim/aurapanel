@@ -35,6 +35,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize service proxy: %v", err)
 	}
+	dbToolsProxy, err := controllers.NewDBToolsProxy()
+	if err != nil {
+		log.Fatalf("failed to initialize db tools proxy: %v", err)
+	}
 
 	publicMux := http.NewServeMux()
 	protectedMux := http.NewServeMux()
@@ -77,6 +81,10 @@ func main() {
 
 	// Main proxy surface for frontend/service communication
 	protectedMux.Handle("/api/v1/", serviceProxy)
+	protectedMux.Handle("/phpmyadmin", dbToolsProxy)
+	protectedMux.Handle("/phpmyadmin/", dbToolsProxy)
+	protectedMux.Handle("/pgadmin4", dbToolsProxy)
+	protectedMux.Handle("/pgadmin4/", dbToolsProxy)
 
 	publicHandler := middleware.RequestIDMiddleware(
 		middleware.CorsMiddleware(
@@ -109,6 +117,10 @@ func main() {
 	mainRouter.Handle("/api/system/", protectedHandler)
 	mainRouter.Handle("/api/websites", protectedHandler)
 	mainRouter.Handle("/api/v1/", protectedHandler)
+	mainRouter.Handle("/phpmyadmin", protectedHandler)
+	mainRouter.Handle("/phpmyadmin/", protectedHandler)
+	mainRouter.Handle("/pgadmin4", protectedHandler)
+	mainRouter.Handle("/pgadmin4/", protectedHandler)
 	mainRouter.Handle("/", middleware.Logger(controllers.PanelStaticHandler()))
 
 	listenAddr := gatewayAddr()

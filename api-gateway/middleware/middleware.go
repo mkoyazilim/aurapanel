@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	defaultIssuer   = "aurapanel-gateway"
-	defaultAudience = "aurapanel-ui"
+	defaultIssuer         = "aurapanel-gateway"
+	defaultAudience       = "aurapanel-ui"
+	defaultAuthCookieName = "aurapanel_session"
 )
 
 type contextKey string
@@ -229,11 +230,25 @@ func extractToken(r *http.Request) string {
 		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
 	}
 
+	if cookie, err := r.Cookie(authCookieName()); err == nil {
+		if value := strings.TrimSpace(cookie.Value); value != "" {
+			return value
+		}
+	}
+
 	if isWebsocketUpgrade(r) {
 		return strings.TrimSpace(r.URL.Query().Get("token"))
 	}
 
 	return ""
+}
+
+func authCookieName() string {
+	value := strings.TrimSpace(os.Getenv("AURAPANEL_AUTH_COOKIE_NAME"))
+	if value == "" {
+		return defaultAuthCookieName
+	}
+	return value
 }
 
 func isWebsocketUpgrade(r *http.Request) bool {

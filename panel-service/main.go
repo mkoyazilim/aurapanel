@@ -35,6 +35,7 @@ const (
 	defaultAdminPass     = "password123"
 	maxJSONBodyBytes     = 1 << 20
 	defaultJWTSessionTTL = 12 * time.Hour
+	defaultAuthCookie    = "aurapanel_session"
 
 	serviceMaxFailedAttempts = 5
 	serviceFailureWindow     = 10 * time.Minute
@@ -1264,6 +1265,51 @@ func serviceClearLoginAttempts(key string) {
 	delete(serviceLoginAttempts, key)
 }
 
+func serviceAuthCookieName() string {
+	value := strings.TrimSpace(os.Getenv("AURAPANEL_AUTH_COOKIE_NAME"))
+	if value == "" {
+		return defaultAuthCookie
+	}
+	return value
+}
+
+func serviceRequestSecure(r *http.Request) bool {
+	if strings.EqualFold(forwardedHeaderValue(r.Header.Get("X-Forwarded-Proto")), "https") {
+		return true
+	}
+	return r.TLS != nil
+}
+
+func setServiceAuthCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
+	seconds := int(ttl / time.Second)
+	if seconds < 0 {
+		seconds = 0
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     serviceAuthCookieName(),
+		Value:    strings.TrimSpace(token),
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   serviceRequestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   seconds,
+		Expires:  time.Now().UTC().Add(ttl),
+	})
+}
+
+func clearServiceAuthCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     serviceAuthCookieName(),
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   serviceRequestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0).UTC(),
+	})
+}
+
 func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Email     string `json:"email"`
@@ -1333,6 +1379,7 @@ func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Token generation failed.")
 		return
 	}
+	setServiceAuthCookie(w, r, token, defaultJWTSessionTTL)
 	s.registerDBToolAccess(matchedUser.Email, serviceClientIP(r), time.Now().UTC().Add(defaultJWTSessionTTL))
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -1349,6 +1396,7 @@ func (s *service) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.revokeDBToolAccess(principal.Email, serviceClientIP(r))
+	clearServiceAuthCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 	})
