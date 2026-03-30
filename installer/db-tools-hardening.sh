@@ -75,7 +75,7 @@ merge_allowlist() {
 
 ensure_dbtools_credentials() {
   local env_user env_pass
-  local svc_user svc_pass svc_ips svc_rate svc_runtime_file svc_reload
+  local svc_user svc_pass svc_ips svc_rate svc_runtime_file svc_reload svc_panel_edge
 
   env_user="$(read_env_value "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   env_pass="$(read_env_value "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
@@ -85,6 +85,7 @@ ensure_dbtools_credentials() {
   svc_rate="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN")"
   svc_runtime_file="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE")"
   svc_reload="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE")"
+  svc_panel_edge="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN")"
 
   DBTOOLS_AUTH_USER="${AURAPANEL_DBTOOLS_AUTH_USER:-${env_user:-${svc_user:-dbtools}}}"
   DBTOOLS_AUTH_PASS="${AURAPANEL_DBTOOLS_AUTH_PASS:-${env_pass:-${svc_pass:-}}}"
@@ -113,6 +114,7 @@ ensure_dbtools_credentials() {
   DBTOOLS_RUNTIME_ALLOWLIST_FILE="$(printf '%s' "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}" | tr -d '\r')"
   [ -n "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}" ] || DBTOOLS_RUNTIME_ALLOWLIST_FILE="${DBTOOLS_RUNTIME_ALLOWLIST_FILE_DEFAULT}"
   DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE="${AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE:-${svc_reload:-0}}"
+  DBTOOLS_PANEL_EDGE_SINGLE_DOMAIN="${AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN:-${svc_panel_edge:-0}}"
 
   mkdir -p "${DBTOOLS_CONF_DIR}" "/usr/local/lsws/conf/vhosts/Example"
   upsert_env "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER" "${DBTOOLS_AUTH_USER}"
@@ -208,7 +210,33 @@ configure_ols_dbtools_context() {
     !skip {print}
   ' "${VHOST_CONF}" > "${tmp_conf}"
 
-  cat <<EOF >> "${tmp_conf}"
+  local edge_enabled="0"
+  case "$(printf '%s' "${DBTOOLS_PANEL_EDGE_SINGLE_DOMAIN}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) edge_enabled="1" ;;
+  esac
+
+  if [ "${edge_enabled}" = "1" ] && grep -qiE '^[[:space:]]*extprocessor[[:space:]]+aurapanel_gateway[[:space:]]*\{' "${VHOST_CONF}"; then
+    cat <<EOF >> "${tmp_conf}"
+
+# AURAPANEL DB TOOLS BEGIN
+context /phpmyadmin/{
+  type proxy
+  handler aurapanel_gateway
+  addDefaultCharset off
+}
+
+context /pgadmin4/{
+  type proxy
+  handler aurapanel_gateway
+  addDefaultCharset off
+}
+# AURAPANEL DB TOOLS END
+EOF
+  else
+    if [ "${edge_enabled}" = "1" ]; then
+      warn "AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN enabled but aurapanel_gateway extprocessor not found; falling back to static DB tools contexts."
+    fi
+    cat <<EOF >> "${tmp_conf}"
 
 # AURAPANEL DB TOOLS BEGIN
 context /phpmyadmin/{
@@ -222,6 +250,7 @@ context /pgadmin4/{
 }
 # AURAPANEL DB TOOLS END
 EOF
+  fi
 
   install -m 640 "${tmp_conf}" "${VHOST_CONF}"
   rm -f "${tmp_conf}"
