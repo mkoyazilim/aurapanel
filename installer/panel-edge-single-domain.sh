@@ -78,9 +78,9 @@ replace_global_rewrite_block() {
       next
     }
     skip {
-      open = gsub(/\{/, "{")
-      close = gsub(/\}/, "}")
-      depth += open - close
+      openCount = gsub(/\{/, "{")
+      closeCount = gsub(/\}/, "}")
+      depth += openCount - closeCount
       if (depth <= 0) {
         skip = 0
       }
