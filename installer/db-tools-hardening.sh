@@ -217,28 +217,7 @@ configure_ols_dbtools_context() {
     !skip {print}
   ' "${VHOST_CONF}" > "${tmp_conf}"
 
-  if panel_edge_single_domain_enabled && grep -qiE '^[[:space:]]*extprocessor[[:space:]]+aurapanel_gateway[[:space:]]*\{' "${VHOST_CONF}"; then
-    cat <<EOF >> "${tmp_conf}"
-
-# AURAPANEL DB TOOLS BEGIN
-context /phpmyadmin/{
-  type proxy
-  handler aurapanel_gateway
-  addDefaultCharset off
-}
-
-context /pgadmin4/{
-  type proxy
-  handler aurapanel_gateway
-  addDefaultCharset off
-}
-# AURAPANEL DB TOOLS END
-EOF
-  else
-    if panel_edge_single_domain_enabled; then
-      warn "AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN enabled but aurapanel_gateway extprocessor not found; falling back to static DB tools contexts."
-    fi
-    cat <<EOF >> "${tmp_conf}"
+  cat <<EOF >> "${tmp_conf}"
 
 # AURAPANEL DB TOOLS BEGIN
 context /phpmyadmin/{
@@ -252,7 +231,6 @@ context /pgadmin4/{
 }
 # AURAPANEL DB TOOLS END
 EOF
-  fi
 
   install -m 640 "${tmp_conf}" "${VHOST_CONF}"
   rm -f "${tmp_conf}"
