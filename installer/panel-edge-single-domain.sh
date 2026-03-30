@@ -55,10 +55,9 @@ gateway_port() {
 
 replace_global_rewrite_block() {
   local conf="$1"
-  local rewrite_target="$2"
   local tmp
   tmp="$(mktemp /tmp/aurapanel-panel-edge-rewrite.XXXXXX)"
-  awk -v target="${rewrite_target}" '
+  awk '
     BEGIN {
       skip = 0
       depth = 0
@@ -67,7 +66,7 @@ replace_global_rewrite_block() {
               "  enable 1\n" \
               "  logLevel 0\n" \
               "  RewriteCond %{REQUEST_URI} !^/webmail/\n" \
-              "  RewriteRule ^(.*)$ http://" target "/$1 [P,L]\n" \
+              "  RewriteRule ^(.*)$ http://aurapanel_gateway/$1 [P,L]\n" \
               "}"
     }
     !skip && $0 ~ /^rewrite[[:space:]]*\{$/ {
@@ -106,7 +105,7 @@ ensure_ols_panel_gateway() {
     return 0
   fi
 
-  replace_global_rewrite_block "${VHOST_CONF}" "${proxy_addr}"
+  replace_global_rewrite_block "${VHOST_CONF}"
 
   local tmp
   tmp="$(mktemp /tmp/aurapanel-panel-edge-vhconf.XXXXXX)"
