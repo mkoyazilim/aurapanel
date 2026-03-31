@@ -27,6 +27,14 @@ type firewallRuntimeRule struct {
 	Reason    string
 }
 
+type firewallPortRuntimeRule struct {
+	Number   int
+	Port     int
+	Protocol string
+	Block    bool
+	Reason   string
+}
+
 type systemMailbox struct {
 	Address string
 	Maildir string
@@ -66,6 +74,52 @@ func addFirewallRuntimeRule(rule FirewallRule) error {
 		return addUFFirewallRule(rule)
 	case "firewalld":
 		return addFirewalldRule(rule)
+	default:
+		return fmt.Errorf("no supported active firewall manager detected")
+	}
+}
+
+func listFirewallRuntimePortRules() []FirewallPortRule {
+	snapshot := collectSecuritySnapshot()
+	switch snapshot.FirewallManager {
+	case "ufw":
+		return listUFFirewallPortRules()
+	case "firewalld":
+		return listFirewalldPortRules()
+	default:
+		return []FirewallPortRule{}
+	}
+}
+
+func addFirewallRuntimePortRule(rule FirewallPortRule) error {
+	normalized, err := normalizeFirewallPortRule(rule)
+	if err != nil {
+		return err
+	}
+
+	snapshot := collectSecuritySnapshot()
+	switch snapshot.FirewallManager {
+	case "ufw":
+		return addUFFirewallPortRule(normalized)
+	case "firewalld":
+		return addFirewalldPortRule(normalized)
+	default:
+		return fmt.Errorf("no supported active firewall manager detected")
+	}
+}
+
+func deleteFirewallRuntimePortRule(rule FirewallPortRule) error {
+	normalized, err := normalizeFirewallPortRule(rule)
+	if err != nil {
+		return err
+	}
+
+	snapshot := collectSecuritySnapshot()
+	switch snapshot.FirewallManager {
+	case "ufw":
+		return deleteUFFirewallPortRule(normalized)
+	case "firewalld":
+		return deleteFirewalldPortRule(normalized)
 	default:
 		return fmt.Errorf("no supported active firewall manager detected")
 	}
@@ -122,26 +176,9 @@ func listUFFirewallRules() []FirewallRule {
 }
 
 func parseUFWNumberedRule(line string) (firewallRuntimeRule, bool) {
-	trimmed := strings.TrimSpace(line)
-	if !strings.HasPrefix(trimmed, "[") {
+	number, body, comment, ok := parseUFWNumberedEntry(line)
+	if !ok {
 		return firewallRuntimeRule{}, false
-	}
-
-	endIdx := strings.Index(trimmed, "]")
-	if endIdx <= 1 {
-		return firewallRuntimeRule{}, false
-	}
-
-	number, err := strconv.Atoi(strings.TrimSpace(trimmed[1:endIdx]))
-	if err != nil {
-		return firewallRuntimeRule{}, false
-	}
-
-	comment := ""
-	body := strings.TrimSpace(trimmed[endIdx+1:])
-	if idx := strings.Index(body, "#"); idx >= 0 {
-		comment = strings.TrimSpace(body[idx+1:])
-		body = strings.TrimSpace(body[:idx])
 	}
 
 	fields := strings.Fields(body)
@@ -165,6 +202,69 @@ func parseUFWNumberedRule(line string) (firewallRuntimeRule, bool) {
 		Block:     actionField == "DENY" || actionField == "REJECT",
 		Reason:    comment,
 	}, true
+}
+
+func parseUFWNumberedPortRule(line string) (firewallPortRuntimeRule, bool) {
+	number, body, comment, ok := parseUFWNumberedEntry(line)
+	if !ok {
+		return firewallPortRuntimeRule{}, false
+	}
+	if strings.Contains(strings.ToLower(body), "(v6)") {
+		return firewallPortRuntimeRule{}, false
+	}
+
+	fields := strings.Fields(body)
+	if len(fields) < 4 {
+		return firewallPortRuntimeRule{}, false
+	}
+
+	actionField := strings.ToUpper(strings.TrimSpace(fields[1]))
+	if actionField != "ALLOW" && actionField != "DENY" && actionField != "REJECT" {
+		return firewallPortRuntimeRule{}, false
+	}
+
+	from := strings.TrimSpace(fields[len(fields)-1])
+	if !isAnywhereFirewallSource(from) {
+		return firewallPortRuntimeRule{}, false
+	}
+
+	port, protocol, ok := parseUFWPortToken(strings.TrimSpace(fields[0]))
+	if !ok {
+		return firewallPortRuntimeRule{}, false
+	}
+
+	return firewallPortRuntimeRule{
+		Number:   number,
+		Port:     port,
+		Protocol: protocol,
+		Block:    actionField == "DENY" || actionField == "REJECT",
+		Reason:   comment,
+	}, true
+}
+
+func parseUFWNumberedEntry(line string) (number int, body string, comment string, ok bool) {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, "[") {
+		return 0, "", "", false
+	}
+
+	endIdx := strings.Index(trimmed, "]")
+	if endIdx <= 1 {
+		return 0, "", "", false
+	}
+
+	parsedNumber, err := strconv.Atoi(strings.TrimSpace(trimmed[1:endIdx]))
+	if err != nil {
+		return 0, "", "", false
+	}
+
+	parsedComment := ""
+	parsedBody := strings.TrimSpace(trimmed[endIdx+1:])
+	if idx := strings.Index(parsedBody, "#"); idx >= 0 {
+		parsedComment = strings.TrimSpace(parsedBody[idx+1:])
+		parsedBody = strings.TrimSpace(parsedBody[:idx])
+	}
+	return parsedNumber, parsedBody, parsedComment, true
 }
 
 func addUFFirewallRule(rule FirewallRule) error {
@@ -198,6 +298,80 @@ func deleteUFFirewallRule(ipAddress string) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(numbers)))
 	if len(numbers) == 0 {
 		return fmt.Errorf("firewall rule not found")
+	}
+
+	for _, number := range numbers {
+		if err := exec.Command("ufw", "--force", "delete", strconv.Itoa(number)).Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func listUFFirewallPortRules() []FirewallPortRule {
+	cmd := exec.Command("ufw", "status", "numbered")
+	output, err := cmd.Output()
+	if err != nil {
+		return []FirewallPortRule{}
+	}
+
+	rules := []FirewallPortRule{}
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		runtimeRule, ok := parseUFWNumberedPortRule(scanner.Text())
+		if !ok {
+			continue
+		}
+		rules = append(rules, FirewallPortRule{
+			Port:     runtimeRule.Port,
+			Protocol: runtimeRule.Protocol,
+			Block:    runtimeRule.Block,
+			Reason:   runtimeRule.Reason,
+		})
+	}
+	return rules
+}
+
+func addUFFirewallPortRule(rule FirewallPortRule) error {
+	action := "allow"
+	if rule.Block {
+		action = "deny"
+	}
+
+	args := []string{
+		"--force", "insert", "1", action,
+		"proto", rule.Protocol,
+		"from", "any",
+		"to", "any",
+		"port", strconv.Itoa(rule.Port),
+	}
+	if reason := strings.TrimSpace(rule.Reason); reason != "" {
+		args = append(args, "comment", truncateShellComment(reason, 60))
+	}
+	return exec.Command("ufw", args...).Run()
+}
+
+func deleteUFFirewallPortRule(rule FirewallPortRule) error {
+	cmd := exec.Command("ufw", "status", "numbered")
+	output, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	numbers := []int{}
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		parsed, ok := parseUFWNumberedPortRule(scanner.Text())
+		if !ok {
+			continue
+		}
+		if parsed.Port == rule.Port && strings.EqualFold(parsed.Protocol, rule.Protocol) && parsed.Block == rule.Block {
+			numbers = append(numbers, parsed.Number)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(numbers)))
+	if len(numbers) == 0 {
+		return fmt.Errorf("firewall port rule not found")
 	}
 
 	for _, number := range numbers {
@@ -255,6 +429,103 @@ func deleteFirewalldRule(ipAddress string) error {
 	return exec.Command("firewall-cmd", "--reload").Run()
 }
 
+func listFirewalldPortRules() []FirewallPortRule {
+	rules := []FirewallPortRule{}
+
+	portsOutput, err := exec.Command("firewall-cmd", "--permanent", "--list-ports").Output()
+	if err == nil {
+		tokens := strings.Fields(string(portsOutput))
+		for _, token := range tokens {
+			port, protocol, ok := parseUFWPortToken(token)
+			if !ok {
+				continue
+			}
+			rules = append(rules, FirewallPortRule{
+				Port:     port,
+				Protocol: protocol,
+				Block:    false,
+				Reason:   "",
+			})
+		}
+	}
+
+	richOutput, err := exec.Command("firewall-cmd", "--permanent", "--list-rich-rules").Output()
+	if err == nil {
+		scanner := bufio.NewScanner(bytes.NewReader(richOutput))
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if !strings.Contains(line, `port port="`) || !strings.Contains(line, `protocol="`) {
+				continue
+			}
+			if !strings.Contains(line, " drop") && !strings.Contains(line, " reject") {
+				continue
+			}
+
+			portValue := extractBetween(line, `port port="`, `"`)
+			protocol := strings.ToLower(strings.TrimSpace(extractBetween(line, `protocol="`, `"`)))
+			port, err := strconv.Atoi(portValue)
+			if err != nil || port <= 0 || port > 65535 {
+				continue
+			}
+			if protocol != "tcp" && protocol != "udp" {
+				continue
+			}
+			rules = append(rules, FirewallPortRule{
+				Port:     port,
+				Protocol: protocol,
+				Block:    true,
+				Reason:   "",
+			})
+		}
+	}
+
+	return rules
+}
+
+func addFirewalldPortRule(rule FirewallPortRule) error {
+	if !rule.Block {
+		if err := exec.Command("firewall-cmd", "--permanent", "--add-port", fmt.Sprintf("%d/%s", rule.Port, rule.Protocol)).Run(); err != nil {
+			return err
+		}
+		return exec.Command("firewall-cmd", "--reload").Run()
+	}
+
+	richRule := fmt.Sprintf(`rule family="ipv4" port port="%d" protocol="%s" drop`, rule.Port, rule.Protocol)
+	if err := exec.Command("firewall-cmd", "--permanent", "--add-rich-rule", richRule).Run(); err != nil {
+		return err
+	}
+	return exec.Command("firewall-cmd", "--reload").Run()
+}
+
+func deleteFirewalldPortRule(rule FirewallPortRule) error {
+	if !rule.Block {
+		output, err := exec.Command("firewall-cmd", "--permanent", "--remove-port", fmt.Sprintf("%d/%s", rule.Port, rule.Protocol)).CombinedOutput()
+		if err != nil {
+			message := strings.TrimSpace(string(output))
+			if strings.Contains(strings.ToLower(message), "not enabled") {
+				return fmt.Errorf("firewall port rule not found")
+			}
+			if message == "" {
+				return err
+			}
+			return fmt.Errorf(message)
+		}
+		return exec.Command("firewall-cmd", "--reload").Run()
+	}
+
+	removed := false
+	for _, action := range []string{"drop", "reject"} {
+		richRule := fmt.Sprintf(`rule family="ipv4" port port="%d" protocol="%s" %s`, rule.Port, rule.Protocol, action)
+		if err := exec.Command("firewall-cmd", "--permanent", "--remove-rich-rule", richRule).Run(); err == nil {
+			removed = true
+		}
+	}
+	if !removed {
+		return fmt.Errorf("firewall port rule not found")
+	}
+	return exec.Command("firewall-cmd", "--reload").Run()
+}
+
 func looksLikeIPAddress(value string) bool {
 	if value == "" || strings.EqualFold(value, "Anywhere") {
 		return false
@@ -282,6 +553,58 @@ func normalizeFirewallIPAddress(value string) (string, error) {
 		return "", fmt.Errorf("Invalid IP format. Use IPv4 like 203.0.113.10.")
 	}
 	return addr.String(), nil
+}
+
+func normalizeFirewallPortRule(rule FirewallPortRule) (FirewallPortRule, error) {
+	if rule.Port <= 0 || rule.Port > 65535 {
+		return FirewallPortRule{}, fmt.Errorf("Port must be between 1 and 65535.")
+	}
+
+	protocol := strings.ToLower(strings.TrimSpace(rule.Protocol))
+	if protocol != "tcp" && protocol != "udp" {
+		return FirewallPortRule{}, fmt.Errorf("Protocol must be tcp or udp.")
+	}
+
+	return FirewallPortRule{
+		Port:     rule.Port,
+		Protocol: protocol,
+		Block:    rule.Block,
+		Reason:   strings.TrimSpace(rule.Reason),
+	}, nil
+}
+
+func isAnywhereFirewallSource(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	return normalized == "anywhere" || normalized == "any"
+}
+
+func parseUFWPortToken(token string) (int, string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(token))
+	if normalized == "" || strings.Contains(normalized, ":") {
+		return 0, "", false
+	}
+
+	parts := strings.Split(normalized, "/")
+	if len(parts) == 1 {
+		port, err := strconv.Atoi(parts[0])
+		if err != nil || port <= 0 || port > 65535 {
+			return 0, "", false
+		}
+		return port, "tcp", true
+	}
+	if len(parts) != 2 {
+		return 0, "", false
+	}
+
+	port, err := strconv.Atoi(parts[0])
+	if err != nil || port <= 0 || port > 65535 {
+		return 0, "", false
+	}
+	protocol := strings.TrimSpace(parts[1])
+	if protocol != "tcp" && protocol != "udp" {
+		return 0, "", false
+	}
+	return port, protocol, true
 }
 
 func extractBetween(value, prefix, suffix string) string {

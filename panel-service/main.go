@@ -193,6 +193,13 @@ type FirewallRule struct {
 	Reason    string `json:"reason"`
 }
 
+type FirewallPortRule struct {
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
+	Block    bool   `json:"block"`
+	Reason   string `json:"reason"`
+}
+
 type UpdateStatus struct {
 	CurrentVersion  string `json:"current_version"`
 	LatestVersion   string `json:"latest_version,omitempty"`
@@ -1067,6 +1074,12 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleFirewallRuleCreate(w, r)
 	case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/security/firewall/rules":
 		s.handleFirewallRuleDelete(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/security/firewall/ports":
+		s.handleFirewallPortRulesList(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/firewall/ports":
+		s.handleFirewallPortRuleCreate(w, r)
+	case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/security/firewall/ports":
+		s.handleFirewallPortRuleDelete(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/waf":
 		s.handleSecurityWAF(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/2fa/setup":
@@ -2856,6 +2869,56 @@ func (s *service) handleFirewallRuleDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Firewall rule deleted."})
+}
+
+func (s *service) handleFirewallPortRulesList(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: listFirewallRuntimePortRules()})
+}
+
+func (s *service) handleFirewallPortRuleCreate(w http.ResponseWriter, r *http.Request) {
+	var payload FirewallPortRule
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid firewall port payload.")
+		return
+	}
+
+	if err := addFirewallRuntimePortRule(payload); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Firewall port rule added."})
+}
+
+func (s *service) handleFirewallPortRuleDelete(w http.ResponseWriter, r *http.Request) {
+	portValue := strings.TrimSpace(r.URL.Query().Get("port"))
+	port, err := strconv.Atoi(portValue)
+	if err != nil || port <= 0 || port > 65535 {
+		writeError(w, http.StatusBadRequest, "Valid port is required.")
+		return
+	}
+
+	protocol := strings.TrimSpace(r.URL.Query().Get("protocol"))
+	if protocol == "" {
+		writeError(w, http.StatusBadRequest, "Protocol is required.")
+		return
+	}
+
+	block, err := strconv.ParseBool(strings.TrimSpace(r.URL.Query().Get("block")))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Block flag is required.")
+		return
+	}
+
+	rule := FirewallPortRule{
+		Port:     port,
+		Protocol: protocol,
+		Block:    block,
+	}
+	if err := deleteFirewallRuntimePortRule(rule); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Firewall port rule deleted."})
 }
 
 func (s *service) handleSSHKeysList(w http.ResponseWriter, r *http.Request) {

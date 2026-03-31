@@ -92,6 +92,60 @@
           </tbody>
         </table>
       </div>
+
+      <div class="mt-4 rounded-xl border border-panel-border bg-panel-dark p-4 space-y-3">
+        <h3 class="text-base font-semibold text-white">Port Kurallari (TCP/UDP)</h3>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
+          <input v-model="firewallPortForm.port" type="number" min="1" max="65535" class="aura-input" placeholder="Port (orn: 3306)" />
+          <select v-model="firewallPortForm.protocol" class="aura-input">
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+          </select>
+          <select v-model="firewallPortForm.block" class="aura-input">
+            <option :value="false">Allow</option>
+            <option :value="true">Block</option>
+          </select>
+          <input v-model="firewallPortForm.reason" class="aura-input" placeholder="Reason (opsiyonel)" />
+          <button class="btn-primary" @click="addFirewallPortRule">Port Kurali Ekle</button>
+        </div>
+        <p class="text-xs text-gray-400">
+          Bu bolum port bazli kural icindir. IP tabanli izin/engel islemleri bir ustteki IP/CIDR bolumunden yonetilir.
+        </p>
+        <div v-if="firewallPortError" class="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+          {{ firewallPortError }}
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-panel-border text-gray-400">
+                <th class="py-2 text-left">Port</th>
+                <th class="py-2 text-left">Protocol</th>
+                <th class="py-2 text-left">Action</th>
+                <th class="py-2 text-left">Reason</th>
+                <th class="py-2 text-right">Islem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="firewallPortRules.length === 0">
+                <td colspan="5" class="py-4 text-center text-gray-400">Port kurali yok</td>
+              </tr>
+              <tr
+                v-for="rule in firewallPortRules"
+                :key="`${rule.port}-${rule.protocol}-${rule.block}`"
+                class="border-b border-panel-border/60"
+              >
+                <td class="py-2 font-mono">{{ rule.port }}</td>
+                <td class="py-2 uppercase">{{ rule.protocol }}</td>
+                <td class="py-2">{{ rule.block ? 'Block' : 'Allow' }}</td>
+                <td class="py-2 text-gray-300">{{ rule.reason || '-' }}</td>
+                <td class="py-2 text-right">
+                  <button class="btn-danger px-3 py-1 text-xs" @click="deleteFirewallPortRule(rule)">Sil</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div v-if="activeTab === 'waf'" class="space-y-4">
@@ -412,6 +466,8 @@ async function unbanIp(ip) {
 const status = ref({})
 const firewallRules = ref([])
 const firewallError = ref('')
+const firewallPortRules = ref([])
+const firewallPortError = ref('')
 const sshKeys = ref([])
 const wafResult = ref(null)
 const hardeningResult = ref(null)
@@ -425,6 +481,7 @@ const malwareStarting = ref(false)
 let malwarePollTimer = null
 
 const firewallForm = ref({ ip_address: '', block: true, reason: '' })
+const firewallPortForm = ref({ port: '', protocol: 'tcp', block: false, reason: '' })
 const wafInput = ref({
   method: 'GET',
   path: '/',
@@ -488,6 +545,15 @@ async function loadFirewallRules() {
   }
 }
 
+async function loadFirewallPortRules() {
+  try {
+    const res = await api.get('/security/firewall/ports')
+    firewallPortRules.value = res.data.data || []
+  } catch (err) {
+    firewallPortError.value = err.response?.data?.message || err.message || 'Firewall port kurallari alinamadi.'
+  }
+}
+
 function isValidIPv4(input) {
   const parts = String(input || '').split('.')
   if (parts.length !== 4) return false
@@ -510,6 +576,12 @@ function isValidIPv4OrCIDR(input) {
   if (!/^\d{1,2}$/.test(cidrPart)) return false
   const cidr = Number(cidrPart)
   return cidr >= 0 && cidr <= 32
+}
+
+function isValidPort(input) {
+  if (!/^\d+$/.test(String(input || ''))) return false
+  const value = Number(input)
+  return value >= 1 && value <= 65535
 }
 
 async function addFirewallRule() {
@@ -541,6 +613,45 @@ async function deleteFirewallRule(ip) {
     await loadFirewallRules()
   } catch (err) {
     firewallError.value = err.response?.data?.message || err.message || 'Firewall kurali silinemedi.'
+  }
+}
+
+async function addFirewallPortRule() {
+  const portText = String(firewallPortForm.value.port || '').trim()
+  if (!isValidPort(portText)) {
+    firewallPortError.value = 'Gecersiz port. 1-65535 araliginda olmali.'
+    return
+  }
+
+  firewallPortError.value = ''
+  try {
+    await api.post('/security/firewall/ports', {
+      ...firewallPortForm.value,
+      port: Number(portText),
+      protocol: String(firewallPortForm.value.protocol || 'tcp').toLowerCase(),
+      reason: String(firewallPortForm.value.reason || '').trim(),
+    })
+    firewallPortForm.value.port = ''
+    firewallPortForm.value.reason = ''
+    await loadFirewallPortRules()
+  } catch (err) {
+    firewallPortError.value = err.response?.data?.message || err.message || 'Firewall port kurali eklenemedi.'
+  }
+}
+
+async function deleteFirewallPortRule(rule) {
+  firewallPortError.value = ''
+  try {
+    await api.delete('/security/firewall/ports', {
+      params: {
+        port: rule.port,
+        protocol: rule.protocol,
+        block: rule.block,
+      },
+    })
+    await loadFirewallPortRules()
+  } catch (err) {
+    firewallPortError.value = err.response?.data?.message || err.message || 'Firewall port kurali silinemedi.'
   }
 }
 
@@ -713,6 +824,7 @@ async function loadAll() {
   await Promise.all([
     loadStatus(),
     loadFirewallRules(),
+    loadFirewallPortRules(),
     loadSshKeys(),
     loadMalwareJobs(),
     loadQuarantineRecords(),
