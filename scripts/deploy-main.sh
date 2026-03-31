@@ -17,11 +17,28 @@ log() {
   printf '[deploy] %s\n' "$*"
 }
 
+resolve_go_bin() {
+  if command -v go >/dev/null 2>&1; then
+    command -v go
+    return 0
+  fi
+  if [ -x /usr/local/go/bin/go ]; then
+    echo /usr/local/go/bin/go
+    return 0
+  fi
+  return 1
+}
+
 require_cmd git
-require_cmd go
 require_cmd npm
 require_cmd systemctl
 require_cmd curl
+
+GO_BIN="$(resolve_go_bin || true)"
+if [ -z "${GO_BIN}" ]; then
+  echo "Missing command: go (/usr/local/go/bin/go is also unavailable)" >&2
+  exit 1
+fi
 
 if [ ! -d "${REPO_DIR}/.git" ]; then
   echo "Repository not found: ${REPO_DIR}" >&2
@@ -43,10 +60,10 @@ git checkout "${BRANCH}"
 git pull --ff-only origin "${BRANCH}"
 
 log "Building panel-service"
-go -C "${REPO_DIR}/panel-service" build -o "${REPO_DIR}/panel-service/panel-service" .
+"${GO_BIN}" -C "${REPO_DIR}/panel-service" build -o "${REPO_DIR}/panel-service/panel-service" .
 
 log "Building api-gateway"
-go -C "${REPO_DIR}/api-gateway" build -o "${REPO_DIR}/api-gateway/apigw" .
+"${GO_BIN}" -C "${REPO_DIR}/api-gateway" build -o "${REPO_DIR}/api-gateway/apigw" .
 
 log "Building frontend"
 npm --prefix "${REPO_DIR}/frontend" ci
