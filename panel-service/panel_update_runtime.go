@@ -174,7 +174,7 @@ func fetchGitDeployUpdateStatus() UpdateStatus {
 	return status
 }
 
-func applyPanelUpdateFromDeployScript() (panelUpdateResult, error) {
+func applyPanelUpdateFromDeployScript(scheduleRestart bool) (panelUpdateResult, error) {
 	result := panelUpdateResult{
 		PreviousVersion: resolveCurrentPanelVersion(),
 		TargetVersion:   panelDeployRef(),
@@ -196,8 +196,23 @@ func applyPanelUpdateFromDeployScript() (panelUpdateResult, error) {
 		return result, fmt.Errorf("deploy script not found: %s", scriptPath)
 	}
 
-	if err := runPanelUpdateStep(&result, "Run deploy pipeline (git pull + build + restart)", "bash", scriptPath); err != nil {
-		return result, err
+	if scheduleRestart {
+		if err := runPanelUpdateStep(&result, "Run deploy pipeline (git pull + build)", "env", "AURAPANEL_DEPLOY_SKIP_RESTART=1", "bash", scriptPath); err != nil {
+			return result, err
+		}
+		if err := runPanelUpdateStep(&result, "Schedule API gateway restart (10s)", "systemd-run", "--unit", "aurapanel-api-delayed-restart", "--on-active=10", "systemctl", "restart", "aurapanel-api"); err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("API gateway restart could not be scheduled automatically: %v", err))
+			result.Warnings = append(result.Warnings, "Restart aurapanel-api manually to apply gateway changes.")
+		}
+		if err := runPanelUpdateStep(&result, "Schedule panel-service restart (13s)", "systemd-run", "--unit", "aurapanel-service-delayed-restart", "--on-active=13", "systemctl", "restart", "aurapanel-service"); err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("Panel-service restart could not be scheduled automatically: %v", err))
+			result.Warnings = append(result.Warnings, "Restart aurapanel-service manually to apply backend changes.")
+		}
+		result.Warnings = append(result.Warnings, "Service restarts are scheduled in the background; brief reconnect may occur.")
+	} else {
+		if err := runPanelUpdateStep(&result, "Run deploy pipeline (git pull + build + restart)", "bash", scriptPath); err != nil {
+			return result, err
+		}
 	}
 
 	result.CurrentVersion = resolveCurrentPanelVersion()

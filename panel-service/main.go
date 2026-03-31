@@ -1121,7 +1121,7 @@ func (s *service) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := applyPanelUpdateFromDeployScript()
+	result, err := applyPanelUpdateFromDeployScript(true)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
