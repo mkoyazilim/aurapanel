@@ -949,10 +949,12 @@ userdb {
 		"smtpd_tls_auth_only=no",
 		"smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject_unauth_destination",
 	}
+	args := []string{"-e"}
 	for _, setting := range postfixSettings {
-		if err := exec.Command("postconf", "-e", setting).Run(); err != nil {
-			return err
-		}
+		args = append(args, setting)
+	}
+	if err := exec.Command("postconf", args...).Run(); err != nil {
+		return err
 	}
 
 	return nil
@@ -1124,9 +1126,11 @@ func reloadMailRuntime() error {
 		_ = exec.Command("postmap", mapPath).Run()
 		ensurePostfixMapReadable(mapPath + ".db")
 	}
-	for _, unit := range []string{"postfix", "dovecot"} {
-		_ = exec.Command("systemctl", "restart", unit).Run()
-	}
+	go func() {
+		for _, unit := range []string{"postfix", "dovecot"} {
+			_ = exec.Command("systemctl", "reload", unit).Run()
+		}
+	}()
 	return nil
 }
 
