@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"os/user"
@@ -52,6 +53,13 @@ func listFirewallRuntimeRules() []FirewallRule {
 }
 
 func addFirewallRuntimeRule(rule FirewallRule) error {
+	normalizedIP, err := normalizeFirewallIPAddress(rule.IPAddress)
+	if err != nil {
+		return err
+	}
+	rule.IPAddress = normalizedIP
+	rule.Reason = strings.TrimSpace(rule.Reason)
+
 	snapshot := collectSecuritySnapshot()
 	switch snapshot.FirewallManager {
 	case "ufw":
@@ -251,10 +259,30 @@ func looksLikeIPAddress(value string) bool {
 	if value == "" || strings.EqualFold(value, "Anywhere") {
 		return false
 	}
-	return ipAddressPattern.MatchString(value)
+	_, err := normalizeFirewallIPAddress(value)
+	return err == nil
 }
 
-var ipAddressPattern = regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$`)
+func normalizeFirewallIPAddress(value string) (string, error) {
+	candidate := strings.TrimSpace(value)
+	if candidate == "" {
+		return "", fmt.Errorf("IP address is required.")
+	}
+
+	if strings.Contains(candidate, "/") {
+		prefix, err := netip.ParsePrefix(candidate)
+		if err != nil || !prefix.Addr().Is4() {
+			return "", fmt.Errorf("Invalid IP/CIDR format. Use IPv4 like 203.0.113.10 or 203.0.113.0/24.")
+		}
+		return prefix.Masked().String(), nil
+	}
+
+	addr, err := netip.ParseAddr(candidate)
+	if err != nil || !addr.Is4() {
+		return "", fmt.Errorf("Invalid IP format. Use IPv4 like 203.0.113.10.")
+	}
+	return addr.String(), nil
+}
 
 func extractBetween(value, prefix, suffix string) string {
 	start := strings.Index(value, prefix)

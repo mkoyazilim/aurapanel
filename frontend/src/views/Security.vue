@@ -49,13 +49,23 @@
         </p>
       </div>
       <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <input v-model="firewallForm.ip_address" class="aura-input" :placeholder="t('security_center.firewall.ip')" />
+        <input
+          v-model="firewallForm.ip_address"
+          class="aura-input"
+          placeholder="IP/CIDR (orn: 185.190.140.62 veya 185.190.140.0/24)"
+        />
         <input v-model="firewallForm.reason" class="aura-input" :placeholder="t('security_center.firewall.reason')" />
         <select v-model="firewallForm.block" class="aura-input">
-          <option :value="true">{{ t('security_center.firewall.block') }}</option>
-          <option :value="false">{{ t('security_center.firewall.allow') }}</option>
+          <option :value="true">{{ t('security_center.firewall.block') }} (Tum trafik)</option>
+          <option :value="false">{{ t('security_center.firewall.allow') }} (Tum trafik)</option>
         </select>
         <button class="btn-primary" @click="addFirewallRule">{{ t('security_center.firewall.add_rule') }}</button>
+      </div>
+      <p class="text-xs text-gray-400">
+        Bu alan port degil, IP/CIDR tabanli kural icindir. Port/TCP/UDP yonetimi icin Panel Port veya servis bazli firewall ekranini kullanin.
+      </p>
+      <div v-if="firewallError" class="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        {{ firewallError }}
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -401,6 +411,7 @@ async function unbanIp(ip) {
 
 const status = ref({})
 const firewallRules = ref([])
+const firewallError = ref('')
 const sshKeys = ref([])
 const wafResult = ref(null)
 const hardeningResult = ref(null)
@@ -469,20 +480,68 @@ async function loadStatus() {
 }
 
 async function loadFirewallRules() {
-  const res = await api.get('/security/firewall/rules')
-  firewallRules.value = res.data.data || []
+  try {
+    const res = await api.get('/security/firewall/rules')
+    firewallRules.value = res.data.data || []
+  } catch (err) {
+    firewallError.value = err.response?.data?.message || err.message || 'Firewall kurallari alinamadi.'
+  }
+}
+
+function isValidIPv4(input) {
+  const parts = String(input || '').split('.')
+  if (parts.length !== 4) return false
+  return parts.every(part => {
+    if (!/^\d+$/.test(part)) return false
+    const value = Number(part)
+    return value >= 0 && value <= 255
+  })
+}
+
+function isValidIPv4OrCIDR(input) {
+  const value = String(input || '').trim()
+  if (!value) return false
+  const segments = value.split('/')
+  if (segments.length > 2) return false
+  const ipPart = segments[0]
+  if (!isValidIPv4(ipPart)) return false
+  if (segments.length === 1) return true
+  const cidrPart = segments[1]
+  if (!/^\d{1,2}$/.test(cidrPart)) return false
+  const cidr = Number(cidrPart)
+  return cidr >= 0 && cidr <= 32
 }
 
 async function addFirewallRule() {
-  await api.post('/security/firewall', firewallForm.value)
-  firewallForm.value.ip_address = ''
-  firewallForm.value.reason = ''
-  await loadFirewallRules()
+  const ipAddress = String(firewallForm.value.ip_address || '').trim()
+  if (!isValidIPv4OrCIDR(ipAddress)) {
+    firewallError.value = 'Gecersiz IP/CIDR. Ornek: 185.190.140.62 veya 185.190.140.0/24'
+    return
+  }
+
+  firewallError.value = ''
+  try {
+    await api.post('/security/firewall', {
+      ...firewallForm.value,
+      ip_address: ipAddress,
+      reason: String(firewallForm.value.reason || '').trim(),
+    })
+    firewallForm.value.ip_address = ''
+    firewallForm.value.reason = ''
+    await loadFirewallRules()
+  } catch (err) {
+    firewallError.value = err.response?.data?.message || err.message || 'Firewall kurali eklenemedi.'
+  }
 }
 
 async function deleteFirewallRule(ip) {
-  await api.delete('/security/firewall/rules', { params: { ip_address: ip } })
-  await loadFirewallRules()
+  firewallError.value = ''
+  try {
+    await api.delete('/security/firewall/rules', { params: { ip_address: ip } })
+    await loadFirewallRules()
+  } catch (err) {
+    firewallError.value = err.response?.data?.message || err.message || 'Firewall kurali silinemedi.'
+  }
 }
 
 async function runWafTest() {
