@@ -772,6 +772,8 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/packages",
 		"/api/v1/files",
 		"/api/v1/php",
+		"/api/v1/vhost/discover",
+		"/api/v1/vhost/import",
 		"/api/v1/ols",
 		"/api/v1/storage/minio",
 		"/api/v1/federated",
@@ -954,6 +956,10 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleAuthLogout(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/vhost/list":
 		s.handleVhostList(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/vhost/discover":
+		s.handleVhostDiscovery(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost/import":
+		s.handleVhostImport(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost":
 		s.handleVhostCreate(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost/create":

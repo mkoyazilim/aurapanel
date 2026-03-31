@@ -67,6 +67,54 @@
         <button class="btn-secondary" @click="refreshAll">Yenile</button>
       </div>
 
+      <div class="aura-card border border-panel-border/80 bg-panel-card space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold text-white">Kesfedilen Siteler (Unmanaged)</h2>
+            <p class="text-xs text-gray-400">FTP veya manuel kurulumla gelen domainleri panele import edin.</p>
+          </div>
+          <button class="btn-secondary px-3 py-1.5 text-sm" :disabled="discoveryLoading" @click="loadDiscoveredSites">
+            <Loader2 v-if="discoveryLoading" class="w-4 h-4 animate-spin mr-1 inline" />
+            Kesfi Yenile
+          </button>
+        </div>
+        <div v-if="discoveredSites.length === 0" class="rounded-lg border border-dashed border-panel-border px-4 py-3 text-sm text-gray-500">
+          Import bekleyen site bulunamadi.
+        </div>
+        <div v-else class="space-y-2">
+          <div
+            v-for="item in discoveredSites"
+            :key="`discover-${item.domain}`"
+            class="rounded-lg border border-panel-border/60 bg-panel-dark/60 px-3 py-3 flex flex-col lg:flex-row lg:items-center gap-3 justify-between"
+          >
+            <div class="space-y-1">
+              <p class="text-white font-semibold">{{ item.domain }}</p>
+              <p class="text-xs text-gray-400">Path: {{ item.path }}</p>
+              <p class="text-xs text-gray-400">Docroot: {{ item.docroot }}</p>
+              <div class="flex items-center gap-2 text-[11px]">
+                <span class="px-2 py-0.5 rounded border border-panel-border text-gray-300">Owner: {{ item._owner || item.owner || 'aura' }}</span>
+                <span :class="item.has_docroot ? 'px-2 py-0.5 rounded border border-emerald-500/30 text-emerald-300' : 'px-2 py-0.5 rounded border border-yellow-500/30 text-yellow-300'">
+                  {{ item.has_docroot ? 'Docroot Var' : 'Docroot Yok' }}
+                </span>
+                <span :class="item.has_index ? 'px-2 py-0.5 rounded border border-emerald-500/30 text-emerald-300' : 'px-2 py-0.5 rounded border border-yellow-500/30 text-yellow-300'">
+                  {{ item.has_index ? 'Index Var' : 'Index Yok' }}
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <select v-model="item._php_version" class="aura-input text-sm py-1.5 min-w-[130px]">
+                <option v-for="v in phpVersions" :key="`discover-php-${item.domain}-${v}`" :value="v">PHP {{ v }}</option>
+              </select>
+              <input v-model="item._owner" type="text" class="aura-input text-sm py-1.5 min-w-[120px]" placeholder="owner" />
+              <button class="btn-primary px-3 py-1.5 text-sm" :disabled="importingDomain === item.domain" @click="importDiscoveredSite(item)">
+                <Loader2 v-if="importingDomain === item.domain" class="w-4 h-4 animate-spin mr-1 inline" />
+                Import Et
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="loading" class="aura-card text-center py-12">
         <Loader2 class="w-8 h-8 text-brand-500 animate-spin mx-auto mb-3" />
         <p class="text-gray-400">{{ t('common.loading') }}</p>
@@ -564,6 +612,9 @@ const showEditSiteModal = ref(false)
 const showSiteLogsModal = ref(false)
 const showSubdomainModal = ref(false)
 const showDbLinkModal = ref(false)
+const discoveryLoading = ref(false)
+const discoveredSites = ref([])
+const importingDomain = ref('')
 
 const siteActionLoading = ref(false)
 const editSiteActionLoading = ref(false)
@@ -863,11 +914,28 @@ async function loadPlatformStatus() {
   }
 }
 
+async function loadDiscoveredSites() {
+  discoveryLoading.value = true
+  try {
+    const res = await api.get('/vhost/discover')
+    const items = Array.isArray(res.data?.data) ? res.data.data : []
+    discoveredSites.value = items.map((item) => ({
+      ...item,
+      _php_version: item?.suggested_php || phpVersions.value[0] || '8.3',
+      _owner: item?.owner || 'aura',
+    }))
+  } catch {
+    discoveredSites.value = []
+  } finally {
+    discoveryLoading.value = false
+  }
+}
+
 async function refreshAll() {
   loading.value = true
   error.value = ''
   try {
-    await Promise.all([loadSites(), loadUsers(), loadSubdomains(), loadDbLinks(), loadDatabases(), loadPackages(), loadPlatformStatus(), loadPhpVersions()])
+    await Promise.all([loadSites(), loadUsers(), loadSubdomains(), loadDbLinks(), loadDatabases(), loadPackages(), loadPlatformStatus(), loadPhpVersions(), loadDiscoveredSites()])
     if (!advancedDomain.value) {
       advancedDomain.value = parentDomains.value[0] || ''
     }
@@ -876,6 +944,25 @@ async function refreshAll() {
     error.value = apiErrorMessage(e, 'Veriler alinamadi')
   } finally {
     loading.value = false
+  }
+}
+
+async function importDiscoveredSite(item) {
+  if (!item?.domain) return
+  importingDomain.value = item.domain
+  error.value = ''
+  try {
+    await api.post('/vhost/import', {
+      domain: item.domain,
+      owner: item._owner || item.owner || 'aura',
+      php_version: item._php_version || item.suggested_php || phpVersions.value[0] || '8.3',
+      package: 'default',
+    })
+    await refreshAll()
+  } catch (e) {
+    error.value = apiErrorMessage(e, 'Website import basarisiz')
+  } finally {
+    importingDomain.value = ''
   }
 }
 

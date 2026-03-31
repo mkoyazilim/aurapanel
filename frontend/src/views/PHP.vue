@@ -9,6 +9,7 @@
       <nav class="flex gap-6">
         <button @click="tab='versions'" :class="tabClass('versions')">{{ t('php.versions_tab') }}</button>
         <button @click="tab='sites'" :class="tabClass('sites')">{{ t('php.sites_tab') }}</button>
+        <button @click="tab='extensions'" :class="tabClass('extensions')">{{ t('php.extensions_tab') }}</button>
         <button @click="tab='config'" :class="tabClass('config')">{{ t('php.ini_tab') }}</button>
       </nav>
     </div>
@@ -64,6 +65,65 @@
         </table>
       </div>
 
+      <div v-if="tab==='extensions'" class="bg-panel-card border border-panel-border rounded-xl overflow-hidden">
+        <div class="p-4 border-b border-panel-border flex flex-wrap items-center gap-3">
+          <select v-model="selectedExtensionVersion" class="php-field aura-input max-w-xs" @change="loadExtensions">
+            <option v-for="v in installedVersions" :key="`ext-${v}`" :value="v">PHP {{ v }}</option>
+          </select>
+          <button class="btn-secondary" @click="loadExtensions">{{ t('common.refresh') }}</button>
+          <span class="text-xs text-gray-400">Paket yoneticisi: {{ extensionPackageManager || '-' }}</span>
+        </div>
+        <div v-if="extensionLoading" class="p-6 text-center text-gray-400">{{ t('common.loading') }}</div>
+        <table v-else class="w-full text-sm">
+          <thead>
+            <tr class="text-gray-400 border-b border-panel-border">
+              <th class="text-left px-4 py-3">Extension</th>
+              <th class="text-left px-4 py-3">Paket</th>
+              <th class="text-left px-4 py-3">Durum</th>
+              <th class="text-left px-4 py-3">Aksiyon</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in extensionItems" :key="item.id" class="border-b border-panel-border/50 hover:bg-white/[0.02] transition">
+              <td class="px-4 py-3">
+                <p class="text-white font-medium">{{ item.name }}</p>
+                <p class="text-xs text-gray-400 mt-0.5">{{ item.description }}</p>
+              </td>
+              <td class="px-4 py-3 text-gray-300 font-mono text-xs">{{ item.package || '-' }}</td>
+              <td class="px-4 py-3">
+                <span :class="['px-2 py-0.5 rounded text-xs font-medium', item.installed ? 'bg-green-500/15 text-green-400' : 'bg-gray-500/15 text-gray-400']">
+                  {{ item.installed ? 'Installed' : 'Not Installed' }}
+                </span>
+                <span v-if="item.baseline" class="ml-2 px-2 py-0.5 rounded text-xs bg-blue-500/15 text-blue-300">Baseline</span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <button
+                    class="btn-primary px-3 py-1.5 text-xs"
+                    :disabled="item.installed || !item.available || extensionActionKey === `install-${item.id}`"
+                    @click="installExtension(item)"
+                  >
+                    <Loader2 v-if="extensionActionKey === `install-${item.id}`" class="w-3 h-3 animate-spin mr-1 inline" />
+                    Install
+                  </button>
+                  <button
+                    class="btn-danger px-3 py-1.5 text-xs"
+                    :disabled="!item.installed || extensionActionKey === `remove-${item.id}`"
+                    @click="removeExtension(item)"
+                  >
+                    <Loader2 v-if="extensionActionKey === `remove-${item.id}`" class="w-3 h-3 animate-spin mr-1 inline" />
+                    Remove
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="extensionItems.length===0">
+              <td colspan="4" class="p-4 text-center text-gray-500">Extension listesi alinamadi.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div v-if="tab==='config'" class="space-y-3">
         <div class="flex items-center gap-3">
           <select v-model="selectedConfigVersion" class="php-field aura-input max-w-xs" @change="loadPhpIni">
@@ -90,7 +150,7 @@ const { t } = useI18n({ useScope: 'global' })
 
 const normalizeTab = (query) => {
   const value = String(query?.tab || '').trim().toLowerCase()
-  if (value === 'sites' || value === 'config') return value
+  if (value === 'sites' || value === 'config' || value === 'extensions') return value
   return 'versions'
 }
 
@@ -102,7 +162,12 @@ const success = ref('')
 const phpVersions = ref([])
 const siteAssignments = ref([])
 const selectedConfigVersion = ref(typeof route.query.version === 'string' ? route.query.version : '')
+const selectedExtensionVersion = ref(typeof route.query.version === 'string' ? route.query.version : '')
 const phpIniContent = ref('')
+const extensionItems = ref([])
+const extensionLoading = ref(false)
+const extensionActionKey = ref('')
+const extensionPackageManager = ref('')
 
 const installedVersions = computed(() => phpVersions.value.filter(v => v.installed).map(v => v.version))
 
@@ -139,9 +204,14 @@ async function loadData() {
     if (!selectedConfigVersion.value || !installedVersions.value.includes(selectedConfigVersion.value)) {
       selectedConfigVersion.value = installedVersions.value[0] || ''
     }
+    if (!selectedExtensionVersion.value || !installedVersions.value.includes(selectedExtensionVersion.value)) {
+      selectedExtensionVersion.value = installedVersions.value[0] || ''
+    }
 
     if (selectedConfigVersion.value && tab.value === 'config') {
       await loadPhpIni()
+    } else if (selectedExtensionVersion.value && tab.value === 'extensions') {
+      await loadExtensions()
     } else {
       phpIniContent.value = ''
     }
@@ -225,6 +295,66 @@ async function loadPhpIni() {
   }
 }
 
+async function loadExtensions() {
+  if (!selectedExtensionVersion.value) {
+    extensionItems.value = []
+    extensionPackageManager.value = ''
+    return
+  }
+  extensionLoading.value = true
+  error.value = ''
+  try {
+    const res = await api.get('/php/extensions', { params: { version: selectedExtensionVersion.value } })
+    const payload = res.data?.data || {}
+    extensionItems.value = Array.isArray(payload.extensions) ? payload.extensions : []
+    extensionPackageManager.value = payload.package_manager || ''
+  } catch (e) {
+    extensionItems.value = []
+    extensionPackageManager.value = ''
+    error.value = apiErrorMessage(e, 'php.messages.load_failed')
+  } finally {
+    extensionLoading.value = false
+  }
+}
+
+async function installExtension(item) {
+  if (!item?.id || !selectedExtensionVersion.value) return
+  extensionActionKey.value = `install-${item.id}`
+  error.value = ''
+  success.value = ''
+  try {
+    const res = await api.post('/php/extensions/install', {
+      version: selectedExtensionVersion.value,
+      extension: item.id,
+    })
+    success.value = res.data?.message || `${item.name} installed.`
+    await loadExtensions()
+  } catch (e) {
+    error.value = apiErrorMessage(e, 'php.messages.install_failed')
+  } finally {
+    extensionActionKey.value = ''
+  }
+}
+
+async function removeExtension(item) {
+  if (!item?.id || !selectedExtensionVersion.value) return
+  extensionActionKey.value = `remove-${item.id}`
+  error.value = ''
+  success.value = ''
+  try {
+    const res = await api.post('/php/extensions/remove', {
+      version: selectedExtensionVersion.value,
+      extension: item.id,
+    })
+    success.value = res.data?.message || `${item.name} removed.`
+    await loadExtensions()
+  } catch (e) {
+    error.value = apiErrorMessage(e, 'php.messages.remove_failed')
+  } finally {
+    extensionActionKey.value = ''
+  }
+}
+
 async function savePhpIni() {
   if (!selectedConfigVersion.value) return
   error.value = ''
@@ -245,11 +375,17 @@ function syncRouteQuery() {
   if (tab.value === 'sites') {
     nextQuery.tab = 'sites'
   }
+  if (tab.value === 'extensions') {
+    nextQuery.tab = 'extensions'
+  }
   if (tab.value === 'config') {
     nextQuery.tab = 'config'
   }
   if (tab.value === 'config' && selectedConfigVersion.value) {
     nextQuery.version = selectedConfigVersion.value
+  }
+  if (tab.value === 'extensions' && selectedExtensionVersion.value) {
+    nextQuery.version = selectedExtensionVersion.value
   }
 
   const currentTab = typeof route.query.tab === 'string' ? route.query.tab : ''
@@ -271,6 +407,9 @@ watch(
     if (selectedConfigVersion.value !== nextVersion && nextVersion) {
       selectedConfigVersion.value = nextVersion
     }
+    if (selectedExtensionVersion.value !== nextVersion && nextVersion) {
+      selectedExtensionVersion.value = nextVersion
+    }
   },
   { immediate: true },
 )
@@ -279,11 +418,20 @@ watch(tab, () => {
   if (tab.value === 'config' && selectedConfigVersion.value) {
     loadPhpIni()
   }
+  if (tab.value === 'extensions' && selectedExtensionVersion.value) {
+    loadExtensions()
+  }
   syncRouteQuery()
 })
 
 watch(selectedConfigVersion, () => {
   if (tab.value === 'config' && selectedConfigVersion.value) {
+    syncRouteQuery()
+  }
+})
+
+watch(selectedExtensionVersion, () => {
+  if (tab.value === 'extensions' && selectedExtensionVersion.value) {
     syncRouteQuery()
   }
 })

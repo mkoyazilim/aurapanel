@@ -19,6 +19,15 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/php/versions":
 		s.handlePHPVersions(w)
 		return true
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/php/extensions":
+		s.handlePHPExtensionsList(w, r)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/php/extensions/install":
+		s.handlePHPExtensionInstall(w, r)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/php/extensions/remove":
+		s.handlePHPExtensionRemove(w, r)
+		return true
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/php/install":
 		s.handlePHPInstall(w, r)
 		return true
