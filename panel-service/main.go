@@ -281,6 +281,7 @@ type service struct {
 	state               appState
 	modules             moduleState
 	update              updateStatusCache
+	updateJob           panelUpdateJobState
 	dbAccess            map[string]dbToolSessionGrant
 	dbACLFile           string
 	dbACLReloadInFlight bool
@@ -1108,9 +1109,25 @@ func (s *service) handleHealth(w http.ResponseWriter) {
 }
 
 func (s *service) handleUpdateStatus(w http.ResponseWriter) {
+	status := s.getUpdateStatus()
+	job := s.getUpdateJobSnapshot()
+
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status: "success",
-		Data:   s.getUpdateStatus(),
+		Data: map[string]interface{}{
+			"current_version":  status.CurrentVersion,
+			"latest_version":   status.LatestVersion,
+			"latest_tag":       status.LatestTag,
+			"update_available": status.UpdateAvailable,
+			"release_name":     status.ReleaseName,
+			"release_url":      status.ReleaseURL,
+			"release_notes":    status.ReleaseNotes,
+			"published_at":     status.PublishedAt,
+			"source":           status.Source,
+			"checked_at":       status.CheckedAt,
+			"error":            status.Error,
+			"job":              job,
+		},
 	})
 }
 
@@ -1121,26 +1138,27 @@ func (s *service) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := applyPanelUpdateFromDeployScript(true)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+	job, started := s.beginPanelUpdateJob()
+	if !started {
+		writeJSON(w, http.StatusOK, apiResponse{
+			Status:  "success",
+			Message: "Panel deploy is already running in the background.",
+			Data: map[string]interface{}{
+				"running": true,
+				"job":     job,
+			},
+		})
 		return
 	}
 
-	// Force next "check update" request to refresh live git status immediately.
-	s.mu.Lock()
-	s.update = updateStatusCache{}
-	s.mu.Unlock()
+	go s.runPanelUpdateJob()
 
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status:  "success",
-		Message: "Panel deploy completed.",
+		Message: "Panel deploy started in background.",
 		Data: map[string]interface{}{
-			"previous_version": result.PreviousVersion,
-			"current_version":  result.CurrentVersion,
-			"target_version":   result.TargetVersion,
-			"steps":            result.Steps,
-			"warnings":         result.Warnings,
+			"running": true,
+			"job":     job,
 		},
 	})
 }

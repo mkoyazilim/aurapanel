@@ -73,6 +73,14 @@
       {{ message }}
     </div>
 
+    <div v-if="updateJob.running" class="bg-sky-500/10 border border-sky-500/30 rounded-xl p-4 text-sm text-sky-200">
+      <p class="font-semibold">{{ updateJob.message || t('panel_update.messages.in_progress') }}</p>
+      <p class="mt-1 text-xs text-sky-100/80">{{ t('panel_update.messages.in_progress_hint') }}</p>
+      <p v-if="updateJob.started_at" class="mt-2 text-xs text-sky-100/70">
+        {{ t('panel_update.last_checked') }}: {{ formatReleaseDate(updateJob.started_at) }}
+      </p>
+    </div>
+
     <div v-if="warnings.length" class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-200">
       <p class="font-semibold mb-2">{{ t('panel_update.warnings') }}</p>
       <ul class="space-y-1">
@@ -94,7 +102,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
 
@@ -121,6 +129,21 @@ const updateStatus = ref({
   error: '',
 })
 
+const updateJob = ref({
+  running: false,
+  started_at: '',
+  finished_at: '',
+  message: '',
+  error: '',
+  previous_version: '',
+  current_version: '',
+  target_version: '',
+  steps: [],
+  warnings: [],
+})
+
+let pollTimer = null
+
 function formatReleaseDate(value) {
   if (!value) return '-'
   const date = new Date(value)
@@ -130,22 +153,87 @@ function formatReleaseDate(value) {
   return date.toLocaleString()
 }
 
-async function loadUpdateStatus() {
-  loading.value = true
-  error.value = ''
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function startPolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(() => {
+    loadUpdateStatus({ silent: true })
+  }, 3000)
+}
+
+function applyStatusPayload(payload) {
+  const source = payload?.status && typeof payload.status === 'object'
+    ? payload.status
+    : payload
+  const nextJob = payload?.job && typeof payload.job === 'object'
+    ? payload.job
+    : null
+
+  updateStatus.value = {
+    ...updateStatus.value,
+    ...(source || {}),
+  }
+
+  if (nextJob) {
+    updateJob.value = {
+      ...updateJob.value,
+      ...nextJob,
+      steps: Array.isArray(nextJob.steps) ? nextJob.steps : [],
+      warnings: Array.isArray(nextJob.warnings) ? nextJob.warnings : [],
+    }
+
+    updating.value = !!updateJob.value.running
+    if (updateJob.value.running) {
+      message.value = updateJob.value.message || t('panel_update.messages.in_progress')
+      startPolling()
+      return
+    }
+
+    stopPolling()
+    warnings.value = Array.isArray(updateJob.value.warnings) ? updateJob.value.warnings : []
+    steps.value = Array.isArray(updateJob.value.steps) ? updateJob.value.steps : []
+
+    if (updateJob.value.error) {
+      error.value = updateJob.value.error
+      message.value = ''
+    } else if (updateJob.value.finished_at) {
+      message.value = updateJob.value.message || t('panel_update.messages.applied')
+    }
+  } else {
+    updating.value = false
+    stopPolling()
+  }
+}
+
+async function loadUpdateStatus(options = {}) {
+  const silent = !!options.silent
+  if (!silent) {
+    loading.value = true
+  }
+  if (!silent) {
+    error.value = ''
+  }
+
   try {
     const res = await api.get('/status/update')
     if (res.data?.status !== 'success') {
       throw new Error(res.data?.message || t('panel_update.messages.load_failed'))
     }
-    updateStatus.value = {
-      ...updateStatus.value,
-      ...(res.data?.data || {}),
-    }
+    applyStatusPayload(res.data?.data || {})
   } catch (err) {
-    error.value = err?.response?.data?.message || err?.message || t('panel_update.messages.load_failed')
+    if (!silent) {
+      error.value = err?.response?.data?.message || err?.message || t('panel_update.messages.load_failed')
+    }
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
 
@@ -156,21 +244,21 @@ async function applyUpdate() {
   steps.value = []
   updating.value = true
   try {
-    const res = await api.post('/status/update/apply', {})
+    const res = await api.post('/status/update/apply', {}, { timeout: 15000 })
     if (res.data?.status !== 'success') {
       throw new Error(res.data?.message || t('panel_update.messages.apply_failed'))
     }
-    const payload = res.data?.data || {}
-    message.value = res.data?.message || t('panel_update.messages.applied')
-    warnings.value = Array.isArray(payload.warnings) ? payload.warnings : []
-    steps.value = Array.isArray(payload.steps) ? payload.steps : []
-    await loadUpdateStatus()
+    message.value = res.data?.message || t('panel_update.messages.started')
+    applyStatusPayload(res.data?.data || {})
+    startPolling()
+    await loadUpdateStatus({ silent: true })
   } catch (err) {
     error.value = err?.response?.data?.message || err?.message || t('panel_update.messages.apply_failed')
-  } finally {
     updating.value = false
+    stopPolling()
   }
 }
 
 onMounted(loadUpdateStatus)
+onUnmounted(stopPolling)
 </script>

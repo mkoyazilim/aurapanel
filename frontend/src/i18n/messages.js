@@ -241,6 +241,9 @@ const baseEn = {
     messages: {
       load_failed: 'Update status could not be loaded.',
       apply_failed: 'Panel update could not be applied.',
+      started: 'Panel update started in background.',
+      in_progress: 'Panel update is running in background...',
+      in_progress_hint: 'Do not close this page. Build and service restart may take a few minutes.',
       applied: 'Panel update completed.',
     },
   },
@@ -731,6 +734,9 @@ const baseTr = deepMerge(baseEn, {
     messages: {
       load_failed: 'Guncelleme durumu alinamadi.',
       apply_failed: 'Panel guncellemesi uygulanamadi.',
+      started: 'Panel guncellemesi arka planda baslatildi.',
+      in_progress: 'Panel guncellemesi arka planda calisiyor...',
+      in_progress_hint: 'Bu sayfayi kapatmayin. Build ve servis yeniden baslatma islemleri birkac dakika surebilir.',
       applied: 'Panel guncellemesi tamamlandi.',
     },
   },
