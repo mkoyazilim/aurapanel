@@ -133,6 +133,17 @@ curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.s
 
 This flow uses the main installer and prepares the host with the required runtime stack.
 
+### Update Existing Installation (Git Pull Deploy)
+
+For hosts that are already installed, use the deploy script from the repository root:
+
+```bash
+cd /opt/aurapanel
+bash scripts/deploy-main.sh
+```
+
+This flow performs `git pull --ff-only` on `main`, rebuilds backend and frontend components, restarts `aurapanel-service` and `aurapanel-api`, and runs health checks.
+
 ### 2. Verified Release Bootstrap
 
 AuraPanel also supports a verified release bootstrap flow based on a signed manifest and SHA-256 checked release bundle.
