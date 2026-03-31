@@ -689,11 +689,13 @@ func (s *service) handleSSHConfigSet(w http.ResponseWriter, r *http.Request) {
 
 	// Restart SSH service (sshd on EL, ssh on Ubuntu/Debian)
 	// Disable ssh.socket on Debian/Ubuntu to apply sshd_config correctly
-	_ = exec.Command("systemctl", "disable", "--now", "ssh.socket").Run()
-	_ = exec.Command("systemctl", "daemon-reload").Run()
-	_ = exec.Command("systemctl", "enable", "ssh.service").Run()
-	_ = exec.Command("systemctl", "restart", "sshd").Run()
-	_ = exec.Command("systemctl", "restart", "ssh").Run()
+	go func() {
+		_ = exec.Command("systemctl", "disable", "--now", "ssh.socket").Run()
+		_ = exec.Command("systemctl", "daemon-reload").Run()
+		_ = exec.Command("systemctl", "enable", "ssh.service").Run()
+		_ = exec.Command("systemctl", "restart", "sshd").Run()
+		_ = exec.Command("systemctl", "restart", "ssh").Run()
+	}()
 
 	s.mu.Lock()
 	s.appendActivityLocked("system", "ssh_config", "SSH Port and Root Login configuration updated.", "")

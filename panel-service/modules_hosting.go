@@ -302,8 +302,10 @@ func (s *service) handleMariaDBTuningSet(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_ = exec.Command("systemctl", "restart", "mariadb").Run()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "MariaDB settings updated and service restarted"})
+	go func() {
+		_ = exec.Command("systemctl", "restart", "mariadb").Run()
+	}()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "MariaDB settings updated. Service is restarting in the background."})
 }
 
 // PostgreSQL Tuning APIs
@@ -421,8 +423,10 @@ func (s *service) handlePostgresTuningSet(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_ = exec.Command("systemctl", "restart", "postgresql").Run()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "PostgreSQL settings updated and service restarted"})
+	go func() {
+		_ = exec.Command("systemctl", "restart", "postgresql").Run()
+	}()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "PostgreSQL settings updated. Service is restarting in the background."})
 }
 
 func (s *service) handleWebsiteAdvancedConfigGet(w http.ResponseWriter, r *http.Request) {
@@ -492,8 +496,10 @@ func (s *service) handleMailTuningSet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = exec.Command("systemctl", "restart", "postfix").Run()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Mail server settings updated and Postfix restarted"})
+	go func() {
+		_ = exec.Command("systemctl", "restart", "postfix").Run()
+	}()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Mail server settings updated. Postfix is restarting in the background."})
 }
 
 func (s *service) handleWebsiteCustomSSLGet(w http.ResponseWriter, r *http.Request) {
@@ -1582,8 +1588,10 @@ func (s *service) handleFTPTuningSet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = exec.Command("systemctl", "restart", "pure-ftpd").Run()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "FTP settings updated and service restarted"})
+	go func() {
+		_ = exec.Command("systemctl", "restart", "pure-ftpd").Run()
+	}()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "FTP settings updated. Service is restarting in the background."})
 }
 
 func (s *service) handleCronJobsList(w http.ResponseWriter) {
@@ -2280,8 +2288,10 @@ func (s *service) handleSSLMailIssue(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		_ = exec.Command("systemctl", "restart", "postfix").Run()
-		_ = exec.Command("systemctl", "restart", "dovecot").Run()
+		go func() {
+			_ = exec.Command("systemctl", "restart", "postfix").Run()
+			_ = exec.Command("systemctl", "restart", "dovecot").Run()
+		}()
 	}
 
 	s.mu.Lock()
