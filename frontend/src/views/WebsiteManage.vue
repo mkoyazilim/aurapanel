@@ -76,16 +76,19 @@
                 v-for="item in group.items"
                 :key="item.key"
                 :href="item.href"
-                class="group flex min-h-[110px] items-center gap-4 rounded-[24px] border border-white/10 bg-slate-950/35 px-4 py-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/35 hover:bg-slate-950/55"
+                :class="[
+                  'group flex min-h-[86px] items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-left transition-all duration-300',
+                  item.disabled ? 'pointer-events-none cursor-not-allowed opacity-60' : 'hover:-translate-y-0.5 hover:border-brand-500/35 hover:bg-slate-950/55',
+                ]"
                 @click="item.action ? item.action() : null"
               >
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
-                  <component :is="item.icon" class="h-7 w-7" :class="item.iconClass || 'text-brand-300'" />
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06]">
+                  <component :is="item.icon" class="h-5 w-5" :class="item.iconClass || 'text-brand-300'" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-base font-semibold text-white">{{ item.label }}</p>
-                  <p class="mt-1 text-sm leading-5 text-gray-400">{{ item.description }}</p>
-                  <p v-if="item.badge" class="mt-2 text-xs font-medium text-brand-200">{{ item.badge }}</p>
+                  <p class="truncate text-sm font-semibold text-white">{{ item.label }}</p>
+                  <p class="mt-0.5 text-xs leading-5 text-gray-400">{{ item.description }}</p>
+                  <p v-if="item.badge" class="mt-1.5 text-[11px] font-medium text-brand-200">{{ item.badge }}</p>
                 </div>
               </component>
             </div>
@@ -433,11 +436,13 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
   ArrowLeft,
-  Box,
   ChevronRight,
+  Database,
+  FolderOpen,
   Globe,
   Link2,
   Lock,
+  Mail,
   PauseCircle,
   PlayCircle,
   RefreshCw,
@@ -446,7 +451,6 @@ import {
   Server,
   Settings2,
   ShieldCheck,
-  User,
 } from 'lucide-vue-next'
 import api from '../services/api'
 
@@ -465,6 +469,8 @@ const aliases = ref([])
 const aliasInput = ref('')
 const advanced = ref({ open_basedir: false, rewrite_rules: '', vhost_config: '' })
 const customSsl = ref({ cert_pem: '', key_pem: '' })
+const launchingDbTool = ref('')
+const launchingWebmail = ref(false)
 const logKind = ref('access')
 const logs = ref([])
 const insightError = ref('')
@@ -478,7 +484,7 @@ const traffic = ref({
   source_log: '',
 })
 
-const adminEmail = computed(() => form.value.email || `webmaster@${domain.value}`)
+const siteHomePath = computed(() => `/home/${domain.value}/public_html`)
 const isSuspended = computed(() => String(site.value?.status || 'active').toLowerCase() === 'suspended')
 const recentTrafficSeries = computed(() => (traffic.value.series || []).slice(-12))
 const recentMaxTrafficHit = computed(() => Math.max(1, ...recentTrafficSeries.value.map(item => Number(item.hits || 0))))
@@ -502,52 +508,6 @@ const insightRequestConfig = {
   timeout: 30000,
   headers: { 'X-Aura-Silent-Error': '1' },
 }
-
-const summaryCards = computed(() => [
-  { label: t('website_manage.summary.owner'), value: form.value.owner || 'aura', icon: User, iconClass: 'text-cyan-300' },
-  { label: t('website_manage.summary.package'), value: form.value.package || 'default', icon: Box, iconClass: 'text-amber-300' },
-  { label: t('website_manage.summary.php'), value: `PHP ${form.value.php_version || '8.3'}`, icon: Server, iconClass: 'text-brand-300' },
-  { label: t('website_manage.summary.aliases'), value: String(aliases.value.length), icon: Link2, iconClass: 'text-cyan-300' },
-])
-
-const quickActions = computed(() => [
-  {
-    key: 'save',
-    label: t('website_manage.save'),
-    description: t('website_manage.quick_action_save'),
-    icon: Save,
-    handler: saveWebsite,
-  },
-  {
-    key: 'ssl',
-    label: t('website_manage.issue_ssl'),
-    description: t('website_manage.quick_action_ssl'),
-    icon: ShieldCheck,
-    handler: issueSsl,
-  },
-  {
-    key: isSuspended.value ? 'resume' : 'suspend',
-    label: isSuspended.value ? t('website_manage.unsuspend') : t('website_manage.suspend'),
-    description: isSuspended.value ? t('website_manage.quick_action_unsuspend') : t('website_manage.quick_action_suspend'),
-    icon: isSuspended.value ? PlayCircle : PauseCircle,
-    handler: toggleSuspend,
-  },
-  {
-    key: 'refresh',
-    label: t('website_manage.refresh'),
-    description: t('website_manage.quick_action_refresh'),
-    icon: RefreshCw,
-    handler: refreshAll,
-  },
-])
-
-const sectionLinks = computed(() => [
-  { id: 'profile', label: t('website_manage.categories.profile'), icon: Settings2 },
-  { id: 'domain', label: t('website_manage.categories.domain'), icon: Globe },
-  { id: 'security', label: t('website_manage.categories.security'), icon: Lock },
-  { id: 'server', label: t('website_manage.categories.server'), icon: Server },
-  { id: 'observability', label: t('website_manage.categories.observability'), icon: Activity },
-])
 
 const insightTabs = computed(() => [
   { key: 'traffic', label: t('website_manage.insights.traffic'), icon: Activity },
@@ -598,6 +558,135 @@ const launcherGroups = computed(() => [
         description: t('website_manage.launcher.logs_desc'),
         href: '#observability',
         icon: ScrollText,
+        iconClass: 'text-amber-300',
+      },
+    ],
+  },
+  {
+    key: 'access',
+    label: t('website_manage.launcher.access_title'),
+    description: t('website_manage.launcher.access_body'),
+    items: [
+      {
+        key: 'ftp',
+        label: 'FTP',
+        description: t('website_manage.launcher.ftp_desc'),
+        action: () => goToFtp(),
+        icon: Server,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'ftp_create',
+        label: t('website_manage.launcher.ftp_create'),
+        description: t('website_manage.launcher.ftp_create_desc'),
+        action: () => goToFtp({ action: 'create' }),
+        icon: Save,
+        iconClass: 'text-brand-300',
+      },
+      {
+        key: 'sftp',
+        label: 'SFTP',
+        description: t('website_manage.launcher.sftp_desc'),
+        action: () => goToSftp(),
+        icon: Lock,
+        iconClass: 'text-brand-300',
+      },
+      {
+        key: 'file_manager',
+        label: t('routes.FileManager'),
+        description: t('website_manage.launcher.file_manager_desc'),
+        action: () => goToFileManager(),
+        icon: FolderOpen,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'site_root',
+        label: 'public_html',
+        description: t('website_manage.launcher.site_root_desc'),
+        action: () => goToFileManager(siteHomePath.value),
+        icon: FolderOpen,
+        iconClass: 'text-amber-300',
+      },
+    ],
+  },
+  {
+    key: 'database',
+    label: t('website_manage.launcher.database_title'),
+    description: t('website_manage.launcher.database_body'),
+    items: [
+      {
+        key: 'database_page',
+        label: t('routes.Databases'),
+        description: t('website_manage.launcher.database_desc'),
+        action: () => goToDatabases(),
+        icon: Database,
+      },
+      {
+        key: 'database_create',
+        label: t('website_manage.launcher.database_create'),
+        description: t('website_manage.launcher.database_create_desc'),
+        action: () => goToDatabases({ action: 'create' }),
+        icon: Save,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'phpmyadmin',
+        label: 'phpMyAdmin',
+        description: t('website_manage.launcher.phpmyadmin_desc'),
+        action: () => launchDatabaseTool('phpmyadmin'),
+        icon: Database,
+        iconClass: 'text-brand-300',
+        badge: launchingDbTool.value === 'phpmyadmin' ? t('common.loading') : '',
+        disabled: launchingDbTool.value === 'phpmyadmin',
+      },
+      {
+        key: 'pgadmin',
+        label: 'pgAdmin',
+        description: t('website_manage.launcher.pgadmin_desc'),
+        action: () => launchDatabaseTool('pgadmin'),
+        icon: Database,
+        iconClass: 'text-amber-300',
+        badge: launchingDbTool.value === 'pgadmin' ? t('common.loading') : '',
+        disabled: launchingDbTool.value === 'pgadmin',
+      },
+    ],
+  },
+  {
+    key: 'mail',
+    label: t('website_manage.launcher.mail_title'),
+    description: t('website_manage.launcher.mail_body'),
+    items: [
+      {
+        key: 'mailboxes',
+        label: t('routes.Emails'),
+        description: t('website_manage.launcher.mailbox_desc'),
+        action: () => goToEmails(),
+        icon: Mail,
+      },
+      {
+        key: 'mailbox_create',
+        label: t('website_manage.launcher.mailbox_create'),
+        description: t('website_manage.launcher.mailbox_create_desc'),
+        action: () => goToEmails({ action: 'create' }),
+        icon: Save,
+        iconClass: 'text-cyan-300',
+      },
+      {
+        key: 'webmail_sso',
+        label: t('website_manage.launcher.webmail_sso'),
+        description: t('website_manage.launcher.webmail_sso_desc'),
+        action: launchWebmailSso,
+        icon: Mail,
+        iconClass: 'text-brand-300',
+        badge: launchingWebmail.value ? t('common.loading') : '',
+        disabled: launchingWebmail.value,
+      },
+      {
+        key: 'mail_routing',
+        label: t('website_manage.launcher.mail_routing'),
+        description: t('website_manage.launcher.mail_routing_desc'),
+        action: () => goToEmails({ tab: 'routing' }),
+        icon: Link2,
         iconClass: 'text-amber-300',
       },
     ],
@@ -669,29 +758,17 @@ const launcherGroups = computed(() => [
         icon: isSuspended.value ? PlayCircle : PauseCircle,
         iconClass: 'text-amber-300',
       },
+      {
+        key: 'refresh',
+        label: t('website_manage.refresh'),
+        description: t('website_manage.quick_action_refresh'),
+        action: refreshAll,
+        icon: RefreshCw,
+        iconClass: 'text-cyan-300',
+      },
     ],
   },
 ])
-
-function quickActionClass(key) {
-  if (key === 'save') {
-    return 'border-brand-400/30 bg-[linear-gradient(135deg,rgba(16,185,129,0.24),rgba(6,182,212,0.12))] shadow-[0_22px_40px_-30px_rgba(16,185,129,0.75)] hover:border-brand-300/60'
-  }
-
-  if (key === 'ssl') {
-    return 'border-cyan-400/25 bg-[linear-gradient(135deg,rgba(8,145,178,0.22),rgba(15,23,42,0.55))] hover:border-cyan-300/55'
-  }
-
-  if (key === 'suspend') {
-    return 'border-amber-400/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.22),rgba(15,23,42,0.55))] hover:border-amber-300/55'
-  }
-
-  if (key === 'resume') {
-    return 'border-brand-400/25 bg-[linear-gradient(135deg,rgba(16,185,129,0.2),rgba(15,23,42,0.55))] hover:border-brand-300/55'
-  }
-
-  return 'border-white/10 bg-slate-950/40 hover:border-brand-500/40 hover:bg-slate-950/65'
-}
 
 function trafficBucketLabel(bucket) {
   const parts = String(bucket || '').trim().split(/\s+/)
@@ -823,6 +900,106 @@ async function refreshAll() {
     await refreshInsights()
   } catch (err) {
     error.value = msg(err, 'website_manage.messages.load_failed')
+  }
+}
+
+function compactQuery(query) {
+  const entries = Object.entries(query || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  return Object.fromEntries(entries)
+}
+
+function openExternal(url) {
+  const openedWindow = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!openedWindow) {
+    window.location.href = url
+  }
+}
+
+function goToFtp(extraQuery = {}) {
+  const query = compactQuery({ domain: domain.value, ...extraQuery })
+  router.push({ path: '/ftp', query })
+}
+
+function goToSftp(extraQuery = {}) {
+  const query = compactQuery({ domain: domain.value, ...extraQuery })
+  router.push({ path: '/sftp', query })
+}
+
+function goToDatabases(extraQuery = {}) {
+  const query = compactQuery({ domain: domain.value, ...extraQuery })
+  router.push({ path: '/databases', query })
+}
+
+function goToEmails(extraQuery = {}) {
+  const query = compactQuery({ domain: domain.value, ...extraQuery })
+  router.push({ path: '/emails', query })
+}
+
+function goToFileManager(path = '') {
+  const query = compactQuery({ domain: domain.value, path })
+  router.push({ path: '/filemanager', query })
+}
+
+async function launchDatabaseTool(tool) {
+  const normalizedTool = tool === 'phpmyadmin' ? 'phpmyadmin' : 'pgadmin'
+  launchingDbTool.value = normalizedTool
+
+  try {
+    const endpoint = normalizedTool === 'phpmyadmin'
+      ? '/db/tools/phpmyadmin/sso'
+      : '/db/tools/pgadmin/sso'
+    const response = await api.post(endpoint, { ttl_seconds: 120 })
+    const launchUrl = String(response?.data?.data?.url || '').trim()
+    if (!launchUrl) {
+      throw new Error(t('website_manage.messages.db_tool_failed'))
+    }
+    openExternal(launchUrl)
+  } catch (err) {
+    error.value = msg(err, 'website_manage.messages.db_tool_failed')
+  } finally {
+    launchingDbTool.value = ''
+  }
+}
+
+async function launchWebmailSso() {
+  launchingWebmail.value = true
+  try {
+    const res = await api.get('/mail/list')
+    const domainName = domain.value
+    const domainMailboxes = (res.data?.data || []).filter((mailbox) => {
+      const mailboxDomain = String(mailbox?.domain || '').trim().toLowerCase()
+      const mailboxAddress = String(mailbox?.address || '').trim().toLowerCase()
+      return mailboxDomain === domainName || mailboxAddress.endsWith(`@${domainName}`)
+    })
+
+    if (!domainMailboxes.length) {
+      goToEmails({ action: 'create' })
+      throw new Error(t('website_manage.messages.mailbox_required'))
+    }
+
+    const defaultAddress = String(domainMailboxes[0]?.address || '').trim().toLowerCase()
+    let selectedAddress = defaultAddress
+
+    if (domainMailboxes.length > 1) {
+      const manualAddress = window.prompt(t('website_manage.messages.webmail_prompt'), defaultAddress)
+      if (!manualAddress) return
+      selectedAddress = String(manualAddress).trim().toLowerCase()
+    }
+
+    if (!selectedAddress.includes('@')) {
+      selectedAddress = `${selectedAddress}@${domainName}`
+    }
+
+    const ssoRes = await api.post('/mail/webmail/sso', { address: selectedAddress, ttl_seconds: 300 })
+    const launchUrl = String(ssoRes?.data?.data?.url || '').trim()
+    if (!launchUrl) {
+      throw new Error(t('website_manage.messages.webmail_sso_failed'))
+    }
+    openExternal(launchUrl)
+  } catch (err) {
+    error.value = msg(err, 'website_manage.messages.webmail_sso_failed')
+  } finally {
+    launchingWebmail.value = false
   }
 }
 

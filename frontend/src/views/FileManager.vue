@@ -151,13 +151,30 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { FolderOpen } from 'lucide-vue-next'
 import api from '../services/api'
 
 const { t } = useI18n()
-const currentPath = ref('/home')
+const route = useRoute()
+
+function resolveRoutePath(query) {
+  const requestedPath = String(query?.path || '').trim()
+  if (requestedPath.startsWith('/')) {
+    return requestedPath
+  }
+
+  const requestedDomain = String(query?.domain || '').trim().toLowerCase()
+  if (requestedDomain) {
+    return `/home/${requestedDomain}/public_html`
+  }
+
+  return '/home'
+}
+
+const currentPath = ref(resolveRoutePath(route.query))
 const fileList = ref([])
 const selectedFiles = ref([])
 const loading = ref(false)
@@ -389,6 +406,16 @@ const createFolder = async () => {
   }
 }
 
+watch(
+  () => route.query,
+  (query) => {
+    const nextPath = resolveRoutePath(query)
+    if (nextPath && nextPath !== currentPath.value) {
+      currentPath.value = nextPath
+      loadFiles()
+    }
+  },
+)
+
 onMounted(loadFiles)
 </script>
-

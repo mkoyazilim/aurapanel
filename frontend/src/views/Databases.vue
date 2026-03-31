@@ -413,6 +413,7 @@ const normalizeTuningEngine = (query) =>
 const engine = ref(normalizeMainEngine(route.query))
 const tuningEngine = ref(normalizeTuningEngine(route.query))
 const showCreateModal = ref(false)
+const createActionConsumed = ref(false)
 const notification = ref(null)
 const launchingTool = ref('')
 
@@ -608,13 +609,34 @@ function syncRouteQuery() {
   const currentTab = typeof route.query.tab === 'string' ? route.query.tab : ''
   const currentEngine = typeof route.query.engine === 'string' ? route.query.engine : ''
   const currentTuningEngine = typeof route.query.tuning_engine === 'string' ? route.query.tuning_engine : ''
+  const currentDomain = typeof route.query.domain === 'string' ? route.query.domain : ''
+  const currentAction = typeof route.query.action === 'string' ? route.query.action : ''
+
+  if (currentDomain) {
+    nextQuery.domain = currentDomain
+  }
+  if (currentAction === 'create') {
+    nextQuery.action = 'create'
+  }
 
   const sameQuery = currentTab === (nextQuery.tab || '')
     && currentEngine === (nextQuery.engine || '')
     && currentTuningEngine === (nextQuery.tuning_engine || '')
+    && currentDomain === (nextQuery.domain || '')
+    && currentAction === (nextQuery.action || '')
 
   if (!sameQuery) {
     router.replace({ path: '/databases', query: nextQuery })
+  }
+}
+
+function applyDomainQuery(query) {
+  const requestedDomain = String(query?.domain || '').trim().toLowerCase()
+  if (!requestedDomain) return
+
+  const matched = siteOptions.value.find((siteDomain) => String(siteDomain || '').trim().toLowerCase() === requestedDomain)
+  if (matched) {
+    createForm.value.site_domain = matched
   }
 }
 
@@ -660,6 +682,7 @@ const loadData = async () => {
   if (!createForm.value.site_domain && siteOptions.value.length > 0) {
     createForm.value.site_domain = siteOptions.value[0]
   }
+  applyDomainQuery(route.query)
 }
 
 const loadRemoteAccess = async () => {
@@ -855,6 +878,17 @@ watch(
     if (tuningEngine.value !== nextTuningEngine) {
       tuningEngine.value = nextTuningEngine
     }
+
+    applyDomainQuery(query)
+
+    const shouldOpenCreate = query?.action === 'create'
+    if (shouldOpenCreate && !createActionConsumed.value) {
+      showCreateModal.value = true
+      createActionConsumed.value = true
+    }
+    if (!shouldOpenCreate) {
+      createActionConsumed.value = false
+    }
   },
   { immediate: true },
 )
@@ -863,6 +897,10 @@ watch(showCreateModal, (open) => {
   if (open && !createForm.value.site_domain && siteOptions.value.length > 0) {
     createForm.value.site_domain = siteOptions.value[0]
   }
+})
+
+watch(siteOptions, () => {
+  applyDomainQuery(route.query)
 })
 
 watch(websitePackageOptions, (options) => {

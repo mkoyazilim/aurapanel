@@ -183,6 +183,7 @@ const sites = ref([])
 const error = ref('')
 const success = ref('')
 const showCreate = ref(false)
+const createActionConsumed = ref(false)
 const showReset = ref(false)
 const selectedDomain = ref(typeof route.query.domain === 'string' ? route.query.domain : '')
 
@@ -246,6 +247,10 @@ watch(
   () => route.query.domain,
   (value) => {
     selectedDomain.value = typeof value === 'string' ? value : ''
+    createForm.value.domain = selectedDomain.value
+    if (!createForm.value.home_dir) {
+      createForm.value.home_dir = defaultHome(selectedDomain.value)
+    }
     if (activeTab.value === 'ftp') {
       loadFtpUsers()
     }
@@ -258,6 +263,21 @@ watch(
     const nextTab = value === 'tuning' ? 'tuning' : 'ftp'
     if (activeTab.value !== nextTab) {
       activeTab.value = nextTab
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.query.action,
+  (value) => {
+    const shouldOpenCreate = value === 'create'
+    if (shouldOpenCreate && !createActionConsumed.value) {
+      showCreate.value = true
+      createActionConsumed.value = true
+    }
+    if (!shouldOpenCreate) {
+      createActionConsumed.value = false
     }
   },
   { immediate: true },
@@ -298,10 +318,16 @@ function syncRouteQuery() {
   if (selectedDomain.value) {
     nextQuery.domain = selectedDomain.value
   }
+  const currentAction = typeof route.query.action === 'string' ? route.query.action : ''
+  if (currentAction === 'create') {
+    nextQuery.action = 'create'
+  }
 
   const currentTab = typeof route.query.tab === 'string' ? route.query.tab : ''
   const currentDomain = typeof route.query.domain === 'string' ? route.query.domain : ''
-  const sameQuery = currentTab === (nextQuery.tab || '') && currentDomain === (nextQuery.domain || '')
+  const sameQuery = currentTab === (nextQuery.tab || '')
+    && currentDomain === (nextQuery.domain || '')
+    && currentAction === (nextQuery.action || '')
   if (!sameQuery) {
     router.replace({ path: '/ftp', query: nextQuery })
   }

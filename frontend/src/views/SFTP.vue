@@ -89,22 +89,33 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
 
 const { t, locale } = useI18n({ useScope: 'global' })
+const route = useRoute()
 
 const users = ref([])
 const error = ref('')
 const success = ref('')
 const showCreate = ref(false)
+const selectedDomain = ref(typeof route.query.domain === 'string' ? route.query.domain : '')
+const createActionConsumed = ref(false)
 const showReset = ref(false)
+
+function defaultHome(domain) {
+  if (domain) {
+    return `/home/${domain}/public_html`
+  }
+  return '/home'
+}
 
 const createForm = ref({
   username: '',
   password: '',
-  home_dir: '/home',
+  home_dir: defaultHome(selectedDomain.value),
 })
 
 const resetForm = ref({
@@ -125,7 +136,8 @@ function formatTime(ts) {
 async function loadUsers() {
   error.value = ''
   try {
-    const res = await api.get('/sftp/list')
+    const params = selectedDomain.value ? { domain: selectedDomain.value } : {}
+    const res = await api.get('/sftp/list', { params })
     users.value = res.data?.data || []
   } catch (e) {
     error.value = apiErrorMessage(e, 'sftp_manager.messages.list_failed')
@@ -140,10 +152,13 @@ async function createUser() {
     return
   }
   try {
-    const res = await api.post('/sftp/create', createForm.value)
+    const res = await api.post('/sftp/create', {
+      ...createForm.value,
+      domain: selectedDomain.value || undefined,
+    })
     success.value = res.data?.message || t('sftp_manager.messages.created')
     showCreate.value = false
-    createForm.value = { username: '', password: '', home_dir: '/home' }
+    createForm.value = { username: '', password: '', home_dir: defaultHome(selectedDomain.value) }
     await loadUsers()
   } catch (e) {
     error.value = apiErrorMessage(e, 'sftp_manager.messages.create_failed')
@@ -183,6 +198,32 @@ async function removeUser(username) {
     error.value = apiErrorMessage(e, 'sftp_manager.messages.delete_failed')
   }
 }
+
+watch(
+  () => route.query.domain,
+  (value) => {
+    selectedDomain.value = typeof value === 'string' ? value : ''
+    if (!createForm.value.home_dir || createForm.value.home_dir === '/home') {
+      createForm.value.home_dir = defaultHome(selectedDomain.value)
+    }
+    loadUsers()
+  },
+)
+
+watch(
+  () => route.query.action,
+  (value) => {
+    const shouldOpenCreate = value === 'create'
+    if (shouldOpenCreate && !createActionConsumed.value) {
+      showCreate.value = true
+      createActionConsumed.value = true
+    }
+    if (!shouldOpenCreate) {
+      createActionConsumed.value = false
+    }
+  },
+  { immediate: true },
+)
 
 onMounted(loadUsers)
 </script>

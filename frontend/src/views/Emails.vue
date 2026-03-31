@@ -220,14 +220,23 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
 
 const { t } = useI18n({ useScope: 'global' })
+const route = useRoute()
 
-const tab = ref('mailboxes')
+function normalizeTab(value) {
+  const allowedTabs = ['mailboxes', 'forwards', 'routing', 'dkim', 'tuning']
+  const normalized = String(value || '').trim().toLowerCase()
+  return allowedTabs.includes(normalized) ? normalized : 'mailboxes'
+}
+
+const tab = ref(normalizeTab(typeof route.query.tab === 'string' ? route.query.tab : 'mailboxes'))
 const error = ref('')
 const showAddModal = ref(false)
+const createActionConsumed = ref(false)
 
 const tuningForm = ref({
   message_size_limit: '',
@@ -303,6 +312,43 @@ const domains = computed(() => {
   const fromMailbox = (mailboxes.value || []).map(m => m.domain).filter(Boolean)
   return [...new Set([...fromSites, ...fromMailbox])]
 })
+
+function applyDomainQuery(queryDomain) {
+  const requested = String(queryDomain || '').trim().toLowerCase()
+  if (!requested) return
+
+  const matched = domains.value.find((domainName) => String(domainName || '').trim().toLowerCase() === requested)
+  if (!matched) return
+
+  forwardForm.value.domain = matched
+  catchAllForm.value.domain = matched
+  routingForm.value.domain = matched
+  dkimDomain.value = matched
+
+  const currentAddress = String(mailboxForm.value.address || '').trim()
+  if (!currentAddress) {
+    mailboxForm.value.address = `info@${matched}`
+  }
+}
+
+function applyRouteQuery(query) {
+  const queryTab = normalizeTab(typeof query?.tab === 'string' ? query.tab : 'mailboxes')
+  if (tab.value !== queryTab) {
+    tab.value = queryTab
+  }
+
+  applyDomainQuery(query?.domain)
+
+  const shouldCreateMailbox = query?.action === 'create'
+  if (shouldCreateMailbox && !createActionConsumed.value) {
+    tab.value = 'mailboxes'
+    showAddModal.value = true
+    createActionConsumed.value = true
+  }
+  if (!shouldCreateMailbox) {
+    createActionConsumed.value = false
+  }
+}
 
 function tabClass(key) {
   return [
@@ -496,6 +542,18 @@ async function generateWebmailSso(address) {
   }
 }
 
+watch(
+  () => route.query,
+  (query) => {
+    applyRouteQuery(query)
+  },
+  { immediate: true },
+)
+
+watch(domains, () => {
+  applyDomainQuery(route.query.domain)
+})
+
 onMounted(async () => {
   await Promise.all([loadSites(), loadMailboxes(), loadForwards(), loadRouting()])
   if (domains.value.length > 0) {
@@ -504,5 +562,6 @@ onMounted(async () => {
     routingForm.value.domain = domains.value[0]
     dkimDomain.value = domains.value[0]
   }
+  applyRouteQuery(route.query)
 })
 </script>
