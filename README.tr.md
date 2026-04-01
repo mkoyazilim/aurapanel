@@ -1,31 +1,57 @@
-# AuraPanel
+﻿# AuraPanel
 
 <p align="right">
-  <a href="./README.md">English</a> | Türkçe
+  <a href="./README.md">English</a> | Turkce
 </p>
 
-AuraPanel, hızlı, güvenlik odaklı ve operasyonel olarak dürüst bir hosting kontrol düzlemi arayan operatörler için geliştirilmiş modern bir hosting panelidir.
+AuraPanel, modern hosting operasyonları için geliştirilen performans odaklı, güvenlik merkezli ve operasyonel olarak dürüst bir kontrol düzlemidir.
 
-Platform, ayrık bir mimari etrafında tasarlanmıştır:
+Temel üç ilke:
 
-- yönetim arayüzü için `Vue 3 + Vite`
-- kimlik doğrulama, RBAC, statik panel sunumu ve kontrollü proxy katmanı için `Go API Gateway`
-- host otomasyonu, runtime entegrasyonları ve sistem seviyesinde orkestrasyon için `Go Panel Service`
-- web sunum katmanı olarak `OpenLiteSpeed`
+- `Performans`: düşük overhead, deterministik otomasyon
+- `Stabilite`: kontrol düzlemi ile sunum düzlemi ayrık
+- `Güvenlik`: fail-closed API tasarımı ve sıkı RBAC
 
-Temel tasarım hedefi nettir: kontrol düzlemi ile sunum düzlemi birbirinden ayrılmalıdır. Böylece panel yeniden başlatılsa, güncellense veya geçici olarak erişilemez olsa bile web siteleri çalışmaya devam eder.
+## İçindekiler
+
+- [Vizyon](#vizyon)
+- [Neden AuraPanel](#neden-aurapanel)
+- [Mimari](#mimari)
+- [Özellik Yüzeyi](#özellik-yüzeyi)
+- [Güvenlik Modeli](#güvenlik-modeli)
+- [Performans Modeli](#performans-modeli)
+- [Karşılaştırma Özeti](#karşılaştırma-özeti)
+- [Doküman ve Wiki](#doküman-ve-wiki)
+- [Production Kurulum](#production-kurulum)
+- [Yerel Geliştirme](#yerel-geliştirme)
+- [Build ve Paketleme](#build-ve-paketleme)
+- [Repo Yapısı](#repo-yapısı)
+- [Yol Haritası](#yol-haritası)
+- [Katkı Prensipleri](#katkı-prensipleri)
+- [Lisans](#lisans)
+
+## Vizyon
+
+AuraPanel, shell komutlarının üstüne yerleştirilmiş bir arayüz değildir.
+
+Amaç, çok kiracılı hosting ekipleri ve altyapı operasyon ekipleri için:
+
+- yüksek görünürlük
+- ölçülebilir güvenlik
+- düşük sürtünmeli operasyon
+- üretim ortamında güvenilir otomasyon
+
+sunmaktır.
+
+Ana prensip: panel yeniden başlasa bile web siteleri çalışmaya devam etmelidir.
 
 ## Neden AuraPanel
 
-AuraPanel, shell komutlarının üstüne ince bir arayüz eklemek için tasarlanmadı. Gerçek bir hosting platformu olarak şu prensiplerle şekillenmektedir:
+AuraPanel operasyonel dürüstlük ilkesine dayanır:
 
-- performans öncelikli operasyon tasarımı
-- fail-closed güvenlik varsayılanları
-- açık ve dürüst runtime davranışı
-- deterministik altyapı otomasyonu
-- sahte başarı yanıtları yerine gerçek host entegrasyonları
-
-Bir yetenek hosta, harici bir API’ye veya yönetilen bir dosya/konfigürasyon yoluna bağlı değilse aktifmiş gibi sunulmamalıdır.
+- Gerçek host/API/config bağı olmayan özellikler aktif gibi gösterilmez.
+- Desteklenmeyen akışlar sahte başarı yerine `501 Not Implemented` döner.
+- Smoke/acceptance kontrolleri operasyonun doğal parçasıdır.
 
 ## Mimari
 
@@ -52,268 +78,198 @@ Tarayıcı
 ### Kontrol Düzlemi Katmanları
 
 `frontend/`
-- Vue 3, Vite ve router/store odaklı bir frontend mimarisi ile geliştirilmiş operatör arayüzü
-- operasyonel iş akışları, görünürlük ve düşük sürtünmeli host yönetimi için tasarlanmıştır
+- Vue + Vite operatör arayüzü
+- workflow odaklı yönetim ekranları
 
 `api-gateway/`
-- kimliği doğrulanmış trafiğin merkezi giriş noktasıdır
-- request middleware, JWT doğrulama, rol tabanlı yetkilendirme, CORS, request ID ve servis proxy mantığını uygular
-- production ortamında derlenmiş panel arayüzünü sunar
+- kimlik doğrulanmış trafiğin merkezi girişi
+- JWT, middleware, request-id, CORS, RBAC
+- panel-service için kontrollü proxy
 
 `panel-service/`
-- host seviyesinde otomasyonu yürütür ve gerçek runtime aksiyonlarını koordine eder
-- website oluşturma, mail provisioning, veritabanı yönetimi, firewall işlemleri, tuning endpoint’leri, backup akışları, runtime app akışları ve servis kontrolünü yönetir
+- host otomasyonu ve runtime orkestrasyonu
+- provisioning, tuning, hardening, backup ve migration uçları
 
-## Performans Yaklaşımı
+## Özellik Yüzeyi
 
-AuraPanel performans öncelikli bir anlayışla tasarlanmıştır:
+Gerçek entegrasyonlar:
 
-- `Ayrık sunum yolu`: web siteleri panel runtime’ı ile değil, OpenLiteSpeed ile servis edilir
-- `Go tabanlı kontrol servisleri`: düşük overhead, öngörülebilir açılış süresi ve bellek davranışı
-- `Minimal proxy katmanı`: API Gateway, ana `/api/v1/` yüzeyini doğrudan panel-service katmanına iletir
-- `Hızlı yerel entegrasyonlar`: sistem aksiyonları ağır orkestrasyon katmanları yerine deterministik CLI, servis ve config bağlarıyla yürütülür
-- `Operasyonel izolasyon`: panel yeniden başlatmaları website kesintisi anlamına gelmez
-- `Odaklı tuning yüzeyleri`: yüksek etkili tuning yalnızca gerekli alanlarda sunulur; örneğin OpenLiteSpeed, veritabanları, FTP, PHP ve mail stack
+- Website yaşam döngüsü: domain onboarding, vhost sync, rewrite ve htaccess
+- SSL/TLS: issuance, custom cert, wildcard binding
+- DNS: PowerDNS zone/record yönetimi
+- Mail stack: Postfix + Dovecot, mailbox ve forward akışları
+- FTP/SFTP yönetimi
+- MariaDB/PostgreSQL provisioning ve tuning
+- Backup akışları ve MinIO hedef desteği
+- Docker runtime yönetimi
+- Cloudflare entegrasyon yüzeyleri
+- `wp-cli` ile WordPress yönetimi
+- Malware scan/quarantine
+- Firewall ve SSH key yönetimi
+- Panel port ve servis görünürlüğü
+- Migration upload/analysis/import
 
-## Güvenlik Yaklaşımı
+Detaylı runtime durum özeti için: [ENDPOINT_AUDIT.md](./ENDPOINT_AUDIT.md)
 
-AuraPanel, zero-trust ve fail-closed yaklaşımıyla geliştirilmektedir:
+## Güvenlik Modeli
 
-- korumalı tüm istekler kimlik doğrulamadan geçer
-- RBAC gateway katmanında uygulanır
-- desteklenmeyen endpoint’ler sahte başarı yerine `501 Not Implemented` döndürür
-- installer akışı kontrollü izinlerle environment dosyaları üretir
-- imzalı manifest doğrulaması ile verified release bootstrap desteklenir
-- firewall otomasyonu yalnızca gerekli hosting ve panel portlarını açar
-- panel ve servis kimlik bilgileri kurulum sırasında üretilir, senkronize edilir ve smoke-check ile doğrulanır
-- ModSecurity ve OWASP CRS entegrasyonu WAF koruması için desteklenir
-- SSH key iş akışları, 2FA akışları ve security status endpoint’leri birinci sınıf bileşenlerdir
+AuraPanel zero-trust ve fail-closed yaklaşımı uygular:
 
-## Gerçek Runtime Yüzeyi
+- tüm korumalı isteklerde kimlik doğrulama
+- gateway seviyesinde RBAC zorlaması
+- sahte başarı yanıtlarından kaçınma
+- kontrollü izinlerle environment/runtime dosya üretimi
+- manifest + hash doğrulamalı release bootstrap
+- yalnızca gerekli portları açan firewall otomasyonu
+- credential üretimi sonrası smoke doğrulama
+- ModSecurity + OWASP CRS desteği
 
-AuraPanel şu anda aşağıdaki alanlarda gerçek entegrasyonlar içerir:
+## Performans Modeli
 
-- website provisioning ve OpenLiteSpeed vhost senkronizasyonu
-- `.htaccess` write-through ve OpenLiteSpeed rewrite yönetimi
-- PHP sürüm atama ve `php.ini` yönetimi
-- MariaDB ve PostgreSQL provisioning, kullanıcı bilgileri, remote access ve tuning
-- Postfix ve Dovecot provisioning, mailbox, forward, catch-all ve mail SSL akışları
-- Pure-FTPd ve SFTP provisioning
-- PowerDNS zone ve record yönetimi
-- SSL issuance, custom certificate, wildcard ve hostname binding akışları
-- backup, database backup ve dahili MinIO backup target desteği
-- Docker runtime ve uygulama yönetimi
-- Cloudflare durum ve entegrasyon akışları
-- `wp-cli` üzerinden WordPress yönetimi
-- malware scan ve quarantine akışları
-- firewall ve SSH key yönetimi
-- panel port yönetimi ile servis/process görünürlüğü
-- migration upload, analiz ve import akışları
+- `Ayrık sunum yolu`: siteler OpenLiteSpeed üzerinden servis edilir
+- `Go servisleri`: öngörülebilir kaynak kullanımı
+- `Odaklı proxy`: `/api/v1/` trafiğinde minimal katman
+- `Deterministik host entegrasyonları`
+- `Operasyonel izolasyon`: panel restart = site kesintisi değildir
 
-Daha net bir runtime durum özeti için [ENDPOINT_AUDIT.md](./ENDPOINT_AUDIT.md) dosyasına bakabilirsiniz.
+## Karşılaştırma Özeti
 
-## Desteklenen Kurulum Hedefleri
+Bu tablo fiyat/lisans değil, teknik konumlandırma odaklıdır.
 
-Production installer şu işletim sistemlerini hedeflemektedir:
+| Alan | AuraPanel | CyberPanel | cPanel/WHM | Plesk |
+|---|---|---|---|---|
+| Temel yaklaşım | Ayrık kontrol düzlemi + runtime dürüstlüğü | OLS merkezli hızlı kurulum | Ticari shared hosting standardı | Geniş extension ekosistemi |
+| Sunum/Kontrol ayrımı | Güçlü odak | Kuruluma göre değişebilir | Çoğunlukla entegre akışlar | Entegre + extension tabanlı |
+| Runtime şeffaflığı | Doğrulanabilir host-backed endpoint yaklaşımı | Modüle göre değişken | Soyutlama yüksek | Soyutlama + extension katmanı |
+| Güvenlik hedefi | Zero-trust + fail-closed varsayılanlar | Temel hardening araçları | Ticari katmanlarda güçlü | Ticari/extension güvenlik setleri |
+| Extensibility yönü | API/gRPC-first, GitOps uyumlu | Plugin odaklı | Ticari entegrasyon pazarı | Extension odaklı |
+| Operasyon felsefesi | Deterministik otomasyon | Hız ve pratiklik | Pazar olgunluğu | Geniş uyumluluk |
+
+Detaylı analiz: [Wiki Comparisons](./wiki/Comparisons.md)
+
+## Doküman ve Wiki
+
+### Teknik Dokümanlar
+
+- [Documentation Index](./docs/documentation-index.md)
+- [API Contract v1](./docs/api_contract_v1.md)
+- [Final System Audit (2026-03-30)](./docs/final-system-audit-2026-03-30.md)
+- [Product Overview](./docs/product-overview.md)
+- [Hosting Panel Comparison](./docs/hosting-panel-comparison.md)
+- [Endpoint Audit](./ENDPOINT_AUDIT.md)
+- [Changelog](./CHANGELOG.md)
+
+### Wiki Sayfaları (GitHub Wiki Seed)
+
+- [Wiki Home](./wiki/Home.md)
+- [Install Guide](./wiki/Install-Guide.md)
+- [Architecture](./wiki/Architecture.md)
+- [Security Model](./wiki/Security-Model.md)
+- [Performance Model](./wiki/Performance-Model.md)
+- [Operations Runbook](./wiki/Operations-Runbook.md)
+- [Migration Guide](./wiki/Migration-Guide.md)
+- [Comparisons](./wiki/Comparisons.md)
+- [FAQ](./wiki/FAQ.md)
+- [Troubleshooting](./wiki/Troubleshooting.md)
+
+## Production Kurulum
+
+### Desteklenen Hedefler
 
 - Ubuntu `22.04` ve `24.04`
 - Debian `12+`
 - AlmaLinux `8/9`
 - Rocky Linux `8/9`
 
-## Production Kurulumu
-
-### 1. Standart Uzak Kurulum
-
-GitHub üzerinden uzak kurulum başlatmanın en basit yolu:
+### Standart Uzak Kurulum
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
-Bu akış ana installer’ı kullanır ve host üzerinde gerekli runtime stack’i hazırlar.
-
-### 2. Doğrulanmış Release Bootstrap
-
-AuraPanel, imzalı manifest ve SHA-256 doğrulamalı release bundle tabanlı verified bootstrap akışını da destekler.
-
-Örnek:
+### Verified Release Bootstrap
 
 ```bash
 export AURAPANEL_RELEASE_BASE="https://github.com/mkoyazilim/aurapanel/releases/latest/download"
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-Bootstrap sürecini belirli bir manifest dosyasına da yönlendirebilirsiniz:
+### Mevcut Host Güncelleme
 
 ```bash
-export AURAPANEL_MANIFEST_URL="https://example.com/releases/latest/aurapanel_release_manifest.env"
-curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
+cd /opt/aurapanel
+bash scripts/deploy-main.sh
 ```
-
-### 3. Doğrudan Bootstrap Script Kullanımı
-
-Verified bootstrap aşamasını doğrudan çalıştırmak isterseniz:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/aurapanel_bootstrap.sh -o aurapanel_bootstrap.sh
-chmod +x aurapanel_bootstrap.sh
-sudo AURAPANEL_RELEASE_BASE="https://github.com/mkoyazilim/aurapanel/releases/latest/download" ./aurapanel_bootstrap.sh
-```
-
-## Production Installer Neleri Kurar
-
-Installer, tam panel host’u kurmak üzere şu bileşenleri hazırlayacak şekilde tasarlanmıştır:
-
-- OpenLiteSpeed
-- Node.js 20
-- Go toolchain
-- MariaDB
-- PostgreSQL
-- Redis
-- Docker
-- PowerDNS
-- Pure-FTPd
-- Postfix
-- Dovecot
-- MinIO
-- Roundcube
-- ModSecurity ve OWASP CRS
-- WP-CLI
-- AuraPanel bileşenleri için systemd servisleri
-- firewall temel kuralları
-- panel, gateway, OpenLiteSpeed, MinIO ve auth akışları için smoke check’ler
-
-### Oluşturulan systemd Servisleri
-
-Production kurulum şu servisleri oluşturur ve yönetir:
-
-- `aurapanel-service`
-- `aurapanel-api`
-
-Host durumuna ve etkin modüllere bağlı olarak AuraPanel şu servislerle de çalışır:
-
-- `lshttpd`
-- `mariadb`
-- `postgresql`
-- `redis` veya `redis-server`
-- `postfix`
-- `dovecot`
-- `pure-ftpd`
-- `minio`
-- `docker`
-- `pdns`
 
 ## Yerel Geliştirme
 
-### Gereksinimler
+Gereksinimler:
 
 - Go `1.22+`
 - Node.js `20+`
 
-### Windows Yardımcı Scripti
-
-Repository içinde tüm yerel stack’i başlatan yardımcı bir script bulunmaktadır:
+Windows helper:
 
 ```powershell
 .\start-dev.ps1
 ```
 
-Varsayılan yerel endpoint’ler:
+Varsayılan yerel endpointler:
 
 - Frontend: `http://127.0.0.1:5173`
 - Gateway: `http://127.0.0.1:8090`
 - Panel Service: `http://127.0.0.1:8081`
 
-Varsayılan development girişi:
+Varsayılan test girişi:
 
-- E-posta: `admin@server.com`
+- Email: `admin@server.com`
 - Şifre: `password123`
 
-### Manuel Geliştirme Başlatma
-
-Panel service:
-
-```powershell
-cd panel-service
-go run .
-```
-
-Gateway:
-
-```powershell
-cd api-gateway
-$env:AURAPANEL_SERVICE_URL='http://127.0.0.1:8081'
-go run .
-```
-
-Frontend:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-## Build
-
-Tüm bileşenleri derlemek için:
+## Build ve Paketleme
 
 ```bash
 make build
-```
-
-Release tarball üretmek için:
-
-```bash
 make package
-```
-
-Artifact temizliği için:
-
-```bash
 make clean
 ```
 
-## Repository Yapısı
+## Repo Yapısı
 
 ```text
 aurapanel/
-|-- api-gateway/        # Go API Gateway
-|-- panel-service/      # Go host otomasyonu ve runtime orkestrasyonu
-|-- frontend/           # Vue 3 + Vite kontrol paneli
-|-- installer/          # Production kurulum mantığı
-|-- docs/               # Yardımcı teknik dokümantasyon
-|-- aurapanel_bootstrap.sh
-|-- aurapanel_installer.sh
+|-- api-gateway/
+|-- panel-service/
+|-- frontend/
+|-- web-site/
+|-- installer/
+|-- docs/
+|-- wiki/
 |-- install.sh
-|-- start-dev.ps1
-|-- Makefile
 `-- ENDPOINT_AUDIT.md
 ```
 
-## Operasyonel Prensipler
+## Yol Haritası
 
-AuraPanel birkaç temel prensipten taviz vermez:
+Yakın dönem odakları:
 
-- `Kontrol düzlemi != sunum düzlemi`
-- `Kozmetik tamlık yerine operasyonel dürüstlük`
-- `Konfor yerine güvenlik varsayılanları`
-- `Kırılgan gizli state yerine deterministik otomasyon`
-- `Performans hassas yollar mümkün olduğunca sade kalmalıdır`
+- servisler arası güven modeli sıkılaştırma
+- eBPF tabanlı telemetri ve drift detection
+- GitOps döngülerinin güçlendirilmesi
+- cPanel/Plesk/CyberPanel migration yardımcılarının derinleştirilmesi
+- operasyonel analytics + öneri motoru
 
-## Katkı Sağlayacak Geliştiriciler İçin Notlar
+## Katkı Prensipleri
 
-- runtime iddialarını dürüst tutun
-- simüle edilmiş başarı yanıtları yerine gerçek entegrasyonları tercih edin
-- ölçülebilir operasyonel fayda olmadan ağır bağımlılıklar eklemeyin
-- panel arızalarının website çalışma yolunu etkilememesi prensibini koruyun
-- host seviyesindeki otomasyonu production-grade altyapı kodu olarak ele alın
+- runtime iddialarını dürüst tut
+- simülasyon yerine gerçek entegrasyonlara öncelik ver
+- ölçülebilir fayda yoksa ağır bağımlılıktan kaçın
+- kontrol düzlemi ve sunum düzlemi ayrımını koru
+- host otomasyonunu production-grade altyapı kodu olarak ele al
 
 ## Lisans
 
-AuraPanel, [MIT License](./LICENSE) ile dağıtılmaktadır.
+AuraPanel, [MIT License](./LICENSE) ile dağıtılır.
 
 ## Geliştirici
 
-Mkoyazılım ([www.mkoyazilim.com](https://www.mkoyazilim.com)) & Tahamada
+Mkoyazilim ([www.mkoyazilim.com](https://www.mkoyazilim.com)) ve Tahamada

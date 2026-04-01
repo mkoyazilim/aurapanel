@@ -26,8 +26,6 @@ _project_brain/
 .claude/
 api-gateway/tmp_gateway
 plans/
-docs/
-ENDPOINT_AUDIT.md
 
 # Website source (kept local, not tracked)
 web-site/

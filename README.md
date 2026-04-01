@@ -1,31 +1,57 @@
-# AuraPanel
+﻿# AuraPanel
 
 <p align="right">
-  English | <a href="./README.tr.md">Türkçe</a>
+  English | <a href="./README.tr.md">Turkce</a>
 </p>
 
-AuraPanel is a modern hosting control plane built for operators who want a fast, security-conscious, and operationally honest stack.
+AuraPanel is a modern hosting control plane focused on three non-negotiables:
 
-The platform is designed around a decoupled architecture:
+- `Performance first`: low-overhead runtime design and deterministic automation
+- `Reliability first`: control plane is decoupled from serving plane
+- `Security first`: fail-closed APIs, strict RBAC, and explicit runtime state
 
-- `Vue 3 + Vite` frontend for the administrative interface
-- `Go API Gateway` for authentication, RBAC enforcement, static panel delivery, and controlled proxying
-- `Go Panel Service` for host automation, runtime integrations, and system-level orchestration
-- `OpenLiteSpeed` as the web-serving layer
+AuraPanel is being built for 2026-grade infrastructure operations where platform teams need clear control over website, DNS, SSL, mail, database, and service lifecycle in one coherent panel.
 
-The core design goal is simple: the control plane should remain cleanly separated from the serving plane, so websites can keep running even if the panel itself is restarted, upgraded, or unavailable.
+## Table of Contents
+
+- [Vision](#vision)
+- [Why AuraPanel](#why-aurapanel)
+- [Architecture](#architecture)
+- [Feature Surface](#feature-surface)
+- [Security Model](#security-model)
+- [Performance Model](#performance-model)
+- [Comparison Snapshot](#comparison-snapshot)
+- [Docs and Wiki](#docs-and-wiki)
+- [Production Installation](#production-installation)
+- [Local Development](#local-development)
+- [Build and Packaging](#build-and-packaging)
+- [Repository Layout](#repository-layout)
+- [Roadmap Direction](#roadmap-direction)
+- [Contribution Principles](#contribution-principles)
+- [License](#license)
+
+## Vision
+
+AuraPanel is not a thin UI over shell commands.
+
+It is an operator-grade control plane for hosting businesses, infrastructure teams, and multi-tenant environments that need:
+
+- stable website serving under operational load
+- transparent and testable automation paths
+- low-friction day-2 operations
+- clear security boundaries between users, services, and host-level actions
+
+The core principle is simple: websites must keep running even when panel components are restarted, upgraded, or temporarily unavailable.
 
 ## Why AuraPanel
 
-AuraPanel is not intended to be a thin UI over shell commands. It is being shaped as a real hosting platform with:
+AuraPanel is designed around operational honesty:
 
-- performance-first operational design
-- fail-closed security defaults
-- explicit runtime honesty
-- deterministic infrastructure automation
-- direct host integrations instead of fake or placeholder success states
+- if a feature is not wired to a real host/API/config path, it should not be marked as active
+- unsupported flows return `501 Not Implemented` rather than fake success
+- acceptance checks and runtime probes are part of normal operations, not optional extras
 
-If a capability is not wired to the host, an external API, or a managed file/config path, it should not be presented as active.
+This approach reduces hidden risk, shrinks mean-time-to-diagnose, and keeps teams aligned with real production state.
 
 ## Architecture
 
@@ -52,168 +78,146 @@ Browser
 ### Control Plane Layers
 
 `frontend/`
-- Operator UI built with Vue 3, Vite, Vue Router, and a store-driven frontend architecture
-- Focused on operational workflows, visibility, and low-friction host management
+- Vue + Vite operator UI
+- workflow-oriented views for hosting lifecycle
+- RBAC-aware frontend permission boundaries
 
 `api-gateway/`
-- Central entry point for authenticated traffic
-- Enforces request middleware, JWT validation, role-based access control, CORS, request IDs, and service proxying
-- Serves the built panel UI in production
+- central authenticated entry point
+- JWT validation, middleware chain, request IDs, CORS, RBAC checks
+- controlled proxying to panel-service
+- static panel delivery in production
 
 `panel-service/`
-- Executes host-level automation and coordinates real runtime actions
-- Owns website provisioning, mail provisioning, database management, firewall operations, tuning endpoints, backup flows, runtime apps, and service control
+- host-level automation and runtime orchestration
+- provisioning, tuning, hardening, backup, migration, and integration endpoints
+- deterministic command/config workflows across Linux environments
 
-## Performance Philosophy
+## Feature Surface
 
-AuraPanel is engineered with a performance-first mindset:
+AuraPanel includes real runtime integrations for:
 
-- `Decoupled serving path`: websites are served by OpenLiteSpeed, not by the panel runtime
-- `Go-based control services`: low-overhead binaries with predictable startup and memory behavior
-- `Minimal proxy layers`: the API Gateway forwards the main `/api/v1/` surface directly to the panel-service
-- `Fast local integrations`: system actions rely on deterministic CLI, service, and config bindings instead of heavyweight orchestration layers
-- `Operational isolation`: panel restarts do not imply website downtime
-- `Focused tuning surfaces`: high-impact runtime tuning is exposed only where it matters, such as OpenLiteSpeed, databases, FTP, PHP, and mail
+- Website lifecycle: domain onboarding, vhost sync, rewrite handling, htaccess write-through
+- SSL/TLS: issuance, custom certs, wildcard bindings, hostname mapping
+- DNS: zone and record lifecycle with PowerDNS
+- Mail stack: Postfix, Dovecot, mailbox provisioning, forward/catch-all flows
+- FTP/SFTP: account and access management
+- Databases: MariaDB/PostgreSQL provisioning, credentials, tuning, remote access controls
+- Backup: website and database backups, MinIO target support
+- Docker runtime: service/app lifecycle endpoints
+- Cloudflare integration surfaces
+- WordPress workflows through `wp-cli`
+- Malware scan and quarantine flows
+- Firewall and SSH key management
+- Panel port and service process visibility
+- Migration upload, analysis, and import paths
 
-## Security Philosophy
+For explicit runtime endpoint status, see [ENDPOINT_AUDIT.md](./ENDPOINT_AUDIT.md).
 
-AuraPanel is built with a zero-trust and fail-closed posture in mind:
+## Security Model
 
-- every protected request is authenticated
-- RBAC is enforced at the gateway layer
-- unsupported endpoints return `501 Not Implemented` instead of fake success
-- installer flow writes dedicated environment files with controlled permissions
-- signed release bootstrap is supported through manifest verification
-- firewall automation opens only the required hosting and panel ports
-- panel and service credentials are generated, synced, and smoke-checked during installation
-- ModSecurity and OWASP CRS integration are supported for WAF coverage
-- SSH key workflows, 2FA flows, and security status endpoints are first-class features
+AuraPanel follows a zero-trust, fail-closed model:
 
-## Implemented Runtime Surface
+- every protected request must be authenticated
+- role-based access controls are enforced at the gateway
+- unsupported routes do not return cosmetic success payloads
+- installer writes environment/runtime artifacts with controlled permissions
+- release bootstrap supports manifest and hash verification
+- firewall automation opens only required ports
+- generated credentials are validated through smoke checks
+- ModSecurity + OWASP CRS integration can be enabled for WAF coverage
 
-AuraPanel currently includes real integrations for:
+Security posture is treated as an always-on runtime property, not a one-time installation checkbox.
 
-- website provisioning and OpenLiteSpeed vhost synchronization
-- `.htaccess` write-through and OpenLiteSpeed rewrite handling
-- PHP version assignment and `php.ini` management
-- MariaDB and PostgreSQL provisioning, credentials, remote access, and tuning
-- Postfix and Dovecot provisioning, mailboxes, forwards, catch-all, and mail SSL flows
-- Pure-FTPd and SFTP provisioning
-- PowerDNS zone and record management
-- SSL issuance, custom certificates, wildcard and hostname bindings
-- backups, database backups, and internal MinIO backup target support
-- Docker runtime and application management
-- Cloudflare status and integration workflows
-- WordPress management through `wp-cli`
-- malware scanning and quarantine flows
-- firewall and SSH key management
-- panel port management and service/process visibility
-- migration upload, analysis, and import workflows
+## Performance Model
 
-For a more explicit runtime status summary, see [ENDPOINT_AUDIT.md](./ENDPOINT_AUDIT.md).
+Performance-sensitive decisions in AuraPanel:
 
-## Supported Installation Targets
+- `Decoupled serving path`: websites are served by OpenLiteSpeed, not by panel runtime
+- `Go services`: predictable startup and memory behavior
+- `Focused proxy layer`: API Gateway forwards core `/api/v1/` surface directly to panel-service
+- `Deterministic integrations`: host operations through managed CLI/config flows
+- `Operational isolation`: panel updates/restarts do not imply website downtime
 
-The production installer currently targets:
+## Comparison Snapshot
+
+This is a technical positioning snapshot (not a licensing/pricing comparison).
+
+| Area | AuraPanel | CyberPanel | cPanel/WHM | Plesk |
+|---|---|---|---|---|
+| Core positioning | Decoupled control plane + explicit runtime honesty | OLS-centric panel with fast setup path | Mature commercial standard for shared hosting | Mature commercial platform with extension ecosystem |
+| Serving/Control separation | Strong architectural focus | Moderate, depends on deployment style | Historically integrated workflows | Integrated with broad extension stack |
+| Runtime transparency | Emphasis on verifiable host-backed endpoints | Varies by module | Mature UI abstractions, less host-level transparency by default | Strong UX abstractions via extensions |
+| Security posture goal | Zero-trust defaults, fail-closed behavior | Basic hardening available | Enterprise features via commercial tiers | Enterprise/security add-ons via extensions |
+| Extensibility direction | API/gRPC-first roadmap, GitOps-friendly | Plugin ecosystem, OLS-focused | Commercial ecosystem and partner integrations | Large extension catalog |
+| Ops philosophy | Deterministic automation over cosmetic completeness | Simplicity and speed | Operational maturity and market standardization | Broad compatibility and managed workflows |
+
+See detailed analysis in [Wiki Comparisons](./wiki/Comparisons.md).
+
+## Docs and Wiki
+
+### Core Technical Docs
+
+- [Documentation Index](./docs/documentation-index.md)
+- [API Contract v1](./docs/api_contract_v1.md)
+- [Final System Audit (2026-03-30)](./docs/final-system-audit-2026-03-30.md)
+- [Product Overview](./docs/product-overview.md)
+- [Hosting Panel Comparison](./docs/hosting-panel-comparison.md)
+- [Endpoint Audit](./ENDPOINT_AUDIT.md)
+- [Changelog](./CHANGELOG.md)
+
+### Wiki Source Pages (GitHub Wiki Seed)
+
+The repository includes a full wiki starter set under `wiki/`:
+
+- [Wiki Home](./wiki/Home.md)
+- [Install Guide](./wiki/Install-Guide.md)
+- [Architecture](./wiki/Architecture.md)
+- [Security Model](./wiki/Security-Model.md)
+- [Performance Model](./wiki/Performance-Model.md)
+- [Operations Runbook](./wiki/Operations-Runbook.md)
+- [Migration Guide](./wiki/Migration-Guide.md)
+- [Comparisons](./wiki/Comparisons.md)
+- [FAQ](./wiki/FAQ.md)
+- [Troubleshooting](./wiki/Troubleshooting.md)
+
+You can copy these pages directly into GitHub Wiki or keep them versioned in-repo as canonical docs.
+
+## Production Installation
+
+### Supported Targets
 
 - Ubuntu `22.04` and `24.04`
 - Debian `12+`
 - AlmaLinux `8/9`
 - Rocky Linux `8/9`
 
-## Production Installation
-
 ### 1. Standard Remote Install
-
-This is the simplest way to start a remote installation from GitHub:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
-This flow uses the main installer and prepares the host with the required runtime stack.
-
-### Update Existing Installation (Git Pull Deploy)
-
-For hosts that are already installed, use the deploy script from the repository root:
-
-```bash
-cd /opt/aurapanel
-bash scripts/deploy-main.sh
-```
-
-This flow performs `git pull --ff-only` on `main`, rebuilds backend and frontend components, restarts `aurapanel-service` and `aurapanel-api`, and runs health checks.
-
 ### 2. Verified Release Bootstrap
-
-AuraPanel also supports a verified release bootstrap flow based on a signed manifest and SHA-256 checked release bundle.
-
-Example:
 
 ```bash
 export AURAPANEL_RELEASE_BASE="https://github.com/mkoyazilim/aurapanel/releases/latest/download"
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-You can also point the bootstrap process to a specific manifest:
+Optional explicit manifest:
 
 ```bash
 export AURAPANEL_MANIFEST_URL="https://example.com/releases/latest/aurapanel_release_manifest.env"
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-### 3. Direct Bootstrap Script
-
-If you want to call the verified bootstrap stage directly:
+### 3. Existing Host Update (Git Pull Deploy)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/aurapanel_bootstrap.sh -o aurapanel_bootstrap.sh
-chmod +x aurapanel_bootstrap.sh
-sudo AURAPANEL_RELEASE_BASE="https://github.com/mkoyazilim/aurapanel/releases/latest/download" ./aurapanel_bootstrap.sh
+cd /opt/aurapanel
+bash scripts/deploy-main.sh
 ```
-
-## What the Production Installer Configures
-
-The installer is designed to provision a full panel host, including:
-
-- OpenLiteSpeed
-- Node.js 20
-- Go toolchain
-- MariaDB
-- PostgreSQL
-- Redis
-- Docker
-- PowerDNS
-- Pure-FTPd
-- Postfix
-- Dovecot
-- MinIO
-- Roundcube
-- ModSecurity with OWASP CRS
-- WP-CLI
-- systemd services for AuraPanel components
-- firewall baseline rules
-- smoke checks for panel, gateway, OpenLiteSpeed, MinIO, and auth flows
-
-### Installed systemd Units
-
-Production deployment creates and manages:
-
-- `aurapanel-service`
-- `aurapanel-api`
-
-Depending on the host and enabled modules, AuraPanel also coordinates:
-
-- `lshttpd`
-- `mariadb`
-- `postgresql`
-- `redis` or `redis-server`
-- `postfix`
-- `dovecot`
-- `pure-ftpd`
-- `minio`
-- `docker`
-- `pdns`
 
 ## Local Development
 
@@ -222,9 +226,7 @@ Depending on the host and enabled modules, AuraPanel also coordinates:
 - Go `1.22+`
 - Node.js `20+`
 
-### Windows Helper
-
-The repository includes a helper script that starts the full local stack:
+### Windows helper
 
 ```powershell
 .\start-dev.ps1
@@ -241,7 +243,7 @@ Default development login:
 - Email: `admin@server.com`
 - Password: `password123`
 
-### Manual Development Startup
+### Manual startup
 
 Panel service:
 
@@ -266,7 +268,7 @@ npm install
 npm run dev
 ```
 
-## Build
+## Build and Packaging
 
 Build all components:
 
@@ -274,7 +276,7 @@ Build all components:
 make build
 ```
 
-Create a release tarball:
+Create release tarball:
 
 ```bash
 make package
@@ -292,9 +294,11 @@ make clean
 aurapanel/
 |-- api-gateway/        # Go API Gateway
 |-- panel-service/      # Go host automation and runtime orchestration
-|-- frontend/           # Vue 3 + Vite control panel
+|-- frontend/           # Vue + Vite control panel
+|-- web-site/           # Public marketing and docs website
 |-- installer/          # Production installation logic
-|-- docs/               # Supporting technical documentation
+|-- docs/               # Technical reference docs
+|-- wiki/               # Wiki source pages
 |-- aurapanel_bootstrap.sh
 |-- aurapanel_installer.sh
 |-- install.sh
@@ -303,23 +307,23 @@ aurapanel/
 `-- ENDPOINT_AUDIT.md
 ```
 
-## Operational Principles
+## Roadmap Direction
 
-AuraPanel follows a few non-negotiable principles:
+Near-term platform direction:
 
-- `Control plane != serving plane`
-- `Operational honesty over cosmetic completeness`
-- `Security defaults before convenience`
-- `Deterministic automation over fragile hidden state`
-- `Performance-sensitive code paths should stay simple`
+- service-to-service trust tightening and token lifecycle hardening
+- eBPF-backed telemetry and runtime drift detection
+- deeper GitOps control loops for repeatable fleet operations
+- richer migration assistants for cPanel/Plesk/CyberPanel transitions
+- expanded operator analytics and auto-remediation recommendations
 
-## Notes for Contributors
+## Contribution Principles
 
 - keep runtime claims honest
-- prefer real integrations over simulated success payloads
-- avoid introducing heavy dependencies without a measurable operational benefit
-- preserve the decoupled model where panel failures do not take websites down
-- treat host-level automation as production-grade infrastructure code
+- prioritize real integrations over simulated responses
+- avoid heavy dependencies without measurable value
+- preserve control-plane and serving-plane decoupling
+- treat host-level automation as production infrastructure code
 
 ## License
 
@@ -327,4 +331,4 @@ AuraPanel is distributed under the [MIT License](./LICENSE).
 
 ## Developer
 
-Mkoyazilim ([www.mkoyazilim.com](https://www.mkoyazilim.com)) & Tahamada
+Mkoyazilim ([www.mkoyazilim.com](https://www.mkoyazilim.com)) and Tahamada
