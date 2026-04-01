@@ -985,7 +985,11 @@ const fetchSidebarServerIp = async () => {
   sidebarIpLoading.value = true
   try {
     const res = await api.get('/status/metrics')
-    const rawIp = String(res.data?.data?.server_ip || '').trim()
+    let rawIp = String(res.data?.data?.server_ip || '').trim()
+    if (!rawIp) {
+      const sec = await api.get('/security/status')
+      rawIp = String(sec.data?.data?.server_ip || '').trim()
+    }
     sidebarServerIp.value = rawIp
   } catch (err) {
     // Sidebar server IP is best-effort and should not block layout rendering.

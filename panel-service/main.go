@@ -2713,6 +2713,10 @@ func (s *service) handleAliasesList(w http.ResponseWriter, r *http.Request) {
 
 func (s *service) handleMetrics(w http.ResponseWriter) {
 	metrics := collectHostMetrics(s.startedAt)
+	serverIP := detectPrimaryIPv4()
+	if strings.TrimSpace(serverIP) == "" {
+		serverIP = "127.0.0.1"
+	}
 
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status: "success",
@@ -2729,6 +2733,7 @@ func (s *service) handleMetrics(w http.ResponseWriter) {
 			"uptime_seconds": metrics.UptimeSeconds,
 			"uptime_human":   metrics.UptimeHuman,
 			"load_avg":       metrics.LoadAvg,
+			"server_ip":      serverIP,
 		},
 	})
 }
