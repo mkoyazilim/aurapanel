@@ -29,13 +29,6 @@ type cloudflareRuntimeStatus struct {
 	HasGlobalKey     bool   `json:"has_global_key"`
 }
 
-type cloudflareAPIResponse[T any] struct {
-	Success bool     `json:"success"`
-	Errors  []cfErr  `json:"errors"`
-	Result  T        `json:"result"`
-	Results []T      `json:"result"`
-}
-
 type cfErr struct {
 	Message string `json:"message"`
 }
