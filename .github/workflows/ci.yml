@@ -86,5 +86,5 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           cd panel-service
           govulncheck ./...
-          cd api-gateway
+          cd ../api-gateway
           govulncheck ./...
