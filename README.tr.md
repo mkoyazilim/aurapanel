@@ -173,6 +173,12 @@ Detaylı analiz: [Wiki Comparisons](./wiki/Comparisons.md)
 - [FAQ](./wiki/FAQ.md)
 - [Troubleshooting](./wiki/Troubleshooting.md)
 
+Bu sayfaları GitHub Wiki'ye yayınlamak için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/publish-wiki.ps1
+```
+
 ## Canlı Demo
 
 - URL: `https://demo.aurapanel.info`

@@ -41,9 +41,46 @@
             {{ loading ? t('dashboard.refreshing') : t('dashboard.refresh') }}
           </button>
         </div>
-        <div class="flex items-center justify-center h-[300px] border-2 border-dashed border-panel-border rounded-xl">
-          <div class="text-center">
-            <Activity class="w-12 h-12 text-brand-500 mx-auto mb-3 opacity-50" :class="loading ? 'animate-pulse' : ''" />
+        <div class="h-[300px] border border-panel-border rounded-xl bg-panel-darker/40 p-4">
+          <div class="mb-3 flex items-center justify-between text-xs text-gray-400">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="inline-flex items-center gap-1.5 rounded-md bg-sky-500/10 px-2 py-1 text-sky-300">
+                <span class="h-2 w-2 rounded-full bg-sky-400"></span>
+                CPU {{ latestCpuUsage }}%
+              </span>
+              <span class="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-emerald-300">
+                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                RAM {{ latestRamUsage }}%
+              </span>
+              <span class="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-amber-300">
+                <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                LOAD {{ latestLoadPercent }}%
+              </span>
+            </div>
+            <span class="text-[11px] text-gray-500">{{ chartPointCount }} pts</span>
+          </div>
+
+          <div class="relative h-[220px] overflow-hidden rounded-lg border border-panel-border/60 bg-panel-card/20">
+            <svg class="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="System load trend chart">
+              <line x1="0" y1="20" x2="100" y2="20" class="stroke-panel-border/50" stroke-width="0.4" />
+              <line x1="0" y1="40" x2="100" y2="40" class="stroke-panel-border/40" stroke-width="0.35" />
+              <line x1="0" y1="60" x2="100" y2="60" class="stroke-panel-border/40" stroke-width="0.35" />
+              <line x1="0" y1="80" x2="100" y2="80" class="stroke-panel-border/40" stroke-width="0.35" />
+              <path v-if="cpuAreaPath" :d="cpuAreaPath" fill="rgba(56, 189, 248, 0.12)" />
+              <path v-if="cpuLinePath" :d="cpuLinePath" fill="none" stroke="rgb(56, 189, 248)" stroke-width="1.1" stroke-linecap="round" />
+              <path v-if="ramLinePath" :d="ramLinePath" fill="none" stroke="rgb(16, 185, 129)" stroke-width="1.1" stroke-linecap="round" />
+              <path v-if="loadLinePath" :d="loadLinePath" fill="none" stroke="rgb(245, 158, 11)" stroke-width="1.1" stroke-linecap="round" />
+            </svg>
+
+            <div v-if="chartPointCount === 0" class="absolute inset-0 flex items-center justify-center">
+              <div class="text-center">
+                <Activity class="mx-auto mb-3 h-10 w-10 text-brand-500 opacity-60" :class="loading ? 'animate-pulse' : ''" />
+                <p class="text-sm text-gray-400">{{ t('dashboard.refreshing') }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 text-center">
             <p class="text-gray-400 font-medium">{{ t('dashboard.uptime', { value: uptimeHuman }) }}</p>
             <p class="text-sm text-gray-500 mt-1">{{ t('dashboard.load_avg', { value: loadAvg }) }}</p>
           </div>
@@ -71,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Server, Globe, Database, ShieldCheck, Activity, Cpu, MemoryStick, HardDrive, Clock } from 'lucide-vue-next'
 import api from '../services/api'
@@ -82,6 +119,11 @@ const loading = ref(false)
 const error = ref('')
 const uptimeHuman = ref(t('dashboard.na'))
 const loadAvg = ref(t('dashboard.na'))
+const chartSeriesLimit = 48
+const cpuHistory = ref([])
+const ramHistory = ref([])
+const loadHistory = ref([])
+let metricsPollTimer = null
 const serverStatusCards = ref([
   { name: t('server_status.cpu'), value: '0%', detail: t('dashboard.na'), subdetail: '', icon: Cpu, iconColor: 'text-blue-400' },
   { name: t('server_status.ram'), value: '0%', detail: t('dashboard.na'), subdetail: '', icon: MemoryStick, iconColor: 'text-green-400' },
@@ -98,6 +140,78 @@ const stats = ref([
 
 const logs = ref([])
 
+const chartPointCount = computed(() =>
+  Math.max(cpuHistory.value.length, ramHistory.value.length, loadHistory.value.length),
+)
+const latestCpuUsage = computed(() =>
+  cpuHistory.value.length ? Math.round(cpuHistory.value[cpuHistory.value.length - 1]) : 0,
+)
+const latestRamUsage = computed(() =>
+  ramHistory.value.length ? Math.round(ramHistory.value[ramHistory.value.length - 1]) : 0,
+)
+const latestLoadPercent = computed(() =>
+  loadHistory.value.length ? Math.round(loadHistory.value[loadHistory.value.length - 1]) : 0,
+)
+
+function clampPercent(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.max(0, Math.min(100, numeric))
+}
+
+function parseLoadAvgPercent(rawLoadAvg, cpuCores) {
+  const firstValue = String(rawLoadAvg || '').trim().split(/\s+/)[0]
+  const loadValue = Number.parseFloat(firstValue)
+  if (!Number.isFinite(loadValue)) return 0
+  const cores = Math.max(1, Number(cpuCores || 1))
+  return clampPercent((loadValue / cores) * 100)
+}
+
+function pushSeriesPoint(seriesRef, nextValue) {
+  const next = [...seriesRef.value, clampPercent(nextValue)]
+  if (next.length > chartSeriesLimit) {
+    next.shift()
+  }
+  seriesRef.value = next
+}
+
+function toChartY(value) {
+  return 95 - (clampPercent(value) / 100) * 90
+}
+
+function buildLinePath(series) {
+  if (!Array.isArray(series) || series.length === 0) return ''
+  const denominator = Math.max(1, series.length - 1)
+  return series
+    .map((value, index) => {
+      const x = 2 + (index / denominator) * 96
+      const y = toChartY(value)
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
+    })
+    .join(' ')
+}
+
+function buildAreaPath(series) {
+  if (!Array.isArray(series) || series.length === 0) return ''
+  const denominator = Math.max(1, series.length - 1)
+  const firstX = 2
+  const lastX = 2 + (Math.max(0, series.length - 1) / denominator) * 96
+  const segments = series
+    .map((value, index) => {
+      const x = 2 + (index / denominator) * 96
+      const y = toChartY(value)
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
+    })
+    .join(' ')
+
+  return `M ${firstX.toFixed(2)} 95 ${segments.slice(1)} L ${lastX.toFixed(2)} 95 Z`
+}
+
+const cpuLinePath = computed(() => buildLinePath(cpuHistory.value))
+const ramLinePath = computed(() => buildLinePath(ramHistory.value))
+const loadLinePath = computed(() => buildLinePath(loadHistory.value))
+const cpuAreaPath = computed(() => buildAreaPath(cpuHistory.value))
+
 function summarizeTime(value) {
   if (!value) return t('dashboard.na')
   const text = String(value)
@@ -108,6 +222,25 @@ function summarizeLine(value, max = 42) {
   if (!value) return t('dashboard.na')
   const text = String(value)
   return text.length > max ? `${text.slice(0, max)}...` : text
+}
+
+function updateLiveMetrics(metrics = {}) {
+  uptimeHuman.value = metrics.uptime_human || t('dashboard.na')
+  loadAvg.value = metrics.load_avg || t('dashboard.na')
+
+  pushSeriesPoint(cpuHistory, metrics.cpu_usage || 0)
+  pushSeriesPoint(ramHistory, metrics.ram_usage || 0)
+  pushSeriesPoint(loadHistory, parseLoadAvgPercent(metrics.load_avg, metrics.cpu_cores))
+}
+
+async function pollLoadMetrics() {
+  try {
+    const metricsRes = await api.get('/status/metrics')
+    const metrics = metricsRes.data?.data || {}
+    updateLiveMetrics(metrics)
+  } catch {
+    // Polling is best-effort; dashboard refresh button remains the authoritative fallback.
+  }
 }
 
 async function loadDashboard() {
@@ -138,8 +271,7 @@ async function loadDashboard() {
     const metrics = metricsRes.data?.data || {}
     const services = Array.isArray(servicesRes.data?.data) ? servicesRes.data.data : []
 
-    uptimeHuman.value = metrics.uptime_human || t('dashboard.na')
-    loadAvg.value = metrics.load_avg || t('dashboard.na')
+    updateLiveMetrics(metrics)
 
     const runningServices = services.filter(s => String(s.status).toLowerCase() === 'running').length
     const uptimeDays = Math.floor(Number(metrics.uptime_seconds || 0) / 86400)
@@ -219,5 +351,15 @@ async function loadDashboard() {
 
 onMounted(() => {
   loadDashboard()
+  metricsPollTimer = setInterval(() => {
+    pollLoadMetrics()
+  }, 5000)
+})
+
+onBeforeUnmount(() => {
+  if (metricsPollTimer) {
+    clearInterval(metricsPollTimer)
+    metricsPollTimer = null
+  }
 })
 </script>

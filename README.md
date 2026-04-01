@@ -184,6 +184,12 @@ The repository includes a full wiki starter set under `wiki/`:
 
 You can copy these pages directly into GitHub Wiki or keep them versioned in-repo as canonical docs.
 
+Publish these pages to GitHub Wiki with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/publish-wiki.ps1
+```
+
 ## Live Demo
 
 - URL: `https://demo.aurapanel.info`
