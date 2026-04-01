@@ -34,8 +34,34 @@ func demoAccountEmail() string {
 	return value
 }
 
+func demoAccountEmails() map[string]struct{} {
+	emails := map[string]struct{}{}
+
+	raw := strings.TrimSpace(os.Getenv("AURAPANEL_DEMO_EMAILS"))
+	if raw != "" {
+		for _, item := range strings.Split(raw, ",") {
+			email := strings.ToLower(strings.TrimSpace(item))
+			if email == "" {
+				continue
+			}
+			emails[email] = struct{}{}
+		}
+	}
+
+	if len(emails) == 0 {
+		emails[demoAccountEmail()] = struct{}{}
+	}
+
+	return emails
+}
+
 func isDemoAccount(user AuthUser) bool {
-	return strings.EqualFold(strings.TrimSpace(user.Email), demoAccountEmail())
+	email := strings.ToLower(strings.TrimSpace(user.Email))
+	if email == "" {
+		return false
+	}
+	_, ok := demoAccountEmails()[email]
+	return ok
 }
 
 func isDemoDBToolPath(path string) bool {

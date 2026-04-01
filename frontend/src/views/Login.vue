@@ -69,6 +69,25 @@
           <div class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
             {{ t('login.hint') }}
           </div>
+
+          <div v-if="showDemoQuickAccess" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+            <p class="text-sm font-semibold text-emerald-200">Demo Quick Access</p>
+            <p class="mt-1 text-xs text-emerald-100/90">
+              One-click login for role preview on demo environment.
+            </p>
+            <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                v-for="profile in demoProfiles"
+                :key="profile.key"
+                type="button"
+                class="rounded-md border border-emerald-400/40 bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="loading"
+                @click="quickDemoLogin(profile)"
+              >
+                {{ profile.label }}
+              </button>
+            </div>
+          </div>
         </form>
       </div>
 
@@ -101,6 +120,12 @@ const errorMsg = ref('')
 const loading = ref(false)
 const requires2fa = ref(false)
 const totpToken = ref('')
+const showDemoQuickAccess = typeof window !== 'undefined' && window.location.hostname.toLowerCase() === 'demo.aurapanel.info'
+const demoProfiles = [
+  { key: 'admin', label: 'Admin Panel', email: 'demo@aurapanel.info', password: '1234567' },
+  { key: 'reseller', label: 'Reseller Panel', email: 'demo.reseller@aurapanel.info', password: '1234567' },
+  { key: 'user', label: 'User Panel', email: 'demo.user@aurapanel.info', password: '1234567' },
+]
 
 const handleLogin = async () => {
   errorMsg.value = ''
@@ -117,5 +142,18 @@ const handleLogin = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const quickDemoLogin = async (profile) => {
+  if (!profile || loading.value) {
+    return
+  }
+
+  requires2fa.value = false
+  totpToken.value = ''
+  rememberMe.value = false
+  email.value = profile.email
+  password.value = profile.password
+  await handleLogin()
 }
 </script>

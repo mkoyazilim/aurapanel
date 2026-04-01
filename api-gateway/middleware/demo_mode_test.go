@@ -149,3 +149,22 @@ func TestDemoModeMiddlewareSkipsChecksWhenDisabled(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 }
+
+func TestDemoModeMiddlewareSupportsMultipleDemoAccounts(t *testing.T) {
+	t.Setenv("AURAPANEL_DEMO_MODE", "true")
+	t.Setenv("AURAPANEL_DEMO_EMAILS", "demo@aurapanel.info, demo.reseller@aurapanel.info, demo.user@aurapanel.info")
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := DemoModeMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/vhost", nil)
+	req = withDemoAuthUser(req, "demo.reseller@aurapanel.info", roleReseller)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for listed demo account, got %d", rec.Code)
+	}
+}
