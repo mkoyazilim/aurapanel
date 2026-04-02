@@ -88,15 +88,19 @@ func main() {
 
 	publicHandler := middleware.RequestIDMiddleware(
 		middleware.CorsMiddleware(
-			middleware.Logger(publicMux),
+			middleware.Logger(
+				middleware.DDoSGuardMiddleware(publicMux),
+			),
 		),
 	)
 	protectedHandler := middleware.RequestIDMiddleware(
 		middleware.CorsMiddleware(
 			middleware.Logger(
-				middleware.AuthMiddleware(
-					middleware.RBACMiddleware(
-						middleware.DemoModeMiddleware(protectedMux),
+				middleware.DDoSGuardMiddleware(
+					middleware.AuthMiddleware(
+						middleware.RBACMiddleware(
+							middleware.DemoModeMiddleware(protectedMux),
+						),
 					),
 				),
 			),

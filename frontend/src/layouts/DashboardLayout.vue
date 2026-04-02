@@ -301,6 +301,9 @@
                   <router-link v-if="can('/security')" :to="{ path: '/security', query: { tab: 'waf' } }" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                     <span>{{ t('layout.links.ml_waf') }}</span>
                   </router-link>
+                  <router-link v-if="can('/security')" :to="{ path: '/security', query: { tab: 'ddos' } }" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                    <span>{{ t('layout.links.ddos') }}</span>
+                  </router-link>
                   <router-link v-if="can('/security')" :to="{ path: '/security', query: { tab: '2fa' } }" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                     <span>{{ t('layout.links.totp') }}</span>
                   </router-link>

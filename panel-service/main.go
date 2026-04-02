@@ -804,6 +804,7 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/security/ssh/config",
 		"/api/v1/security/live-patch",
 		"/api/v1/security/malware",
+		"/api/v1/security/ddos",
 		"/api/v1/status/service/control",
 		"/api/v1/status/panel-port",
 		"/api/v1/status/panel-reverse-domain",
@@ -1087,6 +1088,10 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleFirewallPortRuleDelete(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/waf":
 		s.handleSecurityWAF(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/security/ddos":
+		s.handleSecurityDDoSGet(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/ddos":
+		s.handleSecurityDDoSSet(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/2fa/setup":
 		s.handleTOTPSetup(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/2fa/verify":
@@ -2959,6 +2964,7 @@ func (s *service) handleSecurityStatus(w http.ResponseWriter) {
 			"live_patching":            snapshot.LivePatchingActive,
 			"one_click_hardening":      snapshot.OneClickHardening,
 			"nft_firewall":             snapshot.FirewallActive,
+			"ddos_guard":               snapshot.DDoSGuardActive,
 			"ssh_key_manager":          snapshot.SSHKeyManager,
 			"firewall_active":          snapshot.FirewallActive,
 			"firewall_manager":         snapshot.FirewallManager,

@@ -45,6 +45,7 @@ type securitySnapshot struct {
 	LivePatchingActive     bool
 	EBPFMonitoring         bool
 	MLWAFActive            bool
+	DDoSGuardActive        bool
 	OneClickHardening      bool
 	SSHKeyManager          bool
 	ImmutableOS            bool
@@ -126,6 +127,7 @@ func collectSecuritySnapshot() securitySnapshot {
 		LivePatchingActive:     serviceActive("canonical-livepatch", "kpatch", "kgraft"),
 		EBPFMonitoring:         serviceActive("cilium", "falco", "tetragon"),
 		MLWAFActive:            detectModSecurityActive(),
+		DDoSGuardActive:        loadDDoSRuntimeConfig().Enabled,
 		OneClickHardening:      false,
 		SSHKeyManager:          sshKeyManagerAvailable(),
 		ImmutableOS:            false,

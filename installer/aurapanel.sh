@@ -1727,6 +1727,12 @@ AURAPANEL_GATEWAY_ONLY=1
 AURAPANEL_INTERNAL_PROXY_TOKEN=${proxy_token}
 AURAPANEL_GATEWAY_ADDR=:${PANEL_PORT_DEFAULT}
 AURAPANEL_PANEL_DIST=/opt/aurapanel/frontend/dist
+AURAPANEL_DDOS_ENABLED=0
+AURAPANEL_DDOS_PROFILE=off
+AURAPANEL_DDOS_GLOBAL_RPS=120
+AURAPANEL_DDOS_GLOBAL_BURST=240
+AURAPANEL_DDOS_AUTH_RPS=20
+AURAPANEL_DDOS_AUTH_BURST=40
 EOF
 
     chmod 600 "${GATEWAY_ENV_FILE}"
@@ -1790,6 +1796,12 @@ AURAPANEL_CLOUDFLARE_EMAIL=
 AURAPANEL_CLOUDFLARE_API_KEY=
 AURAPANEL_CLOUDFLARE_API_TOKEN=
 AURAPANEL_CLOUDFLARE_AUTO_SYNC=0
+AURAPANEL_DDOS_ENABLED=0
+AURAPANEL_DDOS_PROFILE=off
+AURAPANEL_DDOS_GLOBAL_RPS=120
+AURAPANEL_DDOS_GLOBAL_BURST=240
+AURAPANEL_DDOS_AUTH_RPS=20
+AURAPANEL_DDOS_AUTH_BURST=40
 EOF
 
     chmod 600 "${SERVICE_ENV_FILE}"
@@ -1803,6 +1815,25 @@ EOF
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_PANEL_DIST" "${PROJECT_DIR}/frontend/dist"
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_ALLOWED_ORIGINS" "http://127.0.0.1:${PANEL_PORT_DEFAULT},http://localhost:${PANEL_PORT_DEFAULT}"
   upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_INTERNAL_PROXY_TOKEN" "${shared_proxy_token}"
+  local gateway_ddos_enabled gateway_ddos_profile gateway_ddos_global_rps gateway_ddos_global_burst gateway_ddos_auth_rps gateway_ddos_auth_burst
+  gateway_ddos_enabled="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_ENABLED")"
+  gateway_ddos_profile="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_PROFILE")"
+  gateway_ddos_global_rps="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_RPS")"
+  gateway_ddos_global_burst="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_BURST")"
+  gateway_ddos_auth_rps="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_AUTH_RPS")"
+  gateway_ddos_auth_burst="$(read_env_value "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_AUTH_BURST")"
+  [ -n "${gateway_ddos_enabled}" ] || gateway_ddos_enabled="0"
+  [ -n "${gateway_ddos_profile}" ] || gateway_ddos_profile="off"
+  [ -n "${gateway_ddos_global_rps}" ] || gateway_ddos_global_rps="120"
+  [ -n "${gateway_ddos_global_burst}" ] || gateway_ddos_global_burst="240"
+  [ -n "${gateway_ddos_auth_rps}" ] || gateway_ddos_auth_rps="20"
+  [ -n "${gateway_ddos_auth_burst}" ] || gateway_ddos_auth_burst="40"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_ENABLED" "${gateway_ddos_enabled}"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_PROFILE" "${gateway_ddos_profile}"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_RPS" "${gateway_ddos_global_rps}"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_BURST" "${gateway_ddos_global_burst}"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_AUTH_RPS" "${gateway_ddos_auth_rps}"
+  upsert_env "${GATEWAY_ENV_FILE}" "AURAPANEL_DDOS_AUTH_BURST" "${gateway_ddos_auth_burst}"
   delete_env "${GATEWAY_ENV_FILE}" "${legacy_gateway_core_url_key}"
 
   local shared_admin_email shared_admin_password shared_admin_hash
@@ -1838,7 +1869,7 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_TARGET" "internal-minio"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_ENDPOINT" "http://127.0.0.1:9000"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_BUCKET" "aurapanel-backups"
-  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload panel_edge_single_domain pma_base pg_base
+  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload panel_edge_single_domain pma_base pg_base ddos_enabled ddos_profile ddos_global_rps ddos_global_burst ddos_auth_rps ddos_auth_burst
   dbtools_auth_user="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   dbtools_auth_pass="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
   dbtools_allowed_ips="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS")"
@@ -1848,6 +1879,12 @@ EOF
   panel_edge_single_domain="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN")"
   pma_base="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PHPMYADMIN_BASE_URL")"
   pg_base="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_BASE_URL")"
+  ddos_enabled="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_ENABLED")"
+  ddos_profile="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_PROFILE")"
+  ddos_global_rps="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_RPS")"
+  ddos_global_burst="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_BURST")"
+  ddos_auth_rps="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_RPS")"
+  ddos_auth_burst="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_BURST")"
   [ -n "${dbtools_auth_user}" ] || dbtools_auth_user="dbtools"
   [ -n "${dbtools_rate}" ] || dbtools_rate="120"
   [ -n "${dbtools_runtime_file}" ] || dbtools_runtime_file="/etc/aurapanel/db-tools/runtime-allowlist.txt"
@@ -1855,6 +1892,12 @@ EOF
   [ -n "${panel_edge_single_domain}" ] || panel_edge_single_domain="0"
   [ -n "${pma_base}" ] || pma_base="/phpmyadmin/index.php"
   [ -n "${pg_base}" ] || pg_base="/pgadmin4/"
+  [ -n "${ddos_enabled}" ] || ddos_enabled="0"
+  [ -n "${ddos_profile}" ] || ddos_profile="off"
+  [ -n "${ddos_global_rps}" ] || ddos_global_rps="120"
+  [ -n "${ddos_global_burst}" ] || ddos_global_burst="240"
+  [ -n "${ddos_auth_rps}" ] || ddos_auth_rps="20"
+  [ -n "${ddos_auth_burst}" ] || ddos_auth_burst="40"
 
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_UID" "5000"
@@ -1879,6 +1922,12 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_API_KEY" "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_API_KEY")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_API_TOKEN" "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_API_TOKEN")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_AUTO_SYNC" "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_CLOUDFLARE_AUTO_SYNC")"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_ENABLED" "${ddos_enabled}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_PROFILE" "${ddos_profile}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_RPS" "${ddos_global_rps}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_BURST" "${ddos_global_burst}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_RPS" "${ddos_auth_rps}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_BURST" "${ddos_auth_burst}"
 
   chmod 600 "${GATEWAY_ENV_FILE}" "${SERVICE_ENV_FILE}"
 }

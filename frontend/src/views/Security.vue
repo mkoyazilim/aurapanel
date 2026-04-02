@@ -215,6 +215,82 @@
       </div>
     </div>
 
+    <div v-if="activeTab === 'ddos'" class="aura-card space-y-4">
+      <div class="rounded-xl border border-panel-border bg-panel-dark p-4">
+        <div class="flex flex-wrap items-center gap-3 text-sm">
+          <span class="font-semibold text-white">{{ t('security_center.ddos.title') }}</span>
+          <span :class="ddos.enabled ? 'text-emerald-400' : 'text-yellow-400'">
+            {{ ddos.enabled ? t('common.active') : t('common.inactive') }}
+          </span>
+          <span class="text-gray-400">Profile: {{ ddos.profile }}</span>
+        </div>
+        <p class="mt-3 text-xs text-gray-400">{{ t('security_center.ddos.note') }}</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <label class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm text-gray-300">
+          <span class="mb-2 block text-xs text-gray-400">{{ t('security_center.ddos.enabled') }}</span>
+          <select v-model="ddos.enabled" class="aura-input w-full">
+            <option :value="true">{{ t('common.active') }}</option>
+            <option :value="false">{{ t('common.inactive') }}</option>
+          </select>
+        </label>
+        <label class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm text-gray-300">
+          <span class="mb-2 block text-xs text-gray-400">{{ t('security_center.ddos.profile') }}</span>
+          <select v-model="ddos.profile" class="aura-input w-full" :disabled="!ddos.enabled">
+            <option value="standard">{{ t('security_center.ddos.profile_standard') }}</option>
+            <option value="strict">{{ t('security_center.ddos.profile_strict') }}</option>
+          </select>
+        </label>
+        <div class="flex items-end">
+          <button class="btn-primary w-full" :disabled="ddosSaving" @click="saveDdos">
+            {{ ddosSaving ? t('common.loading') : t('security_center.ddos.apply') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm text-gray-300">
+          <span class="mb-2 block text-xs text-gray-400">{{ t('security_center.ddos.global_rps') }}</span>
+          <input v-model.number="ddos.global_rps" min="5" type="number" class="aura-input w-full" />
+        </label>
+        <label class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm text-gray-300">
+          <span class="mb-2 block text-xs text-gray-400">{{ t('security_center.ddos.global_burst') }}</span>
+          <input v-model.number="ddos.global_burst" min="5" type="number" class="aura-input w-full" />
+        </label>
+        <label class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm text-gray-300">
+          <span class="mb-2 block text-xs text-gray-400">{{ t('security_center.ddos.auth_rps') }}</span>
+          <input v-model.number="ddos.auth_rps" min="2" type="number" class="aura-input w-full" />
+        </label>
+        <label class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm text-gray-300">
+          <span class="mb-2 block text-xs text-gray-400">{{ t('security_center.ddos.auth_burst') }}</span>
+          <input v-model.number="ddos.auth_burst" min="2" type="number" class="aura-input w-full" />
+        </label>
+      </div>
+
+      <div v-if="ddosWarnings.length" class="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+        <p v-for="(warn, idx) in ddosWarnings" :key="`ddos-warn-${idx}`">{{ warn }}</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm">
+          <h3 class="mb-2 font-semibold text-white">{{ t('security_center.ddos.compatibility') }}</h3>
+          <p v-if="ddosLoading" class="text-gray-400">{{ t('common.loading') }}</p>
+          <ul v-else class="space-y-1 text-gray-300">
+            <li v-for="(item, idx) in ddosCompatibility" :key="`ddos-compat-${idx}`">{{ item }}</li>
+            <li v-if="ddosCompatibility.length === 0" class="text-gray-500">{{ t('common.no_data') }}</li>
+          </ul>
+        </div>
+        <div class="rounded-lg border border-panel-border bg-panel-dark p-3 text-sm">
+          <h3 class="mb-2 font-semibold text-white">{{ t('security_center.ddos.recommendations') }}</h3>
+          <ul class="space-y-1 text-gray-300">
+            <li v-for="(item, idx) in ddosRecommendations" :key="`ddos-reco-${idx}`">{{ item }}</li>
+            <li v-if="ddosRecommendations.length === 0" class="text-gray-500">{{ t('common.no_data') }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <div v-if="activeTab === '2fa'" class="aura-card space-y-4">
       <h2 class="text-lg font-bold text-white">{{ t('security_center.twofa.title') }}</h2>
       <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -429,6 +505,7 @@ const tabs = [
   { id: 'firewall', label: t('security_center.tabs.firewall') },
   { id: 'fail2ban', label: 'Fail2Ban' },
   { id: 'waf', label: t('security_center.tabs.waf') },
+  { id: 'ddos', label: t('security_center.tabs.ddos') || 'DDoS' },
   { id: '2fa', label: t('security_center.tabs.twofa') },
   { id: 'ssh', label: t('security_center.tabs.ssh') },
   { id: 'ssh_config', label: t('security_center.tabs.ssh_config') || 'SSH Config' },
@@ -440,6 +517,19 @@ const tabs = [
 const activeTab = ref(route.query.tab || 'overview')
 const fail2banStatus = ref({ status: 'loading', raw: '' })
 const fail2banLoading = ref(false)
+const ddosLoading = ref(false)
+const ddosSaving = ref(false)
+const ddosWarnings = ref([])
+const ddosCompatibility = ref([])
+const ddosRecommendations = ref([])
+const ddos = ref({
+  enabled: false,
+  profile: 'standard',
+  global_rps: 120,
+  global_burst: 240,
+  auth_rps: 20,
+  auth_burst: 40,
+})
 
 async function loadFail2ban() {
   fail2banLoading.value = true
@@ -460,6 +550,62 @@ async function unbanIp(ip) {
     await loadFail2ban()
   } catch (err) {
     alert('Hata: ' + (err.response?.data?.message || err.message))
+  }
+}
+
+function normalizeDdosProfile(profile) {
+  const value = String(profile || '').toLowerCase()
+  return value === 'strict' ? 'strict' : 'standard'
+}
+
+function toPositiveInt(value, fallback) {
+  const num = Number(value)
+  return Number.isFinite(num) && num > 0 ? Math.round(num) : fallback
+}
+
+async function loadDdos() {
+  ddosLoading.value = true
+  try {
+    const res = await api.get('/security/ddos')
+    const data = res.data?.data || {}
+    ddos.value.enabled = !!data.enabled
+    ddos.value.profile = normalizeDdosProfile(data.profile)
+    ddos.value.global_rps = toPositiveInt(data.global_rps, 120)
+    ddos.value.global_burst = toPositiveInt(data.global_burst, 240)
+    ddos.value.auth_rps = toPositiveInt(data.auth_rps, 20)
+    ddos.value.auth_burst = toPositiveInt(data.auth_burst, 40)
+    ddosCompatibility.value = Array.isArray(data.compatibility) ? data.compatibility : []
+    ddosRecommendations.value = Array.isArray(data.recommendations) ? data.recommendations : []
+    ddosWarnings.value = []
+  } catch (err) {
+    ddosWarnings.value = [err.response?.data?.message || err.message || 'DDoS ayarlari okunamadi.']
+  } finally {
+    ddosLoading.value = false
+  }
+}
+
+async function saveDdos() {
+  ddosSaving.value = true
+  try {
+    const payload = {
+      enabled: !!ddos.value.enabled,
+      profile: normalizeDdosProfile(ddos.value.profile),
+      global_rps: toPositiveInt(ddos.value.global_rps, 120),
+      global_burst: toPositiveInt(ddos.value.global_burst, 240),
+      auth_rps: toPositiveInt(ddos.value.auth_rps, 20),
+      auth_burst: toPositiveInt(ddos.value.auth_burst, 40),
+    }
+    const res = await api.post('/security/ddos', payload)
+    const data = res.data?.data || {}
+    ddosWarnings.value = Array.isArray(data.warnings) ? data.warnings : []
+    ddosCompatibility.value = Array.isArray(data.compatibility) ? data.compatibility : []
+    ddosRecommendations.value = Array.isArray(data.recommendations) ? data.recommendations : []
+    await loadDdos()
+    await loadStatus()
+  } catch (err) {
+    ddosWarnings.value = [err.response?.data?.message || err.message || 'DDoS ayarlari guncellenemedi.']
+  } finally {
+    ddosSaving.value = false
   }
 }
 
@@ -507,6 +653,7 @@ const sshConfigSaving = ref(false)
 const statusCards = computed(() => [
   { key: 'ebpf', label: 'eBPF Monitoring', value: status.value.ebpf_monitoring },
   { key: 'waf', label: 'ML-WAF', value: status.value.ml_waf },
+  { key: 'ddos', label: 'DDoS Guard', value: status.value.ddos_guard },
   { key: 'totp', label: '2FA (TOTP)', value: status.value.totp_2fa },
   { key: 'wg', label: 'WireGuard Federation', value: status.value.wireguard_federation },
   { key: 'immutable', label: 'Immutable OS', value: status.value.immutable_os_support },
@@ -520,6 +667,7 @@ function setTab(tab) {
   activeTab.value = tab
   router.replace({ query: { ...route.query, tab } })
   if (tab === 'fail2ban') loadFail2ban()
+  if (tab === 'ddos') loadDdos()
   if (tab === 'ssh_config') loadSshConfig()
 }
 
@@ -527,6 +675,7 @@ watch(
   () => route.query.tab,
   tab => {
     activeTab.value = tab || 'overview'
+    if (tab === 'ddos') loadDdos()
     if (tab === 'ssh_config') loadSshConfig()
   },
 )
@@ -827,6 +976,7 @@ async function restoreQuarantineRecord(quarantineId) {
 async function loadAll() {
   await Promise.all([
     loadStatus(),
+    loadDdos(),
     loadFirewallRules(),
     loadFirewallPortRules(),
     loadSshKeys(),
