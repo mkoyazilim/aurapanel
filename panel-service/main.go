@@ -1080,12 +1080,16 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleFirewallRuleCreate(w, r)
 	case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/security/firewall/rules":
 		s.handleFirewallRuleDelete(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/firewall/rules/delete":
+		s.handleFirewallRuleDeleteAction(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/security/firewall/ports":
 		s.handleFirewallPortRulesList(w)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/firewall/ports":
 		s.handleFirewallPortRuleCreate(w, r)
 	case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/security/firewall/ports":
 		s.handleFirewallPortRuleDelete(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/firewall/ports/delete":
+		s.handleFirewallPortRuleDeleteAction(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/security/waf":
 		s.handleSecurityWAF(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/security/ddos":
@@ -3032,6 +3036,26 @@ func (s *service) handleFirewallRuleDelete(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Firewall rule deleted."})
 }
 
+func (s *service) handleFirewallRuleDeleteAction(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		IPAddress string `json:"ip_address"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid firewall payload.")
+		return
+	}
+	ip := strings.TrimSpace(payload.IPAddress)
+	if ip == "" {
+		writeError(w, http.StatusBadRequest, "IP address is required.")
+		return
+	}
+	if err := deleteFirewallRuntimeRule(ip); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Firewall rule deleted."})
+}
+
 func (s *service) handleFirewallPortRulesList(w http.ResponseWriter) {
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: listFirewallRuntimePortRules()})
 }
@@ -3076,6 +3100,19 @@ func (s *service) handleFirewallPortRuleDelete(w http.ResponseWriter, r *http.Re
 		Block:    block,
 	}
 	if err := deleteFirewallRuntimePortRule(rule); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Firewall port rule deleted."})
+}
+
+func (s *service) handleFirewallPortRuleDeleteAction(w http.ResponseWriter, r *http.Request) {
+	var payload FirewallPortRule
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid firewall port payload.")
+		return
+	}
+	if err := deleteFirewallRuntimePortRule(payload); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}

@@ -32,6 +32,7 @@ type firewallPortRuntimeRule struct {
 	Port     int
 	Protocol string
 	Block    bool
+	IPv6     bool
 	Reason   string
 }
 
@@ -209,22 +210,31 @@ func parseUFWNumberedPortRule(line string) (firewallPortRuntimeRule, bool) {
 	if !ok {
 		return firewallPortRuntimeRule{}, false
 	}
-	if strings.Contains(strings.ToLower(body), "(v6)") {
-		return firewallPortRuntimeRule{}, false
-	}
 
 	fields := strings.Fields(body)
-	if len(fields) < 4 {
+	if len(fields) < 3 {
 		return firewallPortRuntimeRule{}, false
 	}
 
-	actionField := strings.ToUpper(strings.TrimSpace(fields[1]))
+	actionIdx := -1
+	actionField := ""
+	for idx, field := range fields {
+		normalized := strings.ToUpper(strings.TrimSpace(field))
+		if normalized == "ALLOW" || normalized == "DENY" || normalized == "REJECT" {
+			actionIdx = idx
+			actionField = normalized
+			break
+		}
+	}
+	if actionIdx < 1 {
+		return firewallPortRuntimeRule{}, false
+	}
 	if actionField != "ALLOW" && actionField != "DENY" && actionField != "REJECT" {
 		return firewallPortRuntimeRule{}, false
 	}
 
-	from := strings.TrimSpace(fields[len(fields)-1])
-	if !isAnywhereFirewallSource(from) {
+	sourceDescriptor := strings.ToLower(strings.Join(fields[actionIdx+1:], " "))
+	if !strings.Contains(sourceDescriptor, "anywhere") && !strings.Contains(sourceDescriptor, " any") {
 		return firewallPortRuntimeRule{}, false
 	}
 
@@ -238,6 +248,7 @@ func parseUFWNumberedPortRule(line string) (firewallPortRuntimeRule, bool) {
 		Port:     port,
 		Protocol: protocol,
 		Block:    actionField == "DENY" || actionField == "REJECT",
+		IPv6:     strings.Contains(strings.ToLower(body), "(v6)"),
 		Reason:   comment,
 	}, true
 }
@@ -316,12 +327,18 @@ func listUFFirewallPortRules() []FirewallPortRule {
 	}
 
 	rules := []FirewallPortRule{}
+	seen := map[string]struct{}{}
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	for scanner.Scan() {
 		runtimeRule, ok := parseUFWNumberedPortRule(scanner.Text())
 		if !ok {
 			continue
 		}
+		key := fmt.Sprintf("%d/%s/%t/%s", runtimeRule.Port, runtimeRule.Protocol, runtimeRule.Block, runtimeRule.Reason)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
 		rules = append(rules, FirewallPortRule{
 			Port:     runtimeRule.Port,
 			Protocol: runtimeRule.Protocol,

@@ -758,7 +758,7 @@ async function addFirewallRule() {
 async function deleteFirewallRule(ip) {
   firewallError.value = ''
   try {
-    await api.delete('/security/firewall/rules', { params: { ip_address: ip } })
+    await api.post('/security/firewall/rules/delete', { ip_address: ip })
     await loadFirewallRules()
   } catch (err) {
     firewallError.value = err.response?.data?.message || err.message || 'Firewall kuralı silinemedi.'
@@ -791,12 +791,10 @@ async function addFirewallPortRule() {
 async function deleteFirewallPortRule(rule) {
   firewallPortError.value = ''
   try {
-    await api.delete('/security/firewall/ports', {
-      params: {
-        port: rule.port,
-        protocol: rule.protocol,
-        block: rule.block,
-      },
+    await api.post('/security/firewall/ports/delete', {
+      port: Number(rule.port),
+      protocol: String(rule.protocol || 'tcp').toLowerCase(),
+      block: !!rule.block,
     })
     await loadFirewallPortRules()
   } catch (err) {
