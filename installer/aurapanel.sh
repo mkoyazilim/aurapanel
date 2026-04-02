@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # AuraPanel Production Installation Script
 # Supported OS: Ubuntu 22.04/24.04, Debian 12+, AlmaLinux 8/9, Rocky Linux 8/9
-# Usage: curl -sSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
+# Usage:
+# curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
+# Optional (if mirror is protected): export AURAPANEL_DOWNLOAD_AUTH="user:pass"
 
 set -euo pipefail
 
@@ -19,30 +21,33 @@ OLS_ADMIN_STATE_FILE="${GATEWAY_ENV_DIR}/aurapanel-ols-admin.env"
 MINIO_ENV_FILE="/etc/default/minio"
 CREDENTIALS_SUMMARY_FILE="/root/aurapanel_credentials.txt"
 REPO_URL="https://github.com/mkoyazilim/aurapanel.git"
+AURAPANEL_DOWNLOAD_BASE_URL="${AURAPANEL_DOWNLOAD_BASE_URL:-https://downloads.aurapanel.info/mirror}"
 AURAPANEL_GH_OWNER="${AURAPANEL_GH_OWNER:-mkoyazilim}"
 AURAPANEL_GH_REPO="${AURAPANEL_GH_REPO:-aurapanel}"
 AURAPANEL_GH_REF="${AURAPANEL_GH_REF:-main}"
 RAW_BASE_URL="https://raw.githubusercontent.com/${AURAPANEL_GH_OWNER}/${AURAPANEL_GH_REPO}/${AURAPANEL_GH_REF}"
-RELEASE_BASE_URL="${AURAPANEL_RELEASE_BASE_URL:-https://github.com/${AURAPANEL_GH_OWNER}/${AURAPANEL_GH_REPO}/releases/latest/download}"
+RELEASE_BASE_URL="${AURAPANEL_RELEASE_BASE_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/releases}"
 
 SOURCE_ARCHIVE_URL="${AURAPANEL_SOURCE_ARCHIVE_URL:-${RELEASE_BASE_URL}/aurapanel-source-latest.tar.gz}"
 SOURCE_ARCHIVE_SHA256_URL="${AURAPANEL_SOURCE_ARCHIVE_SHA256_URL:-${SOURCE_ARCHIVE_URL}.sha256}"
-AURAPANEL_ALLOW_GIT_FALLBACK="${AURAPANEL_ALLOW_GIT_FALLBACK:-1}"
-AURAPANEL_INSTALL_SOURCE="${AURAPANEL_INSTALL_SOURCE:-git}"
-POWERDNS_REPO_KEY_URL="${AURAPANEL_POWERDNS_REPO_KEY_URL:-https://repo.powerdns.com/FD380FBB-pub.asc}"
+AURAPANEL_ALLOW_GIT_FALLBACK="${AURAPANEL_ALLOW_GIT_FALLBACK:-0}"
+AURAPANEL_INSTALL_SOURCE="${AURAPANEL_INSTALL_SOURCE:-archive}"
+POWERDNS_REPO_KEY_URL="${AURAPANEL_POWERDNS_REPO_KEY_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/pdns/FD380FBB-pub.asc}"
 POWERDNS_REPO_CHANNEL="${AURAPANEL_POWERDNS_REPO_CHANNEL:-auth-50}"
 
-NODE_SETUP_URL="${AURAPANEL_NODE_SETUP_URL:-https://deb.nodesource.com/setup_20.x}"
+NODE_SETUP_URL="${AURAPANEL_NODE_SETUP_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/node/setup_20.x}"
 GO_VERSION="${AURAPANEL_GO_VERSION:-1.22.1}"
 GO_TARBALL="go${GO_VERSION}.linux-amd64.tar.gz"
-GO_TARBALL_URL="${AURAPANEL_GO_TARBALL_URL:-https://go.dev/dl/${GO_TARBALL}}"
-LITESPEED_REPO_SCRIPT_URL="${AURAPANEL_LITESPEED_REPO_SCRIPT_URL:-https://repo.litespeed.sh}"
-MINIO_BIN_URL="${AURAPANEL_MINIO_BIN_URL:-https://dl.min.io/server/minio/release/linux-amd64/minio}"
-MINIO_MC_URL="${AURAPANEL_MINIO_MC_URL:-https://dl.min.io/client/mc/release/linux-amd64/mc}"
+GO_TARBALL_URL="${AURAPANEL_GO_TARBALL_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/go/${GO_TARBALL}}"
+LITESPEED_REPO_SCRIPT_URL="${AURAPANEL_LITESPEED_REPO_SCRIPT_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/litespeed/repo.sh}"
+MINIO_BIN_URL="${AURAPANEL_MINIO_BIN_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/minio/minio}"
+MINIO_MC_URL="${AURAPANEL_MINIO_MC_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/minio/mc}"
 ROUNDCUBE_VERSION="${AURAPANEL_ROUNDCUBE_VERSION:-1.6.11}"
-ROUNDCUBE_ARCHIVE_URL="${AURAPANEL_ROUNDCUBE_ARCHIVE_URL:-https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBE_VERSION}/roundcubemail-${ROUNDCUBE_VERSION}-complete.tar.gz}"
+ROUNDCUBE_ARCHIVE_URL="${AURAPANEL_ROUNDCUBE_ARCHIVE_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/roundcube/roundcubemail-${ROUNDCUBE_VERSION}-complete.tar.gz}"
 OWASP_CRS_VERSION="${AURAPANEL_OWASP_CRS_VERSION:-v4.2.0}"
-OWASP_CRS_ARCHIVE_URL="${AURAPANEL_OWASP_CRS_ARCHIVE_URL:-https://github.com/coreruleset/coreruleset/archive/refs/tags/${OWASP_CRS_VERSION}.zip}"
+OWASP_CRS_ARCHIVE_URL="${AURAPANEL_OWASP_CRS_ARCHIVE_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/owasp/${OWASP_CRS_VERSION}.zip}"
+WP_CLI_PHAR_URL="${AURAPANEL_WP_CLI_PHAR_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/wpcli/wp-cli.phar}"
+IONCUBE_ARCHIVE_URL="${AURAPANEL_IONCUBE_ARCHIVE_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/ioncube/ioncube_loaders_lin_x86-64.tar.gz}"
 AURAPANEL_FFMPEG_INSTALL="${AURAPANEL_FFMPEG_INSTALL:-1}"
 AURAPANEL_FFMPEG_ACTIVE="${AURAPANEL_FFMPEG_ACTIVE:-1}"
 AURAPANEL_IMAGEMAGICK_INSTALL="${AURAPANEL_IMAGEMAGICK_INSTALL:-1}"
@@ -553,14 +558,27 @@ configure_powerdns() {
 download_file() {
   local url="$1"
   local output="$2"
+  local auth="${AURAPANEL_DOWNLOAD_AUTH:-}"
+  local user=""
+  local pass=""
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "$output" || return 1
+    if [ -n "${auth}" ]; then
+      curl -fsSL -u "${auth}" "$url" -o "$output" || return 1
+    else
+      curl -fsSL "$url" -o "$output" || return 1
+    fi
     return 0
   fi
 
   if command -v wget >/dev/null 2>&1; then
-    wget -q "$url" -O "$output" || return 1
+    if [ -n "${auth}" ] && [[ "${auth}" == *:* ]]; then
+      user="${auth%%:*}"
+      pass="${auth#*:}"
+      wget -q --user="${user}" --password="${pass}" "$url" -O "$output" || return 1
+    else
+      wget -q "$url" -O "$output" || return 1
+    fi
     return 0
   fi
 
@@ -1232,7 +1250,7 @@ ensure_openlitespeed() {
 ensure_wp_cli() {
   if ! command -v wp >/dev/null 2>&1; then
     log "Installing WP-CLI..."
-    curl -sO https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    download_file "${WP_CLI_PHAR_URL}" "wp-cli.phar" || fail "WP-CLI download failed."
     chmod +x wp-cli.phar
     mv wp-cli.phar /usr/local/bin/wp
   else
@@ -1482,7 +1500,7 @@ ensure_ioncube_loader() {
   fi
 
   local lsphp_bin="/usr/local/lsws/lsphp83/bin/lsphp"
-  local ioncube_url="https://downloads.ioncube.com/loader_downloads/ioncube_loaders_lin_x86-64.tar.gz"
+  local ioncube_url="${IONCUBE_ARCHIVE_URL}"
   local ext_dir ini_file loaded_ini scan_dir tmpdir archive src_loader dst_loader
 
   lsphp_ioncube_active() {

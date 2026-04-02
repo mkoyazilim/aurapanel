@@ -19,10 +19,23 @@ fail() {
 download_file() {
   local url="$1"
   local output="$2"
+  local auth="${AURAPANEL_DOWNLOAD_AUTH:-}"
+  local user=""
+  local pass=""
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "$output"
+    if [ -n "${auth}" ]; then
+      curl -fsSL -u "${auth}" "$url" -o "$output"
+    else
+      curl -fsSL "$url" -o "$output"
+    fi
   elif command -v wget >/dev/null 2>&1; then
-    wget -q "$url" -O "$output"
+    if [ -n "${auth}" ] && [[ "${auth}" == *:* ]]; then
+      user="${auth%%:*}"
+      pass="${auth#*:}"
+      wget -q --user="${user}" --password="${pass}" "$url" -O "$output"
+    else
+      wget -q "$url" -O "$output"
+    fi
   else
     fail "curl or wget is required"
   fi
@@ -57,13 +70,14 @@ read_manifest_value() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="$(mktemp -d /tmp/aurapanel-bootstrap.XXXXXX)"
 trap 'rm -rf "$WORK_DIR"' EXIT
+AURAPANEL_DOWNLOAD_BASE_URL="${AURAPANEL_DOWNLOAD_BASE_URL:-https://downloads.aurapanel.info/mirror}"
 
 if [ -n "${AURAPANEL_MANIFEST_URL:-}" ]; then
   MANIFEST_URL="$AURAPANEL_MANIFEST_URL"
 elif [ -n "${AURAPANEL_RELEASE_BASE:-}" ]; then
   MANIFEST_URL="${AURAPANEL_RELEASE_BASE%/}/latest/aurapanel_release_manifest.env"
 else
-  fail "Set AURAPANEL_MANIFEST_URL or AURAPANEL_RELEASE_BASE"
+  MANIFEST_URL="${AURAPANEL_DOWNLOAD_BASE_URL}/releases/latest/aurapanel_release_manifest.env"
 fi
 
 MANIFEST_SIG_URL="${AURAPANEL_MANIFEST_SIG_URL:-${MANIFEST_URL}.sig}"
