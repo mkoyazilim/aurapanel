@@ -120,10 +120,10 @@
       <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.mail.hostname') }}</label>
-          <input v-model="mailForm.domain" list="ssl-mail-domain-options" class="aura-input w-full" :placeholder="t('ssl_manager.placeholders.mail_hostname')" />
-          <datalist id="ssl-mail-domain-options">
-            <option v-for="domainName in mailDomainSuggestions" :key="`ssl-mail-${domainName}`" :value="domainName" />
-          </datalist>
+          <select v-model="mailForm.domain" class="aura-input w-full">
+            <option value="" disabled>{{ t('ssl_manager.placeholders.mail_hostname') }}</option>
+            <option v-for="domainName in mailDomainSuggestions" :key="`ssl-mail-${domainName}`" :value="domainName">{{ domainName }}</option>
+          </select>
         </div>
         <div>
           <label class="mb-1 block text-sm text-gray-400">{{ t('ssl_manager.mail.email') }}</label>
@@ -223,8 +223,44 @@ const mailDomainSuggestions = computed(() => {
     names.add(String(bindings.value.mail_ssl_domain).trim().toLowerCase())
   }
 
+  const hostnameBinding = String(bindings.value?.hostname_ssl_domain || '').trim().toLowerCase()
+  if (hostnameBinding) {
+    const parts = hostnameBinding.split('.').filter(Boolean)
+    if (parts.length >= 3) {
+      names.add(`mail.${parts.slice(1).join('.')}`)
+    }
+  }
+
   return Array.from(names).sort((a, b) => a.localeCompare(b))
 })
+
+function preferredMailHostname() {
+  const explicitMailBinding = String(bindings.value?.mail_ssl_domain || '').trim().toLowerCase()
+  if (explicitMailBinding) return explicitMailBinding
+
+  const hostnameBinding = String(bindings.value?.hostname_ssl_domain || '').trim().toLowerCase()
+  if (hostnameBinding) {
+    const parts = hostnameBinding.split('.').filter(Boolean)
+    if (parts.length >= 3) {
+      return `mail.${parts.slice(1).join('.')}`
+    }
+  }
+
+  if (sites.value.length > 0) {
+    const firstDomain = String(sites.value[0].domain || '').trim().toLowerCase()
+    if (firstDomain) return `mail.${firstDomain}`
+  }
+  return ''
+}
+
+function ensureMailDomainDefault() {
+  const current = String(mailForm.value.domain || '').trim().toLowerCase()
+  if (current) return
+  const preferred = preferredMailHostname()
+  if (preferred) {
+    mailForm.value.domain = preferred
+  }
+}
 
 watch(
   () => route.query.tab,
@@ -265,7 +301,7 @@ async function loadSites() {
       hostnameForm.value.domain = sites.value[0].domain
     }
     if (!mailForm.value.domain && sites.value.length > 0) {
-      mailForm.value.domain = `mail.${sites.value[0].domain}`
+      ensureMailDomainDefault()
     }
     if (!wildcardForm.value.domain && sites.value.length > 0) {
       wildcardForm.value.domain = sites.value[0].domain
@@ -279,6 +315,7 @@ async function loadBindings() {
   try {
     const res = await api.get('/ssl/bindings')
     bindings.value = res.data?.data || bindings.value
+    ensureMailDomainDefault()
   } catch {
     // best effort
   }

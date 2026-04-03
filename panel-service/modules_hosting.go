@@ -2441,15 +2441,24 @@ func (s *service) handleSSLDetails(w http.ResponseWriter, r *http.Request) {
 
 func (s *service) handleSSLHostnameIssue(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Domain string `json:"domain"`
+		Domain  string `json:"domain"`
+		Email   string `json:"email,omitempty"`
+		Webroot string `json:"webroot,omitempty"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid hostname SSL payload.")
 		return
 	}
 	domain := normalizeDomain(payload.Domain)
+	if domain == "" {
+		writeError(w, http.StatusBadRequest, "Hostname domain is required.")
+		return
+	}
 
-	webroot := "/usr/local/lsws/Example/html"
+	webroot := strings.TrimSpace(payload.Webroot)
+	if webroot == "" {
+		webroot = "/usr/local/lsws/Example/html"
+	}
 	_ = os.MkdirAll(webroot, 0o755)
 
 	if err := issueLetsEncryptCertificate([]string{domain}, webroot, false); err != nil {
@@ -2480,15 +2489,24 @@ func (s *service) handleSSLHostnameIssue(w http.ResponseWriter, r *http.Request)
 
 func (s *service) handleSSLMailIssue(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Domain string `json:"domain"`
+		Domain  string `json:"domain"`
+		Email   string `json:"email,omitempty"`
+		Webroot string `json:"webroot,omitempty"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid mail SSL payload.")
 		return
 	}
 	domain := normalizeDomain(payload.Domain)
+	if domain == "" {
+		writeError(w, http.StatusBadRequest, "Mail hostname is required.")
+		return
+	}
 
-	webroot := "/usr/local/lsws/Example/html"
+	webroot := strings.TrimSpace(payload.Webroot)
+	if webroot == "" {
+		webroot = "/usr/local/lsws/Example/html"
+	}
 	_ = os.MkdirAll(webroot, 0o755)
 
 	if err := issueLetsEncryptCertificate([]string{domain}, webroot, false); err != nil {
@@ -2540,15 +2558,24 @@ func (s *service) handleSSLMailIssue(w http.ResponseWriter, r *http.Request) {
 
 func (s *service) handleSSLWildcardIssue(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Domain string `json:"domain"`
+		Domain  string `json:"domain"`
+		Email   string `json:"email,omitempty"`
+		Webroot string `json:"webroot,omitempty"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid wildcard SSL payload.")
 		return
 	}
 	domain := normalizeDomain(payload.Domain)
+	if domain == "" {
+		writeError(w, http.StatusBadRequest, "Wildcard domain is required.")
+		return
+	}
 
-	webroot := "/usr/local/lsws/Example/html"
+	webroot := strings.TrimSpace(payload.Webroot)
+	if webroot == "" {
+		webroot = "/usr/local/lsws/Example/html"
+	}
 	_ = os.MkdirAll(webroot, 0o755)
 
 	if err := issueLetsEncryptCertificate([]string{domain, "*." + domain}, webroot, true); err != nil {
