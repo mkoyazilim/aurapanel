@@ -200,15 +200,23 @@ func applyPanelUpdateFromDeployScript(scheduleRestart bool) (panelUpdateResult, 
 		if err := runPanelUpdateStep(&result, "Run deploy pipeline (git pull + build)", "env", "AURAPANEL_DEPLOY_SKIP_RESTART=1", "bash", scriptPath); err != nil {
 			return result, err
 		}
-		if err := runPanelUpdateStep(&result, "Schedule API gateway restart (10s)", "systemd-run", "--unit", "aurapanel-api-delayed-restart", "--on-active=10", "systemctl", "restart", "aurapanel-api"); err != nil {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("API gateway restart could not be scheduled automatically: %v", err))
-			result.Warnings = append(result.Warnings, "Restart aurapanel-api manually to apply gateway changes.")
+		apiRestartScheduled := scheduleServiceRestartWithFallback(
+			&result,
+			"aurapanel-api",
+			"aurapanel-api-delayed-restart",
+			10,
+			true,
+		)
+		panelRestartScheduled := scheduleServiceRestartWithFallback(
+			&result,
+			"aurapanel-service",
+			"aurapanel-service-delayed-restart",
+			13,
+			false,
+		)
+		if apiRestartScheduled || panelRestartScheduled {
+			result.Warnings = append(result.Warnings, "Service restarts are scheduled in the background; brief reconnect may occur.")
 		}
-		if err := runPanelUpdateStep(&result, "Schedule panel-service restart (13s)", "systemd-run", "--unit", "aurapanel-service-delayed-restart", "--on-active=13", "systemctl", "restart", "aurapanel-service"); err != nil {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("Panel-service restart could not be scheduled automatically: %v", err))
-			result.Warnings = append(result.Warnings, "Restart aurapanel-service manually to apply backend changes.")
-		}
-		result.Warnings = append(result.Warnings, "Service restarts are scheduled in the background; brief reconnect may occur.")
 	} else {
 		if err := runPanelUpdateStep(&result, "Run deploy pipeline (git pull + build + restart)", "bash", scriptPath); err != nil {
 			return result, err
@@ -281,14 +289,48 @@ func applyPanelUpdateToRelease(target string) (panelUpdateResult, error) {
 	if err := runPanelUpdateStep(&result, "Restart API gateway", "systemctl", "restart", "aurapanel-api"); err != nil {
 		return result, err
 	}
-	if err := runPanelUpdateStep(&result, "Schedule panel-service restart", "systemd-run", "--unit", "aurapanel-service-delayed-restart", "--on-active=3", "systemctl", "restart", "aurapanel-service"); err != nil {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("Panel-service restart could not be scheduled automatically: %v", err))
-		result.Warnings = append(result.Warnings, "Restart aurapanel-service manually to apply backend code updates.")
-	} else {
+	if scheduleServiceRestartWithFallback(&result, "aurapanel-service", "aurapanel-service-delayed-restart", 3, false) {
 		result.Warnings = append(result.Warnings, "Panel-service restart is scheduled to run in a few seconds.")
 	}
 	result.CurrentVersion = resolveCurrentPanelVersion()
 	return result, nil
+}
+
+func scheduleServiceRestartWithFallback(result *panelUpdateResult, serviceName, unitName string, delaySeconds int, allowImmediate bool) bool {
+	scheduleTitle := fmt.Sprintf("Schedule %s restart (%ds)", serviceName, delaySeconds)
+	if err := runPanelUpdateStep(
+		result,
+		scheduleTitle,
+		"systemd-run",
+		"--unit", unitName,
+		fmt.Sprintf("--on-active=%d", delaySeconds),
+		"systemctl", "restart", serviceName,
+	); err == nil {
+		return true
+	} else {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("%s could not be scheduled via systemd-run: %v", serviceName, err))
+	}
+
+	// Fallback when transient units are restricted: detach a delayed restart shell.
+	fallbackTitle := fmt.Sprintf("Schedule %s restart via shell fallback (%ds)", serviceName, delaySeconds)
+	fallbackCmd := fmt.Sprintf("nohup bash -lc 'sleep %d; systemctl restart %s' >/dev/null 2>&1 &", delaySeconds, serviceName)
+	if err := runPanelUpdateStep(result, fallbackTitle, "sh", "-c", fallbackCmd); err == nil {
+		return true
+	} else {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("%s fallback scheduler failed: %v", serviceName, err))
+	}
+
+	if allowImmediate {
+		if err := runPanelUpdateStep(result, fmt.Sprintf("Restart %s immediately (fallback)", serviceName), "systemctl", "restart", serviceName); err == nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s was restarted immediately via fallback.", serviceName))
+			return true
+		} else {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s immediate restart fallback failed: %v", serviceName, err))
+		}
+	}
+
+	result.Warnings = append(result.Warnings, fmt.Sprintf("Restart %s manually to apply changes.", serviceName))
+	return false
 }
 
 func runPanelUpdateStep(result *panelUpdateResult, title string, command string, args ...string) error {
