@@ -248,8 +248,7 @@ const routes = [
       {
         path: 'ai-tools',
         name: 'AITools',
-        component: () => import('../views/AITools.vue'),
-        meta: { title: 'AI Tools' }
+        component: () => import('../views/AITools.vue')
       }
     ]
   }

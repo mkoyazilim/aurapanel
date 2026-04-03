@@ -2,13 +2,13 @@
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold text-white">AI Tools Orchestrator</h1>
+        <h1 class="text-2xl font-bold text-white">{{ t('ai_tools.title') }}</h1>
         <p class="mt-1 text-gray-400">
-          DeepSeek/Gemini planlayici + guvenli arac katmani (scan, servis, malware, shell).
+          {{ t('ai_tools.subtitle') }}
         </p>
       </div>
       <button class="btn-secondary" :disabled="loading" @click="loadAll">
-        {{ loading ? 'Yukleniyor...' : 'Yenile' }}
+        {{ loading ? t('ai_tools.actions.loading') : t('ai_tools.actions.refresh') }}
       </button>
     </div>
 
@@ -18,17 +18,17 @@
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <div class="aura-card">
-        <p class="text-xs uppercase tracking-[0.12em] text-gray-500">Aktif Provider</p>
+        <p class="text-xs uppercase tracking-[0.12em] text-gray-500">{{ t('ai_tools.overview.active_provider') }}</p>
         <p class="mt-2 text-lg font-semibold text-white">{{ provider.active_provider || '-' }}</p>
       </div>
       <div class="aura-card">
-        <p class="text-xs uppercase tracking-[0.12em] text-gray-500">Policy Durumu</p>
+        <p class="text-xs uppercase tracking-[0.12em] text-gray-500">{{ t('ai_tools.overview.policy_status') }}</p>
         <p class="mt-2 text-lg font-semibold" :class="policy.enabled ? 'text-emerald-300' : 'text-amber-200'">
-          {{ policy.enabled ? 'Enabled' : 'Disabled' }}
+          {{ policy.enabled ? t('ai_tools.overview.enabled') : t('ai_tools.overview.disabled') }}
         </p>
       </div>
       <div class="aura-card">
-        <p class="text-xs uppercase tracking-[0.12em] text-gray-500">Execution History</p>
+        <p class="text-xs uppercase tracking-[0.12em] text-gray-500">{{ t('ai_tools.overview.execution_history') }}</p>
         <p class="mt-2 text-lg font-semibold text-white">{{ history.length }}</p>
       </div>
     </div>
@@ -36,14 +36,14 @@
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <div class="aura-card space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-white">Provider Config</h2>
+          <h2 class="text-lg font-semibold text-white">{{ t('ai_tools.provider.title') }}</h2>
           <button class="btn-primary px-3 py-1.5 text-sm" :disabled="savingProvider" @click="saveProvider">
-            {{ savingProvider ? 'Kaydediliyor...' : 'Provider Kaydet' }}
+            {{ savingProvider ? t('ai_tools.actions.saving') : t('ai_tools.actions.save_provider') }}
           </button>
         </div>
 
         <label class="space-y-1 text-sm text-gray-300">
-          <span>Active Provider</span>
+          <span>{{ t('ai_tools.provider.active_provider') }}</span>
           <select v-model="provider.active_provider" class="aura-input w-full">
             <option value="deepseek">deepseek</option>
             <option value="gemini">gemini</option>
@@ -51,111 +51,121 @@
         </label>
 
         <div class="rounded-lg border border-panel-border p-3 space-y-2">
-          <p class="text-sm font-semibold text-white">DeepSeek</p>
+          <p class="text-sm font-semibold text-white">{{ t('ai_tools.provider.deepseek') }}</p>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="provider.deepseek.enabled" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Enabled</span>
+            <span>{{ t('ai_tools.provider.enabled') }}</span>
           </label>
-          <input v-model.trim="provider.deepseek.model" class="aura-input w-full" placeholder="Model" />
-          <input v-model.trim="provider.deepseek.base_url" class="aura-input w-full" placeholder="Base URL" />
-          <input v-model.trim="providerSecrets.deepseek_api_key" type="password" class="aura-input w-full" placeholder="Yeni API Key (opsiyonel)" />
+          <input v-model.trim="provider.deepseek.model" class="aura-input w-full" :placeholder="t('ai_tools.provider.model_placeholder')" />
+          <input v-model.trim="provider.deepseek.base_url" class="aura-input w-full" :placeholder="t('ai_tools.provider.base_url_placeholder')" />
+          <input
+            v-model.trim="providerSecrets.deepseek_api_key"
+            type="password"
+            class="aura-input w-full"
+            :placeholder="t('ai_tools.provider.new_api_key_placeholder')"
+          />
           <label class="inline-flex items-center gap-2 text-xs text-gray-400">
             <input v-model="providerSecrets.clear_deepseek_key" type="checkbox" class="h-3.5 w-3.5 accent-brand-500" />
-            <span>Key temizle</span>
+            <span>{{ t('ai_tools.provider.clear_key') }}</span>
           </label>
-          <p class="text-xs text-gray-500">Stored: {{ provider.deepseek.masked_api_key || '-' }}</p>
+          <p class="text-xs text-gray-500">{{ t('ai_tools.provider.stored_key') }}: {{ provider.deepseek.masked_api_key || '-' }}</p>
         </div>
 
         <div class="rounded-lg border border-panel-border p-3 space-y-2">
-          <p class="text-sm font-semibold text-white">Gemini</p>
+          <p class="text-sm font-semibold text-white">{{ t('ai_tools.provider.gemini') }}</p>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="provider.gemini.enabled" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Enabled</span>
+            <span>{{ t('ai_tools.provider.enabled') }}</span>
           </label>
-          <input v-model.trim="provider.gemini.model" class="aura-input w-full" placeholder="Model" />
-          <input v-model.trim="provider.gemini.base_url" class="aura-input w-full" placeholder="Base URL" />
-          <input v-model.trim="providerSecrets.gemini_api_key" type="password" class="aura-input w-full" placeholder="Yeni API Key (opsiyonel)" />
+          <input v-model.trim="provider.gemini.model" class="aura-input w-full" :placeholder="t('ai_tools.provider.model_placeholder')" />
+          <input v-model.trim="provider.gemini.base_url" class="aura-input w-full" :placeholder="t('ai_tools.provider.base_url_placeholder')" />
+          <input
+            v-model.trim="providerSecrets.gemini_api_key"
+            type="password"
+            class="aura-input w-full"
+            :placeholder="t('ai_tools.provider.new_api_key_placeholder')"
+          />
           <label class="inline-flex items-center gap-2 text-xs text-gray-400">
             <input v-model="providerSecrets.clear_gemini_key" type="checkbox" class="h-3.5 w-3.5 accent-brand-500" />
-            <span>Key temizle</span>
+            <span>{{ t('ai_tools.provider.clear_key') }}</span>
           </label>
-          <p class="text-xs text-gray-500">Stored: {{ provider.gemini.masked_api_key || '-' }}</p>
+          <p class="text-xs text-gray-500">{{ t('ai_tools.provider.stored_key') }}: {{ provider.gemini.masked_api_key || '-' }}</p>
         </div>
       </div>
 
       <div class="aura-card space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-white">Policy</h2>
+          <h2 class="text-lg font-semibold text-white">{{ t('ai_tools.policy.title') }}</h2>
           <button class="btn-primary px-3 py-1.5 text-sm" :disabled="savingPolicy" @click="savePolicy">
-            {{ savingPolicy ? 'Kaydediliyor...' : 'Policy Kaydet' }}
+            {{ savingPolicy ? t('ai_tools.actions.saving') : t('ai_tools.actions.save_policy') }}
           </button>
         </div>
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="policy.enabled" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>AI Enabled</span>
+            <span>{{ t('ai_tools.policy.ai_enabled') }}</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="policy.allow_shell" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Allow Shell</span>
+            <span>{{ t('ai_tools.policy.allow_shell') }}</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="policy.allow_privileged_shell" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Allow Privileged Shell</span>
+            <span>{{ t('ai_tools.policy.allow_privileged_shell') }}</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="policy.allow_service_control" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Allow Service Control</span>
+            <span>{{ t('ai_tools.policy.allow_service_control') }}</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="policy.allow_malware_scan" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Allow Malware Scan</span>
+            <span>{{ t('ai_tools.policy.allow_malware_scan') }}</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="policy.require_confirm_token" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Require Confirm Token</span>
+            <span>{{ t('ai_tools.policy.require_confirm_token') }}</span>
           </label>
         </div>
 
-        <input v-model.trim="policy.confirm_token" class="aura-input w-full" placeholder="Confirm Token" />
+        <input v-model.trim="policy.confirm_token" class="aura-input w-full" :placeholder="t('ai_tools.policy.confirm_token_placeholder')" />
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <input v-model.number="policy.max_command_timeout_seconds" type="number" min="2" max="120" class="aura-input" placeholder="Max Timeout (s)" />
-          <input v-model.number="policy.max_output_chars" type="number" min="512" max="20000" class="aura-input" placeholder="Max Output Chars" />
-          <input v-model.trim="policy.default_cwd" class="aura-input" placeholder="Default CWD" />
+          <input v-model.number="policy.max_command_timeout_seconds" type="number" min="2" max="120" class="aura-input" :placeholder="t('ai_tools.policy.max_timeout_placeholder')" />
+          <input v-model.number="policy.max_output_chars" type="number" min="512" max="20000" class="aura-input" :placeholder="t('ai_tools.policy.max_output_placeholder')" />
+          <input v-model.trim="policy.default_cwd" class="aura-input" :placeholder="t('ai_tools.policy.default_cwd_placeholder')" />
         </div>
-        <textarea v-model="allowedPrefixesText" class="aura-input min-h-28 w-full font-mono text-xs" placeholder="Allowed command prefixes (comma/newline)" />
+        <textarea v-model="allowedPrefixesText" class="aura-input min-h-28 w-full font-mono text-xs" :placeholder="t('ai_tools.policy.allowed_prefixes_placeholder')" />
       </div>
     </div>
 
     <div class="aura-card space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-white">Planner</h2>
-          <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold text-white">{{ t('ai_tools.planner.title') }}</h2>
+        <div class="flex items-center gap-3">
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="autoAskAndRun" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Onay Sor + Otomatik Calistir</span>
+            <span>{{ t('ai_tools.planner.auto_ask_and_run') }}</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-gray-300">
             <input v-model="executeDryRun" type="checkbox" class="h-4 w-4 accent-brand-500" />
-            <span>Dry Run</span>
+            <span>{{ t('ai_tools.planner.dry_run') }}</span>
           </label>
-          <input v-model.trim="confirmTokenInput" class="aura-input w-52" placeholder="Confirm token" />
+          <input v-model.trim="confirmTokenInput" class="aura-input w-52" :placeholder="t('ai_tools.planner.confirm_token_placeholder')" />
           <button class="btn-primary px-3 py-1.5 text-sm" :disabled="planning" @click="generatePlan">
-            {{ planning ? 'Plan olusturuluyor...' : 'Plan Uret' }}
+            {{ planning ? t('ai_tools.actions.planning') : t('ai_tools.actions.generate_plan') }}
           </button>
           <button class="btn-secondary px-3 py-1.5 text-sm" :disabled="executing || !plan.id" @click="executePlanAll">
-            {{ executing ? 'Calisiyor...' : 'Plani Toplu Calistir' }}
+            {{ executing ? t('ai_tools.actions.running') : t('ai_tools.actions.execute_plan_all') }}
           </button>
         </div>
       </div>
 
-      <textarea v-model.trim="prompt" class="aura-input min-h-32 w-full" placeholder="Ornek: Sunucuyu tara, riskli bulgulari raporla, gerekli servisleri dry-run ile yeniden baslat" />
+      <textarea v-model.trim="prompt" class="aura-input min-h-32 w-full" :placeholder="t('ai_tools.planner.prompt_placeholder')" />
 
       <div v-if="plan.id" class="rounded-lg border border-panel-border p-3 space-y-3">
         <p class="text-sm text-gray-300">
-          <span class="font-semibold text-white">Plan:</span> {{ plan.summary }}
-          <span class="text-gray-500"> · {{ plan.provider }}/{{ plan.model }}</span>
+          <span class="font-semibold text-white">{{ t('ai_tools.planner.plan_label') }}:</span> {{ plan.summary }}
+          <span class="text-gray-500"> - {{ plan.provider }}/{{ plan.model }}</span>
         </p>
         <div class="space-y-2">
           <div v-for="step in plan.steps" :key="step.id" class="rounded-lg border border-panel-border/80 bg-panel-dark p-3">
@@ -164,7 +174,7 @@
                 {{ step.tool }} <span class="text-xs text-gray-400">({{ step.risk }})</span>
               </p>
               <button class="btn-primary px-2 py-1 text-xs" :disabled="executingStepId === step.id" @click="executePlanStep(step)">
-                {{ executingStepId === step.id ? 'Calisiyor...' : 'Adimi Calistir' }}
+                {{ executingStepId === step.id ? t('ai_tools.actions.running') : t('ai_tools.actions.execute_step') }}
               </button>
             </div>
             <p class="mt-1 text-xs text-gray-400">{{ step.reason }}</p>
@@ -176,7 +186,7 @@
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <div class="aura-card space-y-4">
-        <h2 class="text-lg font-semibold text-white">Quick Execute</h2>
+        <h2 class="text-lg font-semibold text-white">{{ t('ai_tools.quick_execute.title') }}</h2>
         <div class="space-y-2">
           <button
             v-for="item in catalog"
@@ -185,45 +195,45 @@
             :disabled="executing || !item.enabled"
             @click="runCatalogTool(item)"
           >
-            {{ item.id }} - {{ item.enabled ? 'run' : 'blocked' }}
+            {{ item.id }} - {{ item.enabled ? t('ai_tools.quick_execute.run') : t('ai_tools.quick_execute.blocked') }}
           </button>
         </div>
 
         <div class="rounded-lg border border-panel-border p-3 space-y-2">
-          <p class="text-sm font-semibold text-white">Shell Runner</p>
-          <input v-model.trim="shellForm.command" class="aura-input w-full font-mono text-xs" placeholder="command" />
+          <p class="text-sm font-semibold text-white">{{ t('ai_tools.quick_execute.shell_runner') }}</p>
+          <input v-model.trim="shellForm.command" class="aura-input w-full font-mono text-xs" :placeholder="t('ai_tools.quick_execute.command_placeholder')" />
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <input v-model.trim="shellForm.cwd" class="aura-input" placeholder="cwd" />
-            <input v-model.number="shellForm.timeout_seconds" type="number" min="2" max="120" class="aura-input" placeholder="timeout" />
+            <input v-model.trim="shellForm.cwd" class="aura-input" :placeholder="t('ai_tools.quick_execute.cwd_placeholder')" />
+            <input v-model.number="shellForm.timeout_seconds" type="number" min="2" max="120" class="aura-input" :placeholder="t('ai_tools.quick_execute.timeout_placeholder')" />
             <label class="inline-flex items-center gap-2 text-sm text-gray-300">
               <input v-model="shellForm.privileged" type="checkbox" class="h-4 w-4 accent-brand-500" />
-              <span>privileged</span>
+              <span>{{ t('ai_tools.quick_execute.privileged') }}</span>
             </label>
           </div>
           <button class="btn-primary w-full" :disabled="executing" @click="runShell">
-            Shell Calistir
+            {{ t('ai_tools.actions.run_shell') }}
           </button>
         </div>
       </div>
 
       <div class="aura-card space-y-4">
-        <h2 class="text-lg font-semibold text-white">Last Result</h2>
+        <h2 class="text-lg font-semibold text-white">{{ t('ai_tools.result.title') }}</h2>
         <pre class="max-h-96 overflow-auto rounded bg-panel-dark p-3 text-xs text-gray-300">{{ formatJSON(lastResult) }}</pre>
       </div>
     </div>
 
     <div class="aura-card space-y-3">
-      <h2 class="text-lg font-semibold text-white">History</h2>
+      <h2 class="text-lg font-semibold text-white">{{ t('ai_tools.history.title') }}</h2>
       <div class="overflow-auto rounded-lg border border-panel-border">
         <table class="min-w-full text-left text-xs">
           <thead class="bg-panel-dark text-gray-400">
             <tr>
-              <th class="px-3 py-2">Tool</th>
-              <th class="px-3 py-2">Status</th>
-              <th class="px-3 py-2">Risk</th>
-              <th class="px-3 py-2">Dry</th>
-              <th class="px-3 py-2">By</th>
-              <th class="px-3 py-2">Time</th>
+              <th class="px-3 py-2">{{ t('ai_tools.history.headers.tool') }}</th>
+              <th class="px-3 py-2">{{ t('ai_tools.history.headers.status') }}</th>
+              <th class="px-3 py-2">{{ t('ai_tools.history.headers.risk') }}</th>
+              <th class="px-3 py-2">{{ t('ai_tools.history.headers.dry') }}</th>
+              <th class="px-3 py-2">{{ t('ai_tools.history.headers.by') }}</th>
+              <th class="px-3 py-2">{{ t('ai_tools.history.headers.time') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -231,7 +241,7 @@
               <td class="px-3 py-2">{{ entry.tool }}</td>
               <td class="px-3 py-2">{{ entry.status }}</td>
               <td class="px-3 py-2">{{ entry.risk }}</td>
-              <td class="px-3 py-2">{{ entry.dry_run ? 'yes' : 'no' }}</td>
+              <td class="px-3 py-2">{{ entry.dry_run ? t('ai_tools.history.yes') : t('ai_tools.history.no') }}</td>
               <td class="px-3 py-2">{{ entry.requested_by || '-' }}</td>
               <td class="px-3 py-2">{{ formatTimestamp(entry.requested_at) }}</td>
             </tr>
@@ -244,7 +254,10 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../services/api'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const AI_TOOLS_AUTO_ASK_AND_RUN_KEY = 'aurapanel:ai-tools:auto-ask-and-run'
 const AI_TOOLS_DRY_RUN_KEY = 'aurapanel:ai-tools:dry-run'
@@ -285,7 +298,7 @@ const allowedPrefixesText = ref('')
 const catalog = ref([])
 const history = ref([])
 const plan = ref({ id: '', summary: '', provider: '', model: '', steps: [] })
-const prompt = ref('Sunucuyu tara, kritik bulgu varsa servisleri kontrollu sekilde yeniden baslatmadan once onay iste.')
+const prompt = ref(t('ai_tools.planner.default_prompt'))
 const executeDryRun = ref(true)
 const autoAskAndRun = ref(true)
 const confirmTokenInput = ref('')
@@ -362,7 +375,7 @@ async function loadAll() {
     history.value = Array.isArray(historyRes.data?.data) ? historyRes.data.data : []
     shellForm.value.cwd = policy.value.default_cwd || '/home'
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Yukleme hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.load_failed'), 'error')
   } finally {
     loading.value = false
   }
@@ -394,9 +407,9 @@ async function saveProvider() {
     providerSecrets.value.clear_deepseek_key = false
     providerSecrets.value.clear_gemini_key = false
     await loadAll()
-    setNotice('Provider ayarlari kaydedildi.', 'success')
+    setNotice(t('ai_tools.messages.provider_saved'), 'success')
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Provider kaydetme hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.provider_save_failed'), 'error')
   } finally {
     savingProvider.value = false
   }
@@ -420,9 +433,9 @@ async function savePolicy() {
     }
     await api.post('/ai/tools/policy', payload)
     await loadAll()
-    setNotice('Policy kaydedildi.', 'success')
+    setNotice(t('ai_tools.messages.policy_saved'), 'success')
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Policy kaydetme hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.policy_save_failed'), 'error')
   } finally {
     savingPolicy.value = false
   }
@@ -435,14 +448,14 @@ async function generatePlan() {
     const data = res.data?.data || {}
     plan.value = data.plan || { id: '', summary: '', provider: '', model: '', steps: [] }
     if (data.fallback_reason) {
-      setNotice(`Fallback plan: ${data.fallback_reason}`, 'warning')
+      setNotice(t('ai_tools.messages.fallback_plan', { reason: data.fallback_reason }), 'warning')
     } else {
-      setNotice('Plan olusturuldu.', 'success')
+      setNotice(t('ai_tools.messages.plan_created'), 'success')
     }
 
     await maybeAutoExecuteAfterApproval()
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Plan olusturma hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.plan_create_failed'), 'error')
   } finally {
     planning.value = false
   }
@@ -454,14 +467,17 @@ async function maybeAutoExecuteAfterApproval() {
   if (typeof window === 'undefined') return
 
   const summaryRows = plan.value.steps
-    .map((step, index) => `${index + 1}. ${step.tool} (${step.risk || 'medium'})`)
+    .map((step, index) => `${index + 1}. ${step.tool} (${step.risk || t('ai_tools.planner.risk_fallback')})`)
     .join('\n')
 
   const approved = window.confirm(
-    `Plan hazir.\n\n${summaryRows}\n\nDry-run: ${executeDryRun.value ? 'yes' : 'no'}\n\nTum adimlari otomatik calistirmak istiyor musun?`,
+    t('ai_tools.dialogs.auto_execute_confirm', {
+      summary: summaryRows,
+      dryRun: executeDryRun.value ? t('ai_tools.history.yes') : t('ai_tools.history.no'),
+    }),
   )
   if (!approved) {
-    setNotice('Plan hazir. Calistirma kullanici onayina birakildi.', 'warning')
+    setNotice(t('ai_tools.messages.awaiting_manual_approval'), 'warning')
     return
   }
 
@@ -471,11 +487,13 @@ async function maybeAutoExecuteAfterApproval() {
     !String(confirmTokenInput.value || '').trim()
   ) {
     const token = window.prompt(
-      `Canli calisma icin confirm token gerekli.\nBeklenen token: ${policy.value?.confirm_token || '(hidden)'}\n\nToken gir:`,
+      t('ai_tools.dialogs.confirm_token_prompt', {
+        expected: policy.value?.confirm_token || t('ai_tools.dialogs.hidden_token'),
+      }),
       '',
     )
     if (token === null || !String(token).trim()) {
-      setNotice('Token girilmedigi icin otomatik calistirma iptal edildi.', 'warning')
+      setNotice(t('ai_tools.messages.auto_execute_cancelled_no_token'), 'warning')
       return
     }
     confirmTokenInput.value = String(token).trim()
@@ -496,9 +514,9 @@ async function executePlanStep(step) {
     })
     lastResult.value = res.data?.data || {}
     await loadAll()
-    setNotice('Plan adimi calistirildi.', 'success')
+    setNotice(t('ai_tools.messages.step_executed'), 'success')
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Adim calistirma hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.step_execute_failed'), 'error')
   } finally {
     executingStepId.value = ''
   }
@@ -516,9 +534,9 @@ async function executePlanAll() {
     })
     lastResult.value = res.data?.data || {}
     await loadAll()
-    setNotice('Plan toplu calistirildi.', 'success')
+    setNotice(t('ai_tools.messages.plan_executed_all'), 'success')
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Toplu calistirma hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.plan_execute_all_failed'), 'error')
   } finally {
     executing.value = false
   }
@@ -536,13 +554,13 @@ async function runCatalogTool(item) {
       args,
       dry_run: !!executeDryRun.value,
       confirm_token: confirmTokenInput.value || '',
-      prompt: 'Quick execute from UI',
+      prompt: t('ai_tools.quick_execute.backend_prompt'),
     })
     lastResult.value = res.data?.data || {}
     await loadAll()
-    setNotice(`${item.id} calistirildi.`, 'success')
+    setNotice(t('ai_tools.messages.tool_executed', { tool: item.id }), 'success')
   } catch (err) {
-    setNotice(err?.response?.data?.message || err?.message || 'Quick execute hatasi.', 'error')
+    setNotice(err?.response?.data?.message || err?.message || t('ai_tools.messages.quick_execute_failed'), 'error')
   } finally {
     executing.value = false
   }

@@ -423,7 +423,7 @@
                 <span>{{ t('panel_update.title') }}</span>
               </router-link>
               <router-link v-if="can('/ai-tools')" to="/ai-tools" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>AI Tools</span>
+                <span>{{ t('routes.AITools') }}</span>
               </router-link>
             </div>
           </transition>
@@ -689,7 +689,7 @@ const routeTitleKeys = {
   CloudLinux: 'routes.CloudLinux',
   PanelPort: 'routes.PanelPort',
   PanelUpdate: 'panel_update.title',
-  AITools: 'AI Tools',
+  AITools: 'routes.AITools',
   Backups: 'routes.Backups',
   OlsTuning: 'routes.OlsTuning',
   MailTuning: 'Mail Tuning',
@@ -786,7 +786,7 @@ const commandItems = computed(() => [
   { label: t('routes.CloudLinux'), path: '/cloudlinux' },
   { label: t('layout.links.panel_port'), path: '/panel-control' },
   { label: t('panel_update.title'), path: '/panel-update' },
-  { label: 'AI Tools', path: '/ai-tools' },
+  { label: t('routes.AITools'), path: '/ai-tools' },
   { label: t('routes.Docker Images'), path: '/docker/images' },
   { label: t('routes.Docker Containers'), path: '/docker/containers' },
   { label: t('routes.Docker App Store'), path: '/docker/apps' },
