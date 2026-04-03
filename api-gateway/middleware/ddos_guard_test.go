@@ -83,3 +83,63 @@ func TestDDoSGuardMiddlewareAuthLimit(t *testing.T) {
 		t.Fatalf("expected auth burst to be rate-limited, got %d", lastCode)
 	}
 }
+
+func TestDDoSGuardIgnoresXFFFromUntrustedSource(t *testing.T) {
+	t.Setenv("AURAPANEL_DDOS_ENABLED", "1")
+	t.Setenv("AURAPANEL_DDOS_PROFILE", "standard")
+	t.Setenv("AURAPANEL_DDOS_GLOBAL_RPS", "1")
+	t.Setenv("AURAPANEL_DDOS_GLOBAL_BURST", "1")
+	t.Setenv("AURAPANEL_DDOS_AUTH_RPS", "100")
+	t.Setenv("AURAPANEL_DDOS_AUTH_BURST", "100")
+
+	handler := DDoSGuardMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	lastCode := http.StatusNoContent
+	for idx := 0; idx < 6; idx++ {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/status/services", nil)
+		req.RemoteAddr = "198.51.100.40:1111"
+		if idx%2 == 0 {
+			req.Header.Set("X-Forwarded-For", "127.0.0.1")
+		} else {
+			req.Header.Set("X-Forwarded-For", "203.0.113.99")
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		lastCode = rec.Code
+	}
+	if lastCode != http.StatusTooManyRequests {
+		t.Fatalf("expected untrusted XFF to be ignored and requests to be rate-limited, got %d", lastCode)
+	}
+}
+
+func TestDDoSGuardUsesXFFFromTrustedProxy(t *testing.T) {
+	t.Setenv("AURAPANEL_DDOS_ENABLED", "1")
+	t.Setenv("AURAPANEL_DDOS_PROFILE", "standard")
+	t.Setenv("AURAPANEL_DDOS_GLOBAL_RPS", "1")
+	t.Setenv("AURAPANEL_DDOS_GLOBAL_BURST", "1")
+	t.Setenv("AURAPANEL_DDOS_AUTH_RPS", "100")
+	t.Setenv("AURAPANEL_DDOS_AUTH_BURST", "100")
+	t.Setenv("AURAPANEL_TRUSTED_PROXY_CIDRS", "127.0.0.0/8")
+
+	handler := DDoSGuardMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	first := httptest.NewRequest(http.MethodGet, "/api/v1/status/services", nil)
+	first.RemoteAddr = "127.0.0.1:1111"
+	first.Header.Set("X-Forwarded-For", "203.0.113.10")
+	rec1 := httptest.NewRecorder()
+	handler.ServeHTTP(rec1, first)
+
+	second := httptest.NewRequest(http.MethodGet, "/api/v1/status/services", nil)
+	second.RemoteAddr = "127.0.0.1:2222"
+	second.Header.Set("X-Forwarded-For", "203.0.113.11")
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, second)
+
+	if rec1.Code != http.StatusNoContent || rec2.Code != http.StatusNoContent {
+		t.Fatalf("expected requests with distinct trusted XFF ips to pass, got %d and %d", rec1.Code, rec2.Code)
+	}
+}

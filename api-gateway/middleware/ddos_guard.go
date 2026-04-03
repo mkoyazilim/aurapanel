@@ -3,6 +3,7 @@ package middleware
 import (
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -17,15 +18,17 @@ const (
 	ddosEnvGlobalBurst = "AURAPANEL_DDOS_GLOBAL_BURST"
 	ddosEnvAuthRPS     = "AURAPANEL_DDOS_AUTH_RPS"
 	ddosEnvAuthBurst   = "AURAPANEL_DDOS_AUTH_BURST"
+	ddosEnvTrustedCIDR = "AURAPANEL_TRUSTED_PROXY_CIDRS"
 )
 
 type ddosGuardConfig struct {
-	Enabled     bool
-	Profile     string
-	GlobalRPS   float64
-	GlobalBurst float64
-	AuthRPS     float64
-	AuthBurst   float64
+	Enabled          bool
+	Profile          string
+	GlobalRPS        float64
+	GlobalBurst      float64
+	AuthRPS          float64
+	AuthBurst        float64
+	TrustedProxyCIDR []netip.Prefix
 }
 
 type ddosBucket struct {
@@ -54,12 +57,12 @@ func DDoSGuardMiddleware(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if shouldBypassDDoSGuard(r) {
+		if shouldBypassDDoSGuard(r, cfg.TrustedProxyCIDR) {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		clientIP := ddosClientIP(r)
+		clientIP := ddosClientIP(r, cfg.TrustedProxyCIDR)
 		if clientIP == "" {
 			clientIP = "unknown"
 		}
@@ -112,12 +115,13 @@ func loadDDoSGuardConfig() ddosGuardConfig {
 	authBurst := parseEnvIntOr(os.Getenv(ddosEnvAuthBurst), defaultAuthBurst, authRPS, 5000)
 
 	return ddosGuardConfig{
-		Enabled:     enabled,
-		Profile:     profile,
-		GlobalRPS:   float64(globalRPS),
-		GlobalBurst: float64(globalBurst),
-		AuthRPS:     float64(authRPS),
-		AuthBurst:   float64(authBurst),
+		Enabled:          enabled,
+		Profile:          profile,
+		GlobalRPS:        float64(globalRPS),
+		GlobalBurst:      float64(globalBurst),
+		AuthRPS:          float64(authRPS),
+		AuthBurst:        float64(authBurst),
+		TrustedProxyCIDR: parseTrustedProxyCIDRs(os.Getenv(ddosEnvTrustedCIDR)),
 	}
 }
 
@@ -175,7 +179,7 @@ func (s *ddosLimiterState) cleanupExpiredLocked(now time.Time) {
 	}
 }
 
-func shouldBypassDDoSGuard(r *http.Request) bool {
+func shouldBypassDDoSGuard(r *http.Request, trusted []netip.Prefix) bool {
 	if r == nil || r.URL == nil {
 		return true
 	}
@@ -184,18 +188,19 @@ func shouldBypassDDoSGuard(r *http.Request) bool {
 		return true
 	}
 
-	ip := ddosClientIP(r)
+	ip := ddosClientIP(r, trusted)
 	if parsed := net.ParseIP(ip); parsed != nil && parsed.IsLoopback() {
 		return true
 	}
 	return false
 }
 
-func ddosClientIP(r *http.Request) string {
+func ddosClientIP(r *http.Request, trusted []netip.Prefix) string {
 	if r == nil {
 		return ""
 	}
-	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+	remoteIP := remoteAddrIP(r.RemoteAddr)
+	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" && trustedProxySource(remoteIP, trusted) {
 		first := xff
 		if idx := strings.Index(first, ","); idx >= 0 {
 			first = first[:idx]
@@ -204,13 +209,85 @@ func ddosClientIP(r *http.Request) string {
 		if host, _, err := net.SplitHostPort(first); err == nil {
 			first = strings.TrimSpace(host)
 		}
-		return first
+		if parsed := net.ParseIP(first); parsed != nil {
+			return parsed.String()
+		}
 	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil {
-		return strings.TrimSpace(host)
+	if remoteIP != "" {
+		return remoteIP
 	}
 	return strings.TrimSpace(r.RemoteAddr)
+}
+
+func remoteAddrIP(remoteAddr string) string {
+	value := strings.TrimSpace(remoteAddr)
+	if value == "" {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(value)
+	if err != nil {
+		host = value
+	}
+	host = strings.Trim(strings.TrimSpace(host), "[]")
+	if parsed := net.ParseIP(host); parsed != nil {
+		return parsed.String()
+	}
+	return ""
+}
+
+func trustedProxySource(remoteIP string, trusted []netip.Prefix) bool {
+	if remoteIP == "" {
+		return false
+	}
+	addr, err := netip.ParseAddr(remoteIP)
+	if err != nil {
+		return false
+	}
+	for _, prefix := range trusted {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseTrustedProxyCIDRs(raw string) []netip.Prefix {
+	defaults := []string{"127.0.0.0/8", "::1/128"}
+	values := defaults
+	if strings.TrimSpace(raw) != "" {
+		values = strings.Split(raw, ",")
+	}
+
+	parsed := make([]netip.Prefix, 0, len(values))
+	for _, item := range values {
+		candidate := strings.TrimSpace(item)
+		if candidate == "" {
+			continue
+		}
+		if strings.Contains(candidate, "/") {
+			prefix, err := netip.ParsePrefix(candidate)
+			if err != nil {
+				continue
+			}
+			parsed = append(parsed, prefix.Masked())
+			continue
+		}
+		addr, err := netip.ParseAddr(candidate)
+		if err != nil {
+			continue
+		}
+		bits := 32
+		if addr.Is6() {
+			bits = 128
+		}
+		parsed = append(parsed, netip.PrefixFrom(addr, bits).Masked())
+	}
+	if len(parsed) == 0 {
+		loopback4, _ := netip.ParsePrefix("127.0.0.0/8")
+		loopback6, _ := netip.ParsePrefix("::1/128")
+		return []netip.Prefix{loopback4, loopback6}
+	}
+	return parsed
 }
 
 func isDDoSAuthPath(path string) bool {

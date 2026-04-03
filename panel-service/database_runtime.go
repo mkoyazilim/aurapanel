@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,8 +13,7 @@ func sqlQuote(value string) string {
 }
 
 func commandOutputTrimmed(command string, args ...string) (string, error) {
-	cmd := exec.Command(command, args...)
-	output, err := cmd.CombinedOutput()
+	output, err := runCommandCombinedOutput(command, args...)
 	if err != nil {
 		return "", fmt.Errorf("%s", strings.TrimSpace(string(output)))
 	}

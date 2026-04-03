@@ -42,6 +42,12 @@ const (
 	serviceFailureWindow     = 10 * time.Minute
 	serviceLockDuration      = 15 * time.Minute
 
+	defaultStatePersistDebounce   = 900 * time.Millisecond
+	defaultHousekeepingInterval   = 60 * time.Second
+	defaultSecurityStatusCacheTTL = 8 * time.Second
+	securityStatusRateWindow      = 10 * time.Second
+	securityStatusNonAdminLimit   = 8
+
 	defaultGitHubReleaseTimeout = 12 * time.Second
 	defaultGitHubRetryAttempts  = 3
 )
@@ -295,6 +301,15 @@ type service struct {
 	dbACLReloadInFlight bool
 	dbACLReloadNeeded   bool
 	dbACLLastReload     time.Time
+	persistQueue        chan struct{}
+	persistDebounce     time.Duration
+	housekeepingEvery   time.Duration
+
+	securityMu              sync.Mutex
+	securityStatusTTL       time.Duration
+	securityStatusCache     securitySnapshot
+	securityStatusCacheTime time.Time
+	securityStatusRate      map[string]securityStatusRateWindowState
 }
 
 type jwtClaims struct {
@@ -342,20 +357,35 @@ func main() {
 	}
 
 	log.Printf("AuraPanel panel-service listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, svc.routes()))
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           svc.routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(server.ListenAndServe())
 }
 
 func newService() *service {
 	svc := &service{
-		startedAt: time.Now().UTC(),
-		state:     seedState(),
-		modules:   seedModuleState(),
+		startedAt:          time.Now().UTC(),
+		state:              seedState(),
+		modules:            seedModuleState(),
+		persistQueue:       make(chan struct{}, 1),
+		persistDebounce:    statePersistDebounce(),
+		housekeepingEvery:  housekeepingInterval(),
+		securityStatusTTL:  securityStatusCacheTTL(),
+		securityStatusRate: map[string]securityStatusRateWindowState{},
 	}
 	if err := svc.loadRuntimeState(); err != nil {
 		log.Printf("runtime state load skipped: %v", err)
 	}
 	svc.bootstrapModules()
 	svc.initializeDBToolAccessRuntime()
+	svc.startStatePersistenceWorker()
+	svc.startHousekeepingWorker()
 	return svc
 }
 
@@ -947,9 +977,7 @@ func persistenceMiddleware(next http.Handler, svc *service) http.Handler {
 		// ama guvenlik amaciyla genel olarak mutation sonrasi state'i senkronize etmekte fayda var.
 		// Sadece validation hatalarinda (400) eger hicbir sey degismediyse diye pas geciyorduk,
 		// ancak biz simdilik her halukarda save yapalim ki state ile in-memory kopmasin.
-		if err := svc.saveRuntimeState(); err != nil {
-			log.Printf("runtime state save failed after %s %s: %v", r.Method, r.URL.Path, err)
-		}
+		svc.enqueueStatePersist()
 	})
 }
 
@@ -1065,7 +1093,7 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/panel-reverse-domain":
 		s.handlePanelReverseDomainSet(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/security/status":
-		s.handleSecurityStatus(w)
+		s.handleSecurityStatus(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudflare/status":
 		s.handleCloudflareStatus(w)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/cloudflare/server-auth":
@@ -2946,8 +2974,19 @@ func (s *service) handlePanelReverseDomainSet(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (s *service) handleSecurityStatus(w http.ResponseWriter) {
-	snapshot := collectSecuritySnapshot()
+func (s *service) handleSecurityStatus(w http.ResponseWriter, r *http.Request) {
+	now := time.Now().UTC()
+	role := "user"
+	if principal, ok := principalFromContext(r.Context()); ok {
+		role = normalizeRole(principal.Role)
+	}
+	clientIP := serviceClientIP(r)
+	if !s.allowSecurityStatusRequest(role, clientIP, now) {
+		writeError(w, http.StatusTooManyRequests, "Too many security status requests. Please retry shortly.")
+		return
+	}
+
+	snapshot := s.cachedSecuritySnapshot(now)
 	twoFAEnabled := false
 	s.mu.RLock()
 	for _, user := range s.state.Users {

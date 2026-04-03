@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aurapanel/api-gateway/controllers"
 	"github.com/aurapanel/api-gateway/handlers"
@@ -131,5 +132,13 @@ func main() {
 
 	listenAddr := gatewayAddr()
 	fmt.Printf("API Gateway listening on %s\n", listenAddr)
-	log.Fatal(http.ListenAndServe(listenAddr, mainRouter))
+	server := &http.Server{
+		Addr:              listenAddr,
+		Handler:           mainRouter,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(server.ListenAndServe())
 }

@@ -176,8 +176,7 @@ func collectHostProcesses(limit int) []ProcessInfo {
 		return []ProcessInfo{}
 	}
 
-	cmd := exec.Command("ps", "-eo", "pid,user,%cpu,%mem,comm", "--sort=-%cpu")
-	output, err := cmd.Output()
+	output, err := runCommandOutputWithTimeout(8*time.Second, "ps", "-eo", "pid,user,%cpu,%mem,comm", "--sort=-%cpu")
 	if err != nil {
 		return []ProcessInfo{}
 	}
@@ -225,8 +224,7 @@ func executeServiceAction(serviceName, action string) error {
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("service control is only available on linux hosts")
 	}
-	cmd := exec.Command("systemctl", action, unit)
-	return cmd.Run()
+	return runCommandWithTimeout(45*time.Second, "systemctl", action, unit)
 }
 
 func terminateProcess(pid int) error {
@@ -236,8 +234,7 @@ func terminateProcess(pid int) error {
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("process control is only available on linux hosts")
 	}
-	cmd := exec.Command("kill", "-TERM", strconv.Itoa(pid))
-	return cmd.Run()
+	return runCommandWithTimeout(10*time.Second, "kill", "-TERM", strconv.Itoa(pid))
 }
 
 func serviceUnitName(serviceName string) (string, bool) {
@@ -280,8 +277,7 @@ func systemctlUnitExists(unit string) bool {
 	if runtime.GOOS != "linux" {
 		return false
 	}
-	cmd := exec.Command("systemctl", "list-unit-files", unit)
-	output, err := cmd.Output()
+	output, err := runCommandOutputWithTimeout(8*time.Second, "systemctl", "list-unit-files", unit)
 	if err != nil {
 		return false
 	}
@@ -293,8 +289,7 @@ func detectSystemdStatus(units ...string) (string, bool) {
 		return "", false
 	}
 	for _, unit := range units {
-		cmd := exec.Command("systemctl", "show", "--property=LoadState,ActiveState", unit)
-		output, err := cmd.Output()
+		output, err := runCommandOutputWithTimeout(8*time.Second, "systemctl", "show", "--property=LoadState,ActiveState", unit)
 		if err != nil {
 			continue
 		}
@@ -378,8 +373,7 @@ func detectFirewallStatus() (bool, string, []string) {
 	}
 
 	if commandExists("ufw") {
-		cmd := exec.Command("ufw", "status")
-		output, err := cmd.Output()
+		output, err := runCommandOutputWithTimeout(10*time.Second, "ufw", "status")
 		if err == nil {
 			text := string(output)
 			active := strings.Contains(strings.ToLower(text), "status: active")
@@ -388,8 +382,7 @@ func detectFirewallStatus() (bool, string, []string) {
 	}
 
 	if commandExists("nft") {
-		cmd := exec.Command("nft", "list", "ruleset")
-		output, err := cmd.Output()
+		output, err := runCommandOutputWithTimeout(12*time.Second, "nft", "list", "ruleset")
 		if err == nil {
 			text := strings.TrimSpace(string(output))
 			if text != "" {
