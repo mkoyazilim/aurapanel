@@ -213,6 +213,7 @@ function applyStatusPayload(payload) {
 
 async function loadUpdateStatus(options = {}) {
   const silent = !!options.silent
+  const force = options.force === true || !silent
   if (!silent) {
     loading.value = true
   }
@@ -221,7 +222,8 @@ async function loadUpdateStatus(options = {}) {
   }
 
   try {
-    const res = await api.get('/status/update')
+    const params = force ? { force: 1 } : {}
+    const res = await api.get('/status/update', { params })
     if (res.data?.status !== 'success') {
       throw new Error(res.data?.message || t('panel_update.messages.load_failed'))
     }

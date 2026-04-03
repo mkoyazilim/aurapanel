@@ -30,7 +30,7 @@ const (
 	defaultServiceAddr   = "127.0.0.1:8081"
 	defaultGatewayPort   = 8090
 	currentPanelVersion  = "Aura Panel V1"
-	updateCacheTTL       = 15 * time.Minute
+	updateCacheTTL       = 45 * time.Second
 	updateErrorCacheTTL  = 2 * time.Minute
 	defaultAdminEmail    = "admin@server.com"
 	defaultAdminPass     = "password123"
@@ -1079,7 +1079,7 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/processes":
 		s.handleProcesses(w)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/update":
-		s.handleUpdateStatus(w)
+		s.handleUpdateStatus(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/update/apply":
 		s.handleUpdateApply(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/service/control":
@@ -1163,8 +1163,9 @@ func (s *service) handleHealth(w http.ResponseWriter) {
 	})
 }
 
-func (s *service) handleUpdateStatus(w http.ResponseWriter) {
-	status := s.getUpdateStatus()
+func (s *service) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	force := isTruthyQueryValue(r.URL.Query().Get("force"))
+	status := s.getUpdateStatus(force)
 	job := s.getUpdateJobSnapshot()
 
 	writeJSON(w, http.StatusOK, apiResponse{
@@ -1218,7 +1219,7 @@ func (s *service) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *service) getUpdateStatus() UpdateStatus {
+func (s *service) getUpdateStatus(force bool) UpdateStatus {
 	s.mu.RLock()
 	cached := s.update
 	s.mu.RUnlock()
@@ -1227,7 +1228,7 @@ func (s *service) getUpdateStatus() UpdateStatus {
 	if strings.TrimSpace(cached.Data.Error) != "" {
 		cacheTTL = updateErrorCacheTTL
 	}
-	if !cached.CheckedAt.IsZero() && time.Since(cached.CheckedAt) < cacheTTL {
+	if !force && !cached.CheckedAt.IsZero() && time.Since(cached.CheckedAt) < cacheTTL {
 		return cached.Data
 	}
 
@@ -1249,6 +1250,11 @@ func (s *service) getUpdateStatus() UpdateStatus {
 	s.mu.Unlock()
 
 	return status
+}
+
+func isTruthyQueryValue(raw string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
 }
 
 func fetchLatestReleaseStatus() UpdateStatus {
