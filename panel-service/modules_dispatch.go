@@ -259,6 +259,15 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/storage/minio/credentials":
 		s.handleMinIOCredentialCreate(w, r)
 		return true
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/storage/minio/s3-config":
+		s.handleMinIOS3ConfigGet(w)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/storage/minio/s3-config":
+		s.handleMinIOS3ConfigSet(w, r)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/storage/minio/s3-test":
+		s.handleMinIOS3ConfigTest(w, r)
+		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/federated/nodes":
 		s.handleFederatedNodes(w)
 		return true

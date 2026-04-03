@@ -31,6 +31,7 @@ type moduleState struct {
 	RedisIsolations     map[string]RedisIsolation
 	MinIOBuckets        []string
 	MinIOCredentials    map[string]MinIOCredential
+	MinIOS3Config       MinIOS3Config
 	FederatedMode       FederatedMode
 	FederatedNodes      []FederatedNode
 	RuntimeApps         []RuntimeApp
@@ -228,6 +229,16 @@ type MinIOCredential struct {
 	User      string `json:"user"`
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
+}
+
+type MinIOS3Config struct {
+	Provider     string `json:"provider"`
+	Region       string `json:"region"`
+	Bucket       string `json:"bucket"`
+	Endpoint     string `json:"endpoint,omitempty"`
+	AccessKey    string `json:"access_key"`
+	SecretKey    string `json:"secret_key,omitempty"`
+	UsePathStyle bool   `json:"use_path_style"`
 }
 
 type FederatedMode struct {
@@ -544,13 +555,17 @@ type DBToolToken struct {
 
 func seedModuleState() moduleState {
 	return moduleState{
-		PHPIni:             map[string]string{},
-		MailCatchAll:       map[string]MailCatchAll{},
-		MailDKIM:           map[string]DKIMRecord{},
-		MailAuthRecords:    map[string]MailAuthRecord{},
-		DNSRecords:         map[string][]DNSRecord{},
-		RedisIsolations:    map[string]RedisIsolation{},
-		MinIOCredentials:   map[string]MinIOCredential{},
+		PHPIni:           map[string]string{},
+		MailCatchAll:     map[string]MailCatchAll{},
+		MailDKIM:         map[string]DKIMRecord{},
+		MailAuthRecords:  map[string]MailAuthRecord{},
+		DNSRecords:       map[string][]DNSRecord{},
+		RedisIsolations:  map[string]RedisIsolation{},
+		MinIOCredentials: map[string]MinIOCredential{},
+		MinIOS3Config: MinIOS3Config{
+			Provider: "aws",
+			Region:   "us-east-1",
+		},
 		WordPressPlugins:   map[string][]WordPressPlugin{},
 		WordPressThemes:    map[string][]WordPressTheme{},
 		WordPressBackups:   map[string][]WordPressBackup{},
@@ -587,6 +602,12 @@ func (s *service) bootstrapModules() {
 	}
 	if s.modules.MinIOCredentials == nil {
 		s.modules.MinIOCredentials = map[string]MinIOCredential{}
+	}
+	if strings.TrimSpace(s.modules.MinIOS3Config.Provider) == "" {
+		s.modules.MinIOS3Config.Provider = "aws"
+	}
+	if strings.TrimSpace(s.modules.MinIOS3Config.Region) == "" {
+		s.modules.MinIOS3Config.Region = "us-east-1"
 	}
 	if s.modules.WordPressPlugins == nil {
 		s.modules.WordPressPlugins = map[string][]WordPressPlugin{}
