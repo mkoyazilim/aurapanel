@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest'
-import router from './index'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+
+let router
+
+beforeAll(async () => {
+  vi.doMock('../layouts/DashboardLayout.vue', () => ({ default: { template: '<div />' } }))
+  vi.doMock('../views/Dashboard.vue', () => ({ default: { template: '<div />' } }))
+  vi.doMock('../views/Websites.vue', () => ({ default: { template: '<div />' } }))
+  vi.doMock('../views/Login.vue', () => ({ default: { template: '<div />' } }))
+
+  router = (await import('./index')).default
+})
 
 describe('router smoke', () => {
   it('contains critical authenticated routes', () => {
