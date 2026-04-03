@@ -28,10 +28,9 @@
             class="aura-input md:col-span-2"
             :placeholder="t('backup_center.backup_path_placeholder')"
           />
-          <label class="inline-flex items-center gap-2 text-sm text-gray-300 md:col-span-2">
-            <input v-model="runForm.incremental" type="checkbox" class="h-4 w-4" />
+          <div class="md:col-span-2 rounded-lg border border-panel-border bg-panel-dark/40 px-3 py-2 text-sm text-gray-300">
             {{ t('backup_center.incremental_backup') }}
-          </label>
+          </div>
           <input
             v-model.number="runForm.retention_keep"
             type="number"
@@ -170,10 +169,9 @@
           <input v-model="scheduleForm.enabled" type="checkbox" class="h-4 w-4" />
           {{ t('backup_center.enabled') }}
         </label>
-        <label class="inline-flex items-center gap-2 text-sm text-gray-300 md:col-span-2">
-          <input v-model="scheduleForm.incremental" type="checkbox" class="h-4 w-4" />
+        <div class="md:col-span-2 rounded-lg border border-panel-border bg-panel-dark/40 px-3 py-2 text-sm text-gray-300">
           {{ t('backup_center.incremental') }}
-        </label>
+        </div>
         <input
           v-model.number="scheduleForm.retention_keep"
           type="number"
@@ -238,7 +236,7 @@
               <td class="px-2 py-2 font-mono text-white">{{ snapshot.short_id || snapshot.id }}</td>
               <td class="px-2 py-2 text-gray-300">{{ snapshot.time }}</td>
               <td class="px-2 py-2 text-gray-300">{{ snapshot.hostname || '-' }}</td>
-              <td class="px-2 py-2 text-gray-300">{{ snapshot.incremental ? t('backup_center.mode.incremental') : t('backup_center.mode.full') }}</td>
+              <td class="px-2 py-2 text-gray-300">{{ t('backup_center.mode.full') }}</td>
               <td class="px-2 py-2 text-gray-300">{{ formatSize(snapshot.size_bytes) }}</td>
               <td class="px-2 py-2 text-gray-400">{{ (snapshot.tags || []).join(', ') }}</td>
             </tr>
@@ -386,7 +384,6 @@ const scheduleForm = ref({
   destination_id: '',
   backup_path: '',
   cron: '0 3 * * *',
-  incremental: false,
   retention_keep: 14,
   enabled: true,
 })
@@ -395,7 +392,6 @@ const runForm = ref({
   domain: '',
   destination_id: '',
   backup_path: '',
-  incremental: false,
   retention_keep: 14,
 })
 
@@ -443,7 +439,7 @@ function backupPayloadFrom(form) {
     backup_path: form.backup_path,
     remote_repo: destination.remote_repo,
     password: destination.password,
-    incremental: !!form.incremental,
+    incremental: false,
     retention_keep: Number(form.retention_keep || destination.retention_keep || 14),
   }
 }
@@ -594,7 +590,6 @@ function resetScheduleForm() {
     destination_id: destinations.value[0]?.id || '',
     backup_path: '/var/backups/aurapanel/sites',
     cron: '0 3 * * *',
-    incremental: false,
     retention_keep: 14,
     enabled: true,
   }

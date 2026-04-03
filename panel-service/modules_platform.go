@@ -935,8 +935,7 @@ func (s *service) handleWordPressBackupsGet(w http.ResponseWriter, r *http.Reque
 
 func (s *service) handleWordPressBackupCreate(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Domain     string `json:"domain"`
-		BackupType string `json:"backup_type"`
+		Domain string `json:"domain"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid WordPress backup payload.")
@@ -954,7 +953,7 @@ func (s *service) handleWordPressBackupCreate(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusNotFound, "WordPress site not found.")
 		return
 	}
-	record, err := createRuntimeWordPressBackup(site, payload.BackupType)
+	record, err := createRuntimeWordPressBackup(site, "full")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

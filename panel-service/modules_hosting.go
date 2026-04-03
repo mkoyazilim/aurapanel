@@ -2034,6 +2034,7 @@ func (s *service) handleBackupScheduleSet(w http.ResponseWriter, r *http.Request
 		return
 	}
 	payload.ID = firstNonEmpty(payload.ID, generateSecret(6))
+	payload.Incremental = false
 	payload.RetentionKeep = normalizeBackupRetentionKeep(payload.RetentionKeep)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -2092,6 +2093,7 @@ func (s *service) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Domain is required.")
 		return
 	}
+	payload.Incremental = false
 
 	retentionKeep := payload.RetentionKeep
 	s.mu.RLock()
@@ -2106,7 +2108,7 @@ func (s *service) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	retentionKeep = normalizeBackupRetentionKeep(retentionKeep)
 
-	snapshot, err := createRuntimeSiteBackup(domain, payload.BackupPath, payload.Incremental)
+	snapshot, err := createRuntimeSiteBackup(domain, payload.BackupPath, false)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -2117,22 +2119,13 @@ func (s *service) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
 	snapshot.Domain = domain
 	snapshot.DestinationID = strings.TrimSpace(payload.DestinationID)
 	snapshot.RetentionKeep = retentionKeep
-	snapshot.Incremental = payload.Incremental
+	snapshot.Incremental = false
 	s.modules.BackupSnapshots = append([]BackupSnapshot{snapshot}, s.modules.BackupSnapshots...)
 	prunedCount, retentionErr := s.enforceBackupRetentionLocked(domain, retentionKeep)
 
-	actionName := "backup_create"
-	actionDetail := fmt.Sprintf("Backup created for %s.", domain)
-	if payload.Incremental {
-		actionName = "backup_create_incremental"
-		actionDetail = fmt.Sprintf("Incremental backup created for %s.", domain)
-	}
-	s.appendActivityLocked("system", actionName, actionDetail, "")
+	s.appendActivityLocked("system", "backup_create", fmt.Sprintf("Backup created for %s.", domain), "")
 
 	message := fmt.Sprintf("Backup completed for %s.", domain)
-	if payload.Incremental {
-		message = fmt.Sprintf("Incremental backup completed for %s.", domain)
-	}
 	if prunedCount > 0 {
 		message = fmt.Sprintf("%s Retention policy pruned %d old snapshot(s).", message, prunedCount)
 	}

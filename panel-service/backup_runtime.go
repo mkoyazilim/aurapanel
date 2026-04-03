@@ -387,6 +387,9 @@ func deleteRuntimeDBBackup(record DBBackupRecord) error {
 }
 
 func createRuntimeSiteBackup(domain, backupPath string, incremental bool) (BackupSnapshot, error) {
+	// Full-backup policy: incremental requests are ignored globally.
+	incremental = false
+
 	domain = normalizeDomain(domain)
 	if domain == "" {
 		return BackupSnapshot{}, fmt.Errorf("domain is required")
@@ -416,9 +419,6 @@ func createRuntimeSiteBackup(domain, backupPath string, incremental bool) (Backu
 	createdAt := info.ModTime().UTC().UnixMilli()
 	hostname, _ := os.Hostname()
 	tags := []string{"website", domain, "full"}
-	if incremental {
-		tags = []string{"website", domain, "incremental"}
-	}
 	return BackupSnapshot{
 		ID:          generateSecret(8),
 		ShortID:     generateSecret(4),
@@ -427,7 +427,7 @@ func createRuntimeSiteBackup(domain, backupPath string, incremental bool) (Backu
 		Hostname:    firstNonEmpty(hostname, "aurapanel"),
 		Tags:        tags,
 		Domain:      domain,
-		Incremental: incremental,
+		Incremental: false,
 		SizeBytes:   info.Size(),
 		BackupPath:  target,
 	}, nil

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
 func createRuntimeWordPressBackup(site WordPressSite, backupType string) (WordPressBackup, error) {
+	_ = backupType // Full-backup policy: WordPress backups are always full.
+
 	domain := normalizeDomain(site.Domain)
 	if domain == "" {
 		return WordPressBackup{}, fmt.Errorf("domain is required")
@@ -25,7 +26,7 @@ func createRuntimeWordPressBackup(site WordPressSite, backupType string) (WordPr
 		ID:         generateSecret(8),
 		Domain:     domain,
 		FileName:   filepath.Base(snapshot.BackupPath),
-		BackupType: firstNonEmpty(strings.TrimSpace(backupType), "full"),
+		BackupType: "full",
 		SizeBytes:  info.Size(),
 		CreatedAt:  time.Now().UTC().Unix(),
 		Path:       snapshot.BackupPath,

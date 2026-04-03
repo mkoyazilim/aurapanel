@@ -267,11 +267,9 @@
                   <p class="text-sm text-gray-400">{{ t('wordpress_manager.backups.subtitle') }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                  <select v-model="backupType" class="aura-input min-w-[180px]">
-                    <option value="full">{{ t('wordpress_manager.backups.full') }}</option>
-                    <option value="files">{{ t('wordpress_manager.backups.files') }}</option>
-                    <option value="database">{{ t('wordpress_manager.backups.database') }}</option>
-                  </select>
+                  <div class="rounded-full border border-panel-border bg-panel-dark px-3 py-2 text-xs font-semibold text-gray-300">
+                    {{ t('wordpress_manager.backups.full') }}
+                  </div>
                   <button class="btn-secondary" :disabled="backupsLoading" @click="loadBackups">{{ t('wordpress_manager.backups.refresh') }}</button>
                   <button class="btn-primary" :disabled="backupActionLoading" @click="createBackup">{{ t('wordpress_manager.backups.create') }}</button>
                 </div>
@@ -383,7 +381,6 @@ const pluginActionLoading = ref(false)
 const themeActionLoading = ref(false)
 const backupActionLoading = ref(false)
 const stagingActionLoading = ref(false)
-const backupType = ref('full')
 const stagingDomain = ref('')
 const notice = ref({ message: '', type: 'success' })
 
@@ -586,7 +583,7 @@ async function deleteThemes() {
 async function createBackup() {
   backupActionLoading.value = true
   try {
-    await api.post('/wordpress/backups', { domain: selectedDomain.value, backup_type: backupType.value })
+    await api.post('/wordpress/backups', { domain: selectedDomain.value, backup_type: 'full' })
     setNotice(t('wordpress_manager.notices.backup_created'))
     await loadBackups()
   } catch (error) {
