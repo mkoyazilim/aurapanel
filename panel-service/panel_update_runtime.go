@@ -11,9 +11,12 @@ import (
 )
 
 const (
-	defaultPanelRepoPath     = "/opt/aurapanel"
-	defaultPanelDeployRemote = "origin"
-	defaultPanelDeployBranch = "main"
+	defaultPanelRepoPath             = "/opt/aurapanel"
+	defaultPanelDeployRemote         = "origin"
+	defaultPanelDeployBranch         = "main"
+	defaultPanelUpdateTimeoutSeconds = 1800
+	minPanelUpdateTimeoutSeconds     = 30
+	maxPanelUpdateTimeoutSeconds     = 7200
 )
 
 type panelUpdateResult struct {
@@ -335,12 +338,35 @@ func scheduleServiceRestartWithFallback(result *panelUpdateResult, serviceName, 
 
 func runPanelUpdateStep(result *panelUpdateResult, title string, command string, args ...string) error {
 	result.Steps = append(result.Steps, title)
-	output, err := commandOutputTrimmed(command, args...)
+	timeout := panelUpdateCommandTimeout()
+	rawOutput, err := runCommandCombinedOutputWithTimeout(timeout, command, args...)
+	output := strings.TrimSpace(string(rawOutput))
 	if err != nil {
+		if output != "" {
+			return fmt.Errorf("%s: %s", title, output)
+		}
 		return fmt.Errorf("%s: %w", title, err)
 	}
 	if output != "" {
 		result.Steps = append(result.Steps, output)
 	}
 	return nil
+}
+
+func panelUpdateCommandTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("AURAPANEL_PANEL_UPDATE_TIMEOUT_SECONDS"))
+	if raw == "" {
+		raw = strconv.Itoa(defaultPanelUpdateTimeoutSeconds)
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil {
+		seconds = defaultPanelUpdateTimeoutSeconds
+	}
+	if seconds < minPanelUpdateTimeoutSeconds {
+		seconds = minPanelUpdateTimeoutSeconds
+	}
+	if seconds > maxPanelUpdateTimeoutSeconds {
+		seconds = maxPanelUpdateTimeoutSeconds
+	}
+	return time.Duration(seconds) * time.Second
 }
