@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -245,6 +246,7 @@ func writePHPMyAdminAutoLoginPage(w http.ResponseWriter, targetURL string, crede
 	if domain != "" {
 		message = fmt.Sprintf("%s icin phpMyAdmin oturumu aciliyor...", domain)
 	}
+	loginPath := browserPathFromURL(targetURL)
 	writeDBToolAutoLoginPage(w, message, fmt.Sprintf(`
 const loginUrl = %s;
 const username = %s;
@@ -297,7 +299,7 @@ run().catch((error) => {
     el.style.color = '#b91c1c';
   }
 });
-`, strconv.Quote(targetURL), strconv.Quote(credential.Username), strconv.Quote(credential.Password)))
+`, strconv.Quote(loginPath), strconv.Quote(credential.Username), strconv.Quote(credential.Password)))
 }
 
 func writePGAdminAutoLoginPage(w http.ResponseWriter, targetURL, email, password, domain, dbName, dbUser string) {
@@ -309,6 +311,7 @@ func writePGAdminAutoLoginPage(w http.ResponseWriter, targetURL, email, password
 	if dbName != "" && dbUser != "" {
 		hint = fmt.Sprintf("Hedef veritabani: %s (kullanici: %s)", dbName, dbUser)
 	}
+	targetPath := browserPathFromURL(targetURL)
 	writeDBToolAutoLoginPage(w, message, fmt.Sprintf(`
 const targetUrl = %s;
 const loginUrl = new URL('/pgadmin4/login?next=' + encodeURIComponent('/pgadmin4/'), window.location.origin).toString();
@@ -360,7 +363,7 @@ run().catch((error) => {
     hintEl.textContent = hint;
   }
 });
-`, strconv.Quote(targetURL), strconv.Quote(email), strconv.Quote(password), strconv.Quote(hint)))
+`, strconv.Quote(targetPath), strconv.Quote(email), strconv.Quote(password), strconv.Quote(hint)))
 }
 
 func writeDBToolAutoLoginPage(w http.ResponseWriter, message, script string) {
@@ -572,4 +575,33 @@ func isLoopbackHost(host string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+func browserPathFromURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "/"
+	}
+	if strings.HasPrefix(raw, "/") {
+		return raw
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "/" + strings.TrimLeft(raw, "/")
+	}
+	if !parsed.IsAbs() {
+		path := parsed.String()
+		if strings.HasPrefix(path, "/") {
+			return path
+		}
+		return "/" + strings.TrimLeft(path, "/")
+	}
+	path := parsed.EscapedPath()
+	if path == "" {
+		path = "/"
+	}
+	if parsed.RawQuery != "" {
+		path += "?" + parsed.RawQuery
+	}
+	return path
 }
