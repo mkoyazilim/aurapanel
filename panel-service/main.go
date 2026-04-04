@@ -1931,6 +1931,7 @@ func (s *service) handleVhostCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	s.ensureDefaultFTPAccountLocked(site.Domain)
 
 	s.saveRuntimeStateLocked()
 
@@ -3585,6 +3586,98 @@ func (s *service) ensureMailArtifactsLocked(site Website) {
 	s.recordIssuedCertificateLocked(fmt.Sprintf("mail.%s", normalizedDomain), "Let's Encrypt", false)
 }
 
+func transferHomeBelongsToDomain(homeDir, domain string) bool {
+	normalizedDomain := normalizeDomain(domain)
+	if normalizedDomain == "" {
+		return false
+	}
+	normalizedHome := normalizeVirtualPath(homeDir)
+	root := normalizeVirtualPath(fmt.Sprintf("/home/%s", normalizedDomain))
+	return normalizedHome == root || strings.HasPrefix(normalizedHome, root+"/")
+}
+
+func transferAccountBelongsToDomain(account TransferAccount, domain string) bool {
+	if normalizeDomain(account.Domain) == normalizeDomain(domain) {
+		return true
+	}
+	return transferHomeBelongsToDomain(account.HomeDir, domain)
+}
+
+func transferUsernameExists(items []TransferAccount, username string) bool {
+	key := sanitizeName(username)
+	if key == "" {
+		return false
+	}
+	for _, item := range items {
+		if sanitizeName(item.Username) == key {
+			return true
+		}
+	}
+	return false
+}
+
+func buildDefaultFTPUsername(domain string, existing []TransferAccount) string {
+	base := sanitizeName(strings.ReplaceAll(normalizeDomain(domain), ".", "_"))
+	if base == "" {
+		base = "ftpuser"
+	}
+	if len(base) > 24 {
+		base = base[:24]
+	}
+	for i := 0; i < 100; i++ {
+		candidate := base
+		if i > 0 {
+			candidate = fmt.Sprintf("%s_%d", base, i+1)
+		}
+		if !transferUsernameExists(existing, candidate) {
+			return candidate
+		}
+	}
+	return sanitizeName(fmt.Sprintf("%s_%s", base, generateSecret(4)))
+}
+
+func (s *service) ensureDefaultFTPAccountLocked(domain string) {
+	normalizedDomain := normalizeDomain(domain)
+	if normalizedDomain == "" {
+		return
+	}
+	homeDir := domainDocroot(normalizedDomain)
+	runtimeItems := append([]TransferAccount(nil), s.modules.FTPUsers...)
+	if liveItems, err := runtimeTransferAccounts("ftp"); err == nil {
+		runtimeItems = mergeTransferMetadata(liveItems, runtimeItems)
+	} else {
+		log.Printf("ftp account discovery warning for %s: %v", normalizedDomain, err)
+	}
+	s.modules.FTPUsers = runtimeItems
+	for _, item := range runtimeItems {
+		if transferAccountBelongsToDomain(item, normalizedDomain) {
+			account := item
+			account.Domain = normalizedDomain
+			if account.HomeDir == "" {
+				account.HomeDir = homeDir
+			}
+			if account.CreatedAt == 0 {
+				account.CreatedAt = time.Now().UTC().Unix()
+			}
+			s.modules.FTPUsers = append(removeTransferAccountByUsername(s.modules.FTPUsers, account.Username), account)
+			return
+		}
+	}
+
+	account := TransferAccount{
+		Username:  buildDefaultFTPUsername(normalizedDomain, runtimeItems),
+		Domain:    normalizedDomain,
+		HomeDir:   homeDir,
+		CreatedAt: time.Now().UTC().Unix(),
+	}
+	password := generateSecret(20)
+	if err := createRuntimeTransferAccount("ftp", account.Username, password, account.HomeDir); err != nil {
+		log.Printf("ftp auto-provision failed for %s: %v", normalizedDomain, err)
+		return
+	}
+	s.modules.FTPUsers = append(removeTransferAccountByUsername(s.modules.FTPUsers, account.Username), account)
+}
+
 func (s *service) removeDNSArtifactsLocked(domain string) {
 	_ = removePowerDNSZone(domain)
 	filteredZones := s.modules.DNSZones[:0]
@@ -3636,6 +3729,45 @@ func (s *service) removeMailArtifactsLocked(domain string) {
 	_ = exec.Command("rm", "-rf", fmt.Sprintf("/var/vmail/%s", domain)).Run()
 }
 
+func (s *service) removeFTPArtifactsLocked(domain string) {
+	normalizedDomain := normalizeDomain(domain)
+	if normalizedDomain == "" {
+		return
+	}
+
+	candidates := append([]TransferAccount(nil), s.modules.FTPUsers...)
+	if runtimeItems, err := runtimeTransferAccounts("ftp"); err == nil {
+		candidates = mergeTransferMetadata(runtimeItems, candidates)
+	}
+
+	toDelete := map[string]struct{}{}
+	for _, account := range candidates {
+		if transferAccountBelongsToDomain(account, normalizedDomain) {
+			toDelete[sanitizeName(account.Username)] = struct{}{}
+		}
+	}
+
+	for username := range toDelete {
+		if username == "" {
+			continue
+		}
+		_ = deleteRuntimeTransferAccount("ftp", username)
+	}
+
+	filtered := s.modules.FTPUsers[:0]
+	for _, account := range s.modules.FTPUsers {
+		username := sanitizeName(account.Username)
+		if _, ok := toDelete[username]; ok {
+			continue
+		}
+		if transferAccountBelongsToDomain(account, normalizedDomain) {
+			continue
+		}
+		filtered = append(filtered, account)
+	}
+	s.modules.FTPUsers = filtered
+}
+
 func (s *service) removeSiteArtifactsLocked(domain string) error {
 	delete(s.state.AdvancedConfig, domain)
 	delete(s.state.CustomSSL, domain)
@@ -3648,6 +3780,7 @@ func (s *service) removeSiteArtifactsLocked(domain string) error {
 
 	// Remove Mail Configurations and Directories
 	s.removeMailArtifactsLocked(domain)
+	s.removeFTPArtifactsLocked(domain)
 
 	// Remove physical document root directory
 	docroot := domainDocroot(domain)
