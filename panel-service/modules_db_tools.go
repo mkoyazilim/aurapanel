@@ -248,7 +248,8 @@ func writePHPMyAdminAutoLoginPage(w http.ResponseWriter, targetURL string, crede
 	}
 	loginPath := browserPathFromURL(targetURL)
 	writeDBToolAutoLoginPage(w, message, fmt.Sprintf(`
-const loginUrl = %s;
+const loginPath = %s;
+const loginUrl = new URL(loginPath, window.location.origin).toString();
 const username = %s;
 const password = %s;
 
