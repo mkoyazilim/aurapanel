@@ -638,11 +638,6 @@ func (s *service) handleWebsiteRewriteSet(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Write directly to .htaccess as well to ensure immediate application
-	htaccessPath := filepath.Join(domainDocroot(domain), ".htaccess")
-	_ = os.WriteFile(htaccessPath, []byte(resolvedRules), 0o644)
-	_ = reloadOpenLiteSpeed()
-
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Rewrite rules updated.", Data: cfg})
 }
 
@@ -1095,11 +1090,8 @@ func (s *service) handleMailboxesList(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 	items := loadSystemMailboxes(quotaByAddress)
 	if principal.Role != "admin" {
-		ids := principalAliases(principal)
 		s.mu.RLock()
-		if user := s.findUserByEmailLocked(principal.Email); user != nil {
-			ids[sanitizeName(user.Username)] = struct{}{}
-		}
+		ids := s.principalScopedUsernamesLocked(principal)
 		s.mu.RUnlock()
 		filtered := make([]Mailbox, 0, len(items))
 		for _, item := range items {
