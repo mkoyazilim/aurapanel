@@ -12,6 +12,16 @@ MODSEC_CUSTOM="/usr/local/lsws/conf/owasp/modsec_dbtools.conf"
 DBTOOLS_USERDB="/usr/local/lsws/conf/vhosts/Example/htpasswd-dbtools"
 DBTOOLS_GROUPDB="/usr/local/lsws/conf/vhosts/Example/htgroup-dbtools"
 CREDENTIALS_SUMMARY_FILE="/root/aurapanel_credentials.txt"
+PHPMYADMIN_DIR="/usr/local/lsws/Example/html/phpmyadmin"
+PGADMIN_PROXY_PATH="/pgadmin4/"
+PGADMIN_CONTAINER_NAME="aurapanel-pgadmin"
+PGADMIN_DATA_DIR_DEFAULT="/opt/aurapanel/pgadmin"
+PGADMIN_PROXY_PORT_DEFAULT="5055"
+
+DBTOOLS_PGADMIN_DEFAULT_EMAIL=""
+DBTOOLS_PGADMIN_DEFAULT_PASSWORD=""
+DBTOOLS_PGADMIN_PROXY_PORT="${PGADMIN_PROXY_PORT_DEFAULT}"
+DBTOOLS_PGADMIN_DATA_DIR="${PGADMIN_DATA_DIR_DEFAULT}"
 
 log() {
   echo "[db-tools-hardening] $*"
@@ -80,9 +90,52 @@ panel_edge_single_domain_enabled() {
   return 1
 }
 
+safe_password() {
+  openssl rand -base64 24 | tr -d '\n' | tr '/+' 'AB'
+}
+
+default_pgadmin_email() {
+  local host
+  host="$(hostname -f 2>/dev/null || hostname || true)"
+  host="$(printf '%s' "${host}" | tr -d '[:space:]')"
+  if [ -z "${host}" ] || ! printf '%s' "${host}" | grep -Eq '\.'; then
+    host="aurapanel.info"
+  fi
+  printf 'admin@%s' "${host}"
+}
+
+web_owner_user() {
+  if id -u nobody >/dev/null 2>&1; then
+    printf 'nobody'
+    return 0
+  fi
+  if id -u www-data >/dev/null 2>&1; then
+    printf 'www-data'
+    return 0
+  fi
+  printf 'root'
+}
+
+web_owner_group() {
+  if getent group nogroup >/dev/null 2>&1; then
+    printf 'nogroup'
+    return 0
+  fi
+  if getent group nobody >/dev/null 2>&1; then
+    printf 'nobody'
+    return 0
+  fi
+  if getent group www-data >/dev/null 2>&1; then
+    printf 'www-data'
+    return 0
+  fi
+  printf 'root'
+}
+
 ensure_dbtools_credentials() {
   local env_user env_pass
   local svc_user svc_pass svc_ips svc_rate svc_runtime_file svc_reload svc_panel_edge
+  local svc_pgadmin_email svc_pgadmin_pass svc_pgadmin_port svc_pgadmin_data_dir
 
   env_user="$(read_env_value "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   env_pass="$(read_env_value "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
@@ -93,11 +146,15 @@ ensure_dbtools_credentials() {
   svc_runtime_file="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE")"
   svc_reload="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE")"
   svc_panel_edge="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN")"
+  svc_pgadmin_email="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_DEFAULT_EMAIL")"
+  svc_pgadmin_pass="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_DEFAULT_PASSWORD")"
+  svc_pgadmin_port="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_PROXY_PORT")"
+  svc_pgadmin_data_dir="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_DATA_DIR")"
 
   DBTOOLS_AUTH_USER="${AURAPANEL_DBTOOLS_AUTH_USER:-${env_user:-${svc_user:-dbtools}}}"
   DBTOOLS_AUTH_PASS="${AURAPANEL_DBTOOLS_AUTH_PASS:-${env_pass:-${svc_pass:-}}}"
   if [ -z "${DBTOOLS_AUTH_PASS}" ]; then
-    DBTOOLS_AUTH_PASS="$(openssl rand -base64 24 | tr -d '\n' | tr '/+' 'AB')"
+    DBTOOLS_AUTH_PASS="$(safe_password)"
   fi
 
   DBTOOLS_ALLOWED_IPS="${AURAPANEL_DBTOOLS_ALLOWED_IPS:-${svc_ips:-}}"
@@ -122,6 +179,19 @@ ensure_dbtools_credentials() {
   [ -n "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}" ] || DBTOOLS_RUNTIME_ALLOWLIST_FILE="${DBTOOLS_RUNTIME_ALLOWLIST_FILE_DEFAULT}"
   DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE="${AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE:-${svc_reload:-0}}"
   DBTOOLS_PANEL_EDGE_SINGLE_DOMAIN="${AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN:-${svc_panel_edge:-0}}"
+  DBTOOLS_PGADMIN_DEFAULT_EMAIL="${AURAPANEL_PGADMIN_DEFAULT_EMAIL:-${svc_pgadmin_email:-$(default_pgadmin_email)}}"
+  DBTOOLS_PGADMIN_DEFAULT_PASSWORD="${AURAPANEL_PGADMIN_DEFAULT_PASSWORD:-${svc_pgadmin_pass:-}}"
+  DBTOOLS_PGADMIN_PROXY_PORT="${AURAPANEL_PGADMIN_PROXY_PORT:-${svc_pgadmin_port:-${PGADMIN_PROXY_PORT_DEFAULT}}}"
+  DBTOOLS_PGADMIN_DATA_DIR="${AURAPANEL_PGADMIN_DATA_DIR:-${svc_pgadmin_data_dir:-${PGADMIN_DATA_DIR_DEFAULT}}}"
+
+  if [ -z "${DBTOOLS_PGADMIN_DEFAULT_PASSWORD}" ]; then
+    DBTOOLS_PGADMIN_DEFAULT_PASSWORD="$(safe_password)"
+  fi
+  if ! [[ "${DBTOOLS_PGADMIN_PROXY_PORT}" =~ ^[0-9]+$ ]] || [ "${DBTOOLS_PGADMIN_PROXY_PORT}" -lt 1024 ] || [ "${DBTOOLS_PGADMIN_PROXY_PORT}" -gt 65535 ]; then
+    DBTOOLS_PGADMIN_PROXY_PORT="${PGADMIN_PROXY_PORT_DEFAULT}"
+  fi
+  DBTOOLS_PGADMIN_DATA_DIR="$(printf '%s' "${DBTOOLS_PGADMIN_DATA_DIR}" | tr -d '\r')"
+  [ -n "${DBTOOLS_PGADMIN_DATA_DIR}" ] || DBTOOLS_PGADMIN_DATA_DIR="${PGADMIN_DATA_DIR_DEFAULT}"
 
   mkdir -p "${DBTOOLS_CONF_DIR}" "/usr/local/lsws/conf/vhosts/Example"
   upsert_env "${DBTOOLS_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER" "${DBTOOLS_AUTH_USER}"
@@ -137,7 +207,11 @@ ensure_dbtools_credentials() {
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE" "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE" "${DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PHPMYADMIN_BASE_URL" "/phpmyadmin/index.php"
-  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_BASE_URL" "/pgadmin4/"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_BASE_URL" "${PGADMIN_PROXY_PATH}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_DEFAULT_EMAIL" "${DBTOOLS_PGADMIN_DEFAULT_EMAIL}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_DEFAULT_PASSWORD" "${DBTOOLS_PGADMIN_DEFAULT_PASSWORD}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_PROXY_PORT" "${DBTOOLS_PGADMIN_PROXY_PORT}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_PGADMIN_DATA_DIR" "${DBTOOLS_PGADMIN_DATA_DIR}"
   chmod 600 "${SERVICE_ENV_FILE}"
 
   mkdir -p "$(dirname "${DBTOOLS_RUNTIME_ALLOWLIST_FILE}")"
@@ -167,8 +241,109 @@ ensure_dbtools_credentials() {
   chown "${realm_owner}:${realm_group}" "${DBTOOLS_USERDB}" "${DBTOOLS_GROUPDB}" >/dev/null 2>&1 || true
 }
 
+install_phpmyadmin_runtime() {
+  local tmp_dir archive src_dir pma_url owner group secret
+
+  pma_url="${AURAPANEL_PHPMYADMIN_DOWNLOAD_URL:-https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-all-languages.tar.gz}"
+  owner="$(web_owner_user)"
+  group="$(web_owner_group)"
+  mkdir -p "${PHPMYADMIN_DIR}"
+
+  tmp_dir="$(mktemp -d /tmp/aurapanel-pma.XXXXXX)"
+  archive="${tmp_dir}/phpmyadmin.tar.gz"
+
+  if ! curl -fsSL "${pma_url}" -o "${archive}"; then
+    rm -rf "${tmp_dir}"
+    warn "phpMyAdmin archive download failed (${pma_url})."
+    return 1
+  fi
+  if ! tar -xzf "${archive}" -C "${tmp_dir}"; then
+    rm -rf "${tmp_dir}"
+    warn "phpMyAdmin archive extract failed."
+    return 1
+  fi
+  src_dir="$(find "${tmp_dir}" -maxdepth 1 -type d -name 'phpMyAdmin-*' | head -n1)"
+  if [ -z "${src_dir}" ] || [ ! -d "${src_dir}" ]; then
+    rm -rf "${tmp_dir}"
+    warn "phpMyAdmin archive content not found."
+    return 1
+  fi
+
+  rsync -a --delete --exclude='config.inc.php' "${src_dir}/" "${PHPMYADMIN_DIR}/"
+  if [ ! -f "${PHPMYADMIN_DIR}/config.inc.php" ] && [ -f "${PHPMYADMIN_DIR}/config.sample.inc.php" ]; then
+    cp "${PHPMYADMIN_DIR}/config.sample.inc.php" "${PHPMYADMIN_DIR}/config.inc.php"
+  fi
+  if [ -f "${PHPMYADMIN_DIR}/config.inc.php" ] && grep -q "\$cfg\['blowfish_secret'\] = ''" "${PHPMYADMIN_DIR}/config.inc.php"; then
+    secret="$(safe_password)"
+    sed -i "s/\$cfg\['blowfish_secret'\] = '';/\$cfg['blowfish_secret'] = '${secret}';/" "${PHPMYADMIN_DIR}/config.inc.php"
+  fi
+
+  mkdir -p "${PHPMYADMIN_DIR}/tmp"
+  chown -R "${owner}:${group}" "${PHPMYADMIN_DIR}" >/dev/null 2>&1 || true
+  find "${PHPMYADMIN_DIR}" -type d -exec chmod 755 {} \;
+  find "${PHPMYADMIN_DIR}" -type f -exec chmod 644 {} \;
+  chmod 750 "${PHPMYADMIN_DIR}/tmp" >/dev/null 2>&1 || true
+
+  rm -rf "${tmp_dir}"
+  log "phpMyAdmin installed to ${PHPMYADMIN_DIR}."
+  return 0
+}
+
+install_pgadmin_runtime() {
+  local image email password port data_dir code
+
+  if ! command -v docker >/dev/null 2>&1; then
+    warn "docker not found, pgAdmin runtime install skipped."
+    return 1
+  fi
+  image="${AURAPANEL_PGADMIN_IMAGE:-dpage/pgadmin4:9}"
+  email="${DBTOOLS_PGADMIN_DEFAULT_EMAIL}"
+  password="${DBTOOLS_PGADMIN_DEFAULT_PASSWORD}"
+  port="${DBTOOLS_PGADMIN_PROXY_PORT}"
+  data_dir="${DBTOOLS_PGADMIN_DATA_DIR}"
+
+  systemctl enable docker >/dev/null 2>&1 || true
+  systemctl start docker >/dev/null 2>&1 || true
+
+  mkdir -p "${data_dir}"
+  chown -R 5050:5050 "${data_dir}" >/dev/null 2>&1 || true
+
+  docker rm -f "${PGADMIN_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  if ! docker run -d \
+    --name "${PGADMIN_CONTAINER_NAME}" \
+    --restart unless-stopped \
+    -p "127.0.0.1:${port}:80" \
+    -e "PGADMIN_DEFAULT_EMAIL=${email}" \
+    -e "PGADMIN_DEFAULT_PASSWORD=${password}" \
+    -e "SCRIPT_NAME=${PGADMIN_PROXY_PATH%/}" \
+    -v "${data_dir}:/var/lib/pgadmin" \
+    "${image}" >/dev/null; then
+    warn "pgAdmin container launch failed."
+    return 1
+  fi
+
+  code=""
+  for _ in $(seq 1 40); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}${PGADMIN_PROXY_PATH}" || true)"
+    case "${code}" in
+      2*|3*) break ;;
+    esac
+    sleep 1
+  done
+  case "${code}" in
+    2*|3*)
+      log "pgAdmin container is ready on 127.0.0.1:${port}${PGADMIN_PROXY_PATH}."
+      return 0
+      ;;
+    *)
+      warn "pgAdmin health probe failed (HTTP ${code:-000})."
+      return 1
+      ;;
+  esac
+}
+
 ensure_dbtools_placeholder_dirs() {
-  local pma_dir="/usr/local/lsws/Example/html/phpmyadmin"
+  local pma_dir="${PHPMYADMIN_DIR}"
   local pg_dir="/usr/local/lsws/Example/html/pgadmin4"
 
   mkdir -p "${pma_dir}" "${pg_dir}"
@@ -222,16 +397,58 @@ configure_ols_dbtools_context() {
 # AURAPANEL DB TOOLS BEGIN
 context /phpmyadmin/{
   allowBrowse 1
-  location /usr/local/lsws/Example/html/phpmyadmin/
+  location ${PHPMYADMIN_DIR}/
+  rewrite  {
+    enable 0
+  }
+}
+
+extprocessor aurapanel_pgadmin {
+  type                    proxy
+  address                 127.0.0.1:${DBTOOLS_PGADMIN_PROXY_PORT}
+  maxConns                200
+  initTimeout             60
+  retryTimeout            0
+  respBuffer              0
 }
 
 context /pgadmin4/{
-  allowBrowse 1
-  location /usr/local/lsws/Example/html/pgadmin4/
+  type proxy
+  handler aurapanel_pgadmin
+  addDefaultCharset off
+  rewrite  {
+    enable 0
+  }
 }
 # AURAPANEL DB TOOLS END
 EOF
 
+  install -m 640 "${tmp_conf}" "${VHOST_CONF}"
+  rm -f "${tmp_conf}"
+}
+
+ensure_dbtools_rewrite_exclusions() {
+  local tmp_conf
+  if [ ! -f "${VHOST_CONF}" ]; then
+    return 0
+  fi
+  if ! grep -q "RewriteCond %{REQUEST_URI} !^/webmail/" "${VHOST_CONF}" 2>/dev/null; then
+    return 0
+  fi
+  if grep -q "RewriteCond %{REQUEST_URI} !^/phpmyadmin/" "${VHOST_CONF}" 2>/dev/null; then
+    return 0
+  fi
+
+  tmp_conf="$(mktemp /tmp/aurapanel-dbtools-rewrite.XXXXXX)"
+  awk '
+    {
+      print
+      if ($0 ~ /RewriteCond %\{REQUEST_URI\} !\^\/webmail\//) {
+        print "  RewriteCond %{REQUEST_URI} !^/phpmyadmin/"
+        print "  RewriteCond %{REQUEST_URI} !^/pgadmin4/"
+      }
+    }
+  ' "${VHOST_CONF}" > "${tmp_conf}"
   install -m 640 "${tmp_conf}" "${VHOST_CONF}"
   rm -f "${tmp_conf}"
 }
@@ -336,6 +553,9 @@ DB Tools Basic Auth Username: ${DBTOOLS_AUTH_USER}
 DB Tools Basic Auth Password: ${DBTOOLS_AUTH_PASS}
 DB Tools Allowed IPs: ${DBTOOLS_ALLOWED_IPS}
 DB Tools Rate Limit (/min): ${DBTOOLS_RATE_LIMIT_PER_MIN}
+pgAdmin URL Path: ${PGADMIN_PROXY_PATH}
+pgAdmin Login Email: ${DBTOOLS_PGADMIN_DEFAULT_EMAIL}
+pgAdmin Login Password: ${DBTOOLS_PGADMIN_DEFAULT_PASSWORD}
 # AURAPANEL DB TOOLS END
 EOF
   install -m 600 "${tmp_file}" "${file}"
@@ -356,8 +576,11 @@ restart_services() {
 
 main() {
   ensure_dbtools_credentials
+  install_phpmyadmin_runtime || warn "phpMyAdmin runtime install failed, leaving placeholder content."
+  install_pgadmin_runtime || warn "pgAdmin runtime install failed, leaving route protected but unavailable."
   ensure_dbtools_placeholder_dirs
   configure_ols_dbtools_context
+  ensure_dbtools_rewrite_exclusions
   write_modsecurity_dbtools_rules
   ensure_modsecurity_include
   configure_nginx_dbtools_snippet

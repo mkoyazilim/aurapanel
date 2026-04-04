@@ -2214,6 +2214,17 @@ smoke_check() {
   curl -fsS "http://127.0.0.1:${panel_port}/" >/dev/null || fail "Panel static endpoint failed"
   curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || fail "MinIO health check failed"
   curl -fsS 'http://127.0.0.1/webmail/index.php?_task=login' >/dev/null 2>&1 || fail "Roundcube login endpoint failed"
+  local pma_status pg_status
+  pma_status="$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1/phpmyadmin/index.php' || true)"
+  case "${pma_status}" in
+    2*|3*) ;;
+    *) fail "phpMyAdmin endpoint failed (HTTP ${pma_status:-000})" ;;
+  esac
+  pg_status="$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1/pgadmin4/' || true)"
+  case "${pg_status}" in
+    2*|3*) ;;
+    *) fail "pgAdmin endpoint failed (HTTP ${pg_status:-000})" ;;
+  esac
 
   panel_user="$(panel_admin_email)"
   panel_pass="$(panel_admin_password)"
