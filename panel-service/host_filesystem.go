@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -147,6 +148,41 @@ func createManagedDir(path string) error {
 		return err
 	}
 	return os.MkdirAll(resolved, 0o755)
+}
+
+func setManagedPermissions(path, modeValue string) error {
+	resolved, err := resolveManagedPath(path)
+	if err != nil {
+		return err
+	}
+	mode, err := parseOctalFileMode(modeValue)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(resolved, mode)
+}
+
+func parseOctalFileMode(value string) (os.FileMode, error) {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return 0, errors.New("permission mode is required")
+	}
+	if len(raw) == 3 {
+		raw = "0" + raw
+	}
+	if len(raw) != 4 {
+		return 0, errors.New("permission mode must be 3 or 4 octal digits")
+	}
+	for _, ch := range raw {
+		if ch < '0' || ch > '7' {
+			return 0, errors.New("permission mode must contain only digits 0-7")
+		}
+	}
+	parsed, err := strconv.ParseUint(raw, 8, 32)
+	if err != nil {
+		return 0, errors.New("invalid permission mode")
+	}
+	return os.FileMode(parsed), nil
 }
 
 func runManagedArchiveCommand(command string, args ...string) error {

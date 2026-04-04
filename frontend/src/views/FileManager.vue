@@ -66,6 +66,7 @@
               <div class="flex justify-end gap-1">
                 <button v-if="isArchive(item.name)" @click="extractItem(item)" class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded text-xs hover:bg-purple-600/40 transition" :title="t('filemanager.extract')">{{ t('filemanager.extract') }}</button>
                 <button v-if="!item.is_dir" @click="editFile(item)" class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded text-xs hover:bg-blue-600/40 transition">{{ t('filemanager.edit') }}</button>
+                <button @click="editPermissions(item)" class="px-2 py-1 bg-slate-600/30 text-slate-200 rounded text-xs hover:bg-slate-600/50 transition">CHMOD</button>
                 <button @click="renameItem(item)" class="px-2 py-1 bg-yellow-600/20 text-yellow-400 rounded text-xs hover:bg-yellow-600/40 transition">{{ t('filemanager.rename') }}</button>
                 <button @click="trashSingleItem(item)" class="px-2 py-1 bg-red-600/20 text-red-400 rounded text-xs hover:bg-red-600/40 transition">{{ t('filemanager.trash') }}</button>
                 <button @click="deleteSingleItem(item)" class="px-2 py-1 bg-red-700/30 text-red-300 rounded text-xs hover:bg-red-700/50 transition">{{ t('filemanager.delete') }}</button>
@@ -243,6 +244,22 @@ const fileIcon = (name) => {
   return map[ext] || 'FILE'
 }
 
+const symbolicPermissionsToOctal = (value) => {
+  const raw = String(value || '').trim()
+  if (/^[0-7]{3,4}$/.test(raw)) return raw.slice(-3)
+  const normalized = raw.length === 10 ? raw.slice(1) : raw
+  if (!/^[rwx-]{9}$/.test(normalized)) return '644'
+  const triads = [normalized.slice(0, 3), normalized.slice(3, 6), normalized.slice(6, 9)]
+  const convertTriad = (triad) => {
+    let score = 0
+    if (triad[0] === 'r') score += 4
+    if (triad[1] === 'w') score += 2
+    if (triad[2] === 'x') score += 1
+    return String(score)
+  }
+  return triads.map(convertTriad).join('')
+}
+
 const formatModified = (value) => {
   const raw = Number(value)
   if (!Number.isFinite(raw) || raw <= 0) return '-'
@@ -318,6 +335,25 @@ const renameItem = async (item) => {
     } catch {
       showNotif(t('filemanager.messages.rename_error'), 'error')
     }
+  }
+}
+
+const editPermissions = async (item) => {
+  const suggested = symbolicPermissionsToOctal(item.permissions)
+  const input = prompt(`${t('filemanager.permissions')} (644 / 755 / 775):`, suggested)
+  if (input == null) return
+  const mode = String(input).trim()
+  if (!/^[0-7]{3,4}$/.test(mode)) {
+    showNotif('Geçersiz izin formatı. Örnek: 644', 'error')
+    return
+  }
+  try {
+    const path = currentPath.value.replace(/\/$/, '') + '/' + item.name
+    await api.post('/files/chmod', { path, mode })
+    showNotif('İzinler güncellendi')
+    loadFiles()
+  } catch {
+    showNotif('İzin güncelleme başarısız', 'error')
   }
 }
 

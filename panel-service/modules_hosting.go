@@ -1888,6 +1888,22 @@ func (s *service) handleFileRename(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Path renamed."})
 }
 
+func (s *service) handleFileChmod(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Path string `json:"path"`
+		Mode string `json:"mode"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid chmod payload.")
+		return
+	}
+	if err := setManagedPermissions(payload.Path, payload.Mode); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Permissions updated."})
+}
+
 func (s *service) handleFileTrash(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Path string `json:"path"`
