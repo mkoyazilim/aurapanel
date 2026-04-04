@@ -166,7 +166,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, status int, code, messag
 // AuthMiddleware validates JWT coming from headers.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenString := extractToken(r)
+		tokenString, tokenSource := extractTokenWithSource(r)
 		if tokenString == "" {
 			WriteError(w, r, http.StatusUnauthorized, "AUTH_MISSING_TOKEN", "Authorization token is required")
 			return
@@ -215,6 +215,9 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			RolePolicyID: strings.TrimSpace(claims.RolePolicyID),
 			RolePolicy:   strings.TrimSpace(claims.RolePolicy),
 		})
+		if tokenSource == "header" {
+			setGatewayAuthCookie(w, r, tokenString, claims.ExpiresAt)
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -233,23 +236,69 @@ func sanitizeIdentity(value string) string {
 	return builder.String()
 }
 
-func extractToken(r *http.Request) string {
+func extractTokenWithSource(r *http.Request) (string, string) {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	if strings.HasPrefix(authHeader, "Bearer ") {
-		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer ")), "header"
 	}
 
 	if cookie, err := r.Cookie(authCookieName()); err == nil {
 		if value := strings.TrimSpace(cookie.Value); value != "" {
-			return value
+			return value, "cookie"
 		}
 	}
 
 	if isWebsocketUpgrade(r) {
-		return strings.TrimSpace(r.URL.Query().Get("token"))
+		return strings.TrimSpace(r.URL.Query().Get("token")), "query"
 	}
 
-	return ""
+	return "", ""
+}
+
+func gatewayRequestSecure(r *http.Request) bool {
+	if strings.EqualFold(strings.TrimSpace(firstForwardedProto(r.Header.Get("X-Forwarded-Proto"))), "https") {
+		return true
+	}
+	return r.TLS != nil
+}
+
+func firstForwardedProto(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if idx := strings.Index(value, ","); idx >= 0 {
+		value = value[:idx]
+	}
+	return strings.TrimSpace(value)
+}
+
+func setGatewayAuthCookie(w http.ResponseWriter, r *http.Request, token string, expiresAt *jwt.NumericDate) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return
+	}
+	maxAge := int((12 * time.Hour) / time.Second)
+	expires := time.Now().UTC().Add(12 * time.Hour)
+	if expiresAt != nil {
+		if exp := expiresAt.Time.UTC(); !exp.IsZero() {
+			ttl := time.Until(exp)
+			if ttl > 0 {
+				maxAge = int(ttl / time.Second)
+				expires = exp
+			}
+		}
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     authCookieName(),
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   gatewayRequestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   maxAge,
+		Expires:  expires,
+	})
 }
 
 func authCookieName() string {
