@@ -582,7 +582,11 @@ const launchDatabaseTool = async (tool) => {
     const endpoint = normalizedTool === 'phpmyadmin'
       ? '/db/tools/phpmyadmin/sso'
       : '/db/tools/pgadmin/sso'
-    const response = await api.post(endpoint, { ttl_seconds: 120 })
+    const requestedDomain = typeof route.query.domain === 'string' ? String(route.query.domain).trim() : ''
+    const payload = requestedDomain
+      ? { ttl_seconds: 120, domain: requestedDomain }
+      : { ttl_seconds: 120 }
+    const response = await api.post(endpoint, payload)
     const launchUrl = String(response?.data?.data?.url || '').trim()
     if (!launchUrl) {
       throw new Error(t('database_manager.notifications.tool_launch_failed'))

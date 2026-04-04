@@ -557,6 +557,10 @@ type DBToolToken struct {
 	Token     string
 	Tool      string
 	IssuedBy  string
+	Domain    string
+	Engine    string
+	DBName    string
+	DBUser    string
 	ExpiresAt time.Time
 }
 

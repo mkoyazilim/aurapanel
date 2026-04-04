@@ -1135,7 +1135,7 @@ async function launchDatabaseTool(tool) {
     const endpoint = normalizedTool === 'phpmyadmin'
       ? '/db/tools/phpmyadmin/sso'
       : '/db/tools/pgadmin/sso'
-    const response = await api.post(endpoint, { ttl_seconds: 120 })
+    const response = await api.post(endpoint, { ttl_seconds: 120, domain: domain.value })
     const launchUrl = String(response?.data?.data?.url || '').trim()
     if (!launchUrl) {
       throw new Error(t('website_manage.messages.db_tool_failed'))

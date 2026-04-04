@@ -138,6 +138,7 @@ func (s *service) startHousekeepingWorker() {
 func (s *service) runHousekeeping(now time.Time) {
 	cleanupServiceLoginAttempts(now)
 
+	expiredTempUsers := []dbToolTempUser{}
 	s.mu.Lock()
 	removedWebmailTokens := 0
 	for token, item := range s.modules.WebmailTokens {
@@ -150,13 +151,48 @@ func (s *service) runHousekeeping(now time.Time) {
 	for token, item := range s.modules.DBToolTokens {
 		if item.ExpiresAt.Before(now) {
 			delete(s.modules.DBToolTokens, token)
+			if secret, ok := s.dbToolLaunchSecrets[token]; ok {
+				delete(s.dbToolLaunchSecrets, token)
+				if secret.Credential.Temporary {
+					expiredTempUsers = append(expiredTempUsers, dbToolTempUser{
+						Engine:   secret.Credential.Engine,
+						Username: secret.Credential.Username,
+					})
+				}
+			}
 			removedDBToolTokens++
+		}
+	}
+	for token, secret := range s.dbToolLaunchSecrets {
+		if secret.ExpiresAt.Before(now) {
+			delete(s.dbToolLaunchSecrets, token)
+			if secret.Credential.Temporary {
+				expiredTempUsers = append(expiredTempUsers, dbToolTempUser{
+					Engine:   secret.Credential.Engine,
+					Username: secret.Credential.Username,
+				})
+			}
+		}
+	}
+	for key, item := range s.dbToolTempUsers {
+		if item.ExpiresAt.Before(now) {
+			delete(s.dbToolTempUsers, key)
+			expiredTempUsers = append(expiredTempUsers, item)
 		}
 	}
 
 	s.cleanupExpiredDBToolAccessLocked(now)
 	allowlistChanged, err := s.writeDBToolAllowlistFileLocked(now)
 	s.mu.Unlock()
+
+	for _, item := range dedupeDBToolTempUsers(expiredTempUsers) {
+		if strings.TrimSpace(item.Engine) == "" || strings.TrimSpace(item.Username) == "" {
+			continue
+		}
+		if dropErr := dropRuntimeTemporaryDBUser(item.Engine, item.Username); dropErr != nil {
+			log.Printf("housekeeping temp db user cleanup failed (%s/%s): %v", item.Engine, item.Username, dropErr)
+		}
+	}
 
 	if err != nil {
 		log.Printf("housekeeping allowlist write failed: %v", err)
@@ -167,6 +203,26 @@ func (s *service) runHousekeeping(now time.Time) {
 	if removedWebmailTokens > 0 || removedDBToolTokens > 0 || allowlistChanged {
 		s.enqueueStatePersist()
 	}
+}
+
+func dedupeDBToolTempUsers(items []dbToolTempUser) []dbToolTempUser {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	result := make([]dbToolTempUser, 0, len(items))
+	for _, item := range items {
+		key := dbToolTempUserKey(item.Engine, item.Username)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, item)
+	}
+	return result
 }
 
 func cleanupServiceLoginAttempts(now time.Time) {

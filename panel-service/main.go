@@ -27,15 +27,16 @@ import (
 )
 
 const (
-	defaultServiceAddr   = "127.0.0.1:8081"
-	defaultGatewayPort   = 8090
-	currentPanelVersion  = "Aura Panel V1"
-	updateCacheTTL       = 45 * time.Second
-	updateErrorCacheTTL  = 2 * time.Minute
-	defaultAdminEmail    = "admin@server.com"
-	maxJSONBodyBytes     = 1 << 20
-	defaultJWTSessionTTL = 12 * time.Hour
-	defaultAuthCookie    = "aurapanel_session"
+	defaultServiceAddr       = "127.0.0.1:8081"
+	defaultGatewayPort       = 8090
+	currentPanelVersion      = "Aura Panel V1"
+	updateCacheTTL           = 45 * time.Second
+	updateErrorCacheTTL      = 2 * time.Minute
+	defaultAdminEmail        = "admin@server.com"
+	maxJSONBodyBytes         = 1 << 20
+	defaultJWTSessionTTL     = 12 * time.Hour
+	defaultAuthCookie        = "aurapanel_session"
+	defaultDBToolTempUserTTL = 4 * time.Hour
 
 	serviceMaxFailedAttempts = 5
 	serviceFailureWindow     = 10 * time.Minute
@@ -293,6 +294,8 @@ type service struct {
 	startedAt           time.Time
 	state               appState
 	modules             moduleState
+	dbToolLaunchSecrets map[string]dbToolLaunchSecret
+	dbToolTempUsers     map[string]dbToolTempUser
 	update              updateStatusCache
 	updateJob           panelUpdateJobState
 	dbAccess            map[string]dbToolSessionGrant
@@ -369,14 +372,16 @@ func main() {
 
 func newService() *service {
 	svc := &service{
-		startedAt:          time.Now().UTC(),
-		state:              seedState(),
-		modules:            seedModuleState(),
-		persistQueue:       make(chan struct{}, 1),
-		persistDebounce:    statePersistDebounce(),
-		housekeepingEvery:  housekeepingInterval(),
-		securityStatusTTL:  securityStatusCacheTTL(),
-		securityStatusRate: map[string]securityStatusRateWindowState{},
+		startedAt:           time.Now().UTC(),
+		state:               seedState(),
+		modules:             seedModuleState(),
+		dbToolLaunchSecrets: map[string]dbToolLaunchSecret{},
+		dbToolTempUsers:     map[string]dbToolTempUser{},
+		persistQueue:        make(chan struct{}, 1),
+		persistDebounce:     statePersistDebounce(),
+		housekeepingEvery:   housekeepingInterval(),
+		securityStatusTTL:   securityStatusCacheTTL(),
+		securityStatusRate:  map[string]securityStatusRateWindowState{},
 	}
 	if err := svc.loadRuntimeState(); err != nil {
 		log.Printf("runtime state load skipped: %v", err)

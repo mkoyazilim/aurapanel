@@ -32,6 +32,103 @@ func postgresExec(query string) (string, error) {
 	return commandOutputTrimmed("runuser", "-u", "postgres", "--", "psql", "-tA", "-c", query)
 }
 
+func postgresExecDB(dbName, query string) (string, error) {
+	dbName = sanitizeDBName(dbName)
+	return commandOutputTrimmed("runuser", "-u", "postgres", "--", "psql", "-d", dbName, "-tA", "-c", query)
+}
+
+func buildTemporaryDBUsername(engine string) string {
+	prefix := "apsso_"
+	if normalizeEngine(engine) == "postgresql" {
+		prefix = "apsso_pg_"
+	}
+	randomPart := strings.ToLower(strings.TrimSpace(generateSecret(5)))
+	randomPart = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return -1
+	}, randomPart)
+	if randomPart == "" {
+		randomPart = "user"
+	}
+	username := sanitizeDBName(prefix + randomPart)
+	if len(username) > 30 {
+		username = username[:30]
+	}
+	return username
+}
+
+func createRuntimeTemporaryDBUser(engine, dbName, sourceUser string) (string, string, string, error) {
+	engine = normalizeEngine(engine)
+	dbName = sanitizeDBName(dbName)
+	sourceUser = sanitizeDBName(sourceUser)
+	if dbName == "" {
+		return "", "", "", fmt.Errorf("database name is required for temporary db user")
+	}
+
+	username := buildTemporaryDBUsername(engine)
+	password := generateSecret(18)
+	host := "localhost"
+
+	switch engine {
+	case "mariadb":
+		query := fmt.Sprintf(
+			"CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'; GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'; FLUSH PRIVILEGES;",
+			sqlQuote(username),
+			sqlQuote(password),
+			dbName,
+			sqlQuote(username),
+		)
+		if _, err := mysqlExec(query); err != nil {
+			return "", "", "", err
+		}
+	default:
+		roleIdent := postgresIdentifier(username)
+		if _, err := postgresExec(fmt.Sprintf("CREATE ROLE %s LOGIN INHERIT PASSWORD '%s';", roleIdent, sqlQuote(password))); err != nil {
+			return "", "", "", err
+		}
+		if sourceUser != "" {
+			if _, err := postgresExec(fmt.Sprintf("GRANT %s TO %s;", postgresIdentifier(sourceUser), roleIdent)); err != nil {
+				_, _ = postgresExec(fmt.Sprintf("DROP ROLE IF EXISTS %s;", roleIdent))
+				return "", "", "", err
+			}
+		}
+		if _, err := postgresExec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s;", postgresIdentifier(dbName), roleIdent)); err != nil {
+			_, _ = postgresExec(fmt.Sprintf("DROP ROLE IF EXISTS %s;", roleIdent))
+			return "", "", "", err
+		}
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("GRANT USAGE ON SCHEMA public TO %s;", roleIdent))
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO %s;", roleIdent))
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO %s;", roleIdent))
+		host = "127.0.0.1"
+	}
+
+	return username, password, host, nil
+}
+
+func dropRuntimeTemporaryDBUser(engine, username string) error {
+	engine = normalizeEngine(engine)
+	username = sanitizeDBName(username)
+	if username == "" {
+		return nil
+	}
+	if !strings.HasPrefix(username, "apsso_") {
+		return nil
+	}
+	switch engine {
+	case "mariadb":
+		_, err := mysqlExec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'; FLUSH PRIVILEGES;", sqlQuote(username)))
+		return err
+	default:
+		roleIdent := postgresIdentifier(username)
+		_, _ = postgresExec(fmt.Sprintf("REASSIGN OWNED BY %s TO postgres;", roleIdent))
+		_, _ = postgresExec(fmt.Sprintf("DROP OWNED BY %s;", roleIdent))
+		_, err := postgresExec(fmt.Sprintf("DROP ROLE IF EXISTS %s;", roleIdent))
+		return err
+	}
+}
+
 func formatBytesHuman(value int64) string {
 	if value >= 1024*1024*1024 {
 		return fmt.Sprintf("%.1f GB", float64(value)/(1024*1024*1024))
