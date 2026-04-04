@@ -97,7 +97,7 @@ jobs:
           if [ -n "${MIRROR_OWNER}" ]; then
             chown -R "${MIRROR_OWNER}" "${MIRROR_DIR}"
           fi
-REMOTE
+          REMOTE
 
       - name: Verify remote checksums
         run: |
