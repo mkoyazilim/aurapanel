@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -887,6 +889,24 @@ func (s *service) bootstrapModules() {
 			s.ensureMailArtifactsLocked(site)
 		}
 	}
+	if shouldBootstrapOLSSync() {
+		if err := s.syncOLSVhostsLocked(); err != nil && !strings.Contains(err.Error(), "runtime is not installed") {
+			log.Printf("openlitespeed bootstrap sync warning: %v", err)
+		}
+	}
+}
+
+func shouldBootstrapOLSSync() bool {
+	override := strings.ToLower(strings.TrimSpace(os.Getenv("AURAPANEL_DISABLE_BOOTSTRAP_OLS_SYNC")))
+	if override == "1" || override == "true" || override == "yes" || override == "on" {
+		return false
+	}
+	for _, arg := range os.Args {
+		if strings.Contains(strings.ToLower(arg), ".test") {
+			return false
+		}
+	}
+	return true
 }
 
 func buildWordPressSite(domain, owner, email, phpVersion string) WordPressSite {
