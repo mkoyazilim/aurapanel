@@ -724,7 +724,7 @@ const avatarInitial = computed(() => {
   return firstChar ? firstChar.toUpperCase() : 'A'
 })
 
-const can = (path) => canAccessPath(path, authStore.role)
+const can = (path) => canAccessPath(path, authStore.role, authStore.permissions)
 const canPanelUpdateAccess = computed(() => can('/panel-update'))
 const headerUpdateAvailable = computed(() => canPanelUpdateAccess.value && !!headerUpdateStatus.value.update_available)
 const canHostingGroup = computed(() =>

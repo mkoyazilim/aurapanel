@@ -5,10 +5,15 @@
         <h1 class="text-2xl font-bold text-white">{{ t('users.title') }}</h1>
         <p class="text-gray-400 mt-1">{{ t('users.subtitle') }}</p>
       </div>
-      <button class="btn-primary" @click="showAddModal = true">
-        <UserPlus class="w-5 h-5" />
-        {{ t('users.add_new') }}
-      </button>
+      <div class="flex items-center gap-2">
+        <button class="btn-secondary" @click="openRoleEditor">
+          Rol Editör
+        </button>
+        <button class="btn-primary" @click="showAddModal = true">
+          <UserPlus class="w-5 h-5" />
+          {{ t('users.add_new') }}
+        </button>
+      </div>
     </div>
 
     <!-- Loading / Error -->
@@ -34,6 +39,10 @@
               <span class="px-2 py-0.5 rounded text-xs font-semibold bg-panel-dark border border-panel-border">{{ user.package }}</span>
               <span v-if="user.role === 'reseller'" class="px-2 py-0.5 rounded text-xs font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20">Bayi</span>
               <span v-if="user.role === 'admin'" class="px-2 py-0.5 rounded text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">Admin</span>
+              <span v-if="user.is_owner" class="px-2 py-0.5 rounded text-xs font-semibold bg-orange-500/10 text-orange-300 border border-orange-500/20">Owner</span>
+              <span v-if="user.role_policy_name || user.role_policy_id" class="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                {{ user.role_policy_name || policyNameById(user.role_policy_id) }}
+              </span>
             </h3>
             <div class="text-sm text-gray-400 mt-1 flex items-center gap-4">
               <span>{{ user.email }}</span>
@@ -85,6 +94,15 @@
               </select>
             </div>
             <div>
+              <label class="block text-sm text-gray-400 mb-1">Yetki Rolü</label>
+              <select v-model="form.role_policy_id" class="aura-input w-full">
+                <option value="">Sistem Varsayılanı</option>
+                <option v-for="policy in rolePolicies" :key="`new-role-policy-${policy.id}`" :value="policy.id">
+                  {{ policy.name }}
+                </option>
+              </select>
+            </div>
+            <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('users.package') }}</label>
               <select v-model="form.package" class="aura-input w-full">
                 <option v-for="pkg in addPackageOptions" :key="`user-package-${pkg}`" :value="pkg">{{ pkg }}</option>
@@ -123,10 +141,19 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('users.role') }}</label>
-              <select v-model="editForm.role" class="aura-input w-full">
+              <select v-model="editForm.role" class="aura-input w-full" :disabled="editForm.is_owner">
                 <option value="user">{{ t('users.role_user') }}</option>
                 <option value="reseller">{{ t('users.role_reseller') }}</option>
                 <option value="admin">{{ t('users.role_admin') }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Yetki Rolü</label>
+              <select v-model="editForm.role_policy_id" class="aura-input w-full">
+                <option value="">Sistem Varsayılanı</option>
+                <option v-for="policy in rolePolicies" :key="`edit-role-policy-${policy.id}`" :value="policy.id">
+                  {{ policy.name }}
+                </option>
               </select>
             </div>
             <div>
@@ -136,7 +163,7 @@
               </select>
             </div>
             <label class="inline-flex items-center gap-2 text-sm text-gray-300">
-              <input v-model="editForm.active" type="checkbox" class="h-4 w-4" />
+              <input v-model="editForm.active" type="checkbox" class="h-4 w-4" :disabled="editForm.is_owner" />
               {{ t('users.active_account') }}
             </label>
           </div>
@@ -173,6 +200,79 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showRoleEditorModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-panel-card border border-panel-border rounded-2xl p-6 w-full max-w-5xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h2 class="text-xl font-bold text-white">Role Editör</h2>
+              <p class="text-sm text-gray-400 mt-1">Yeni yetki rolü oluşturun, izinleri checkbox ile seçin.</p>
+            </div>
+            <button class="btn-secondary" @click="closeRoleEditor">Kapat</button>
+          </div>
+
+          <div v-if="roleEditorError" class="aura-card border-red-500/30 bg-red-500/5 text-red-400 mb-4">{{ roleEditorError }}</div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Rol Adı</label>
+                <input v-model="policyForm.name" type="text" class="aura-input w-full" placeholder="Editor, Destek, Operasyon..." />
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Açıklama</label>
+                <input v-model="policyForm.description" type="text" class="aura-input w-full" placeholder="Rol açıklaması" />
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-2">Yetkiler</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <label
+                    v-for="perm in rolePermissionCatalog"
+                    :key="perm.key"
+                    class="flex items-center gap-2 rounded border border-panel-border bg-panel-darker/50 px-3 py-2 text-sm text-gray-200"
+                  >
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4"
+                      :checked="policyHasPermission(perm.key)"
+                      @change="togglePolicyPermission(perm.key, $event.target.checked)"
+                    />
+                    <span>{{ perm.label }}</span>
+                    <span class="text-[11px] text-gray-500 ml-auto">{{ perm.key }}</span>
+                  </label>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn-primary" :disabled="roleEditorLoading" @click="savePolicy">
+                  <Loader2 v-if="roleEditorLoading" class="w-4 h-4 animate-spin mr-2 inline" />
+                  {{ policyForm.id ? 'Rolü Güncelle' : 'Rolü Kaydet' }}
+                </button>
+                <button class="btn-secondary" :disabled="roleEditorLoading" @click="resetPolicyForm">Temizle</button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <h3 class="text-sm font-semibold text-gray-300">Tanımlı Roller</h3>
+              <div v-for="policy in rolePolicies" :key="`role-editor-${policy.id}`" class="rounded border border-panel-border bg-panel-darker/50 p-3">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-white font-semibold">{{ policy.name }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">{{ policy.description || '-' }}</p>
+                    <p class="text-[11px] text-gray-500 mt-1">{{ (policy.permissions || []).length }} yetki</p>
+                  </div>
+                  <div class="flex gap-1">
+                    <button class="btn-secondary px-2 py-1 text-xs" @click="editPolicy(policy)">Düzenle</button>
+                    <button class="btn-danger px-2 py-1 text-xs" @click="deletePolicy(policy)">Sil</button>
+                  </div>
+                </div>
+              </div>
+              <div v-if="rolePolicies.length === 0" class="text-sm text-gray-500">Henüz rol tanımı yok.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -181,6 +281,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UserPlus, UserMinus, Globe, Loader2, KeyRound, Pencil } from 'lucide-vue-next'
 import api from '../services/api'
+import { ROLE_PERMISSION_CATALOG } from '../security/rbac'
 
 const { t } = useI18n()
 const users = ref([])
@@ -192,10 +293,16 @@ const showEditModal = ref(false)
 const editLoading = ref(false)
 const showPasswordModal = ref(false)
 const passwordLoading = ref(false)
+const showRoleEditorModal = ref(false)
+const roleEditorLoading = ref(false)
+const roleEditorError = ref('')
 const passwordForm = ref({ username: '', new_password: '' })
 const hostingPackages = ref([])
-const form = ref({ username: '', email: '', password: '', role: 'user', package: 'default' })
-const editForm = ref({ username: '', name: '', email: '', role: 'user', package: 'default', active: true })
+const rolePolicies = ref([])
+const rolePermissionCatalog = ROLE_PERMISSION_CATALOG
+const form = ref({ username: '', email: '', password: '', role: 'user', role_policy_id: '', package: 'default' })
+const editForm = ref({ username: '', name: '', email: '', role: 'user', role_policy_id: '', package: 'default', active: true, is_owner: false })
+const policyForm = ref({ id: '', name: '', description: '', permissions: [] })
 
 function packageOptionsForRole(role) {
   const names = new Set(['default'])
@@ -206,7 +313,7 @@ function packageOptionsForRole(role) {
     const planType = String(pkg?.plan_type || 'hosting').trim().toLowerCase()
     if (!name) continue
     if (wantsResellerPackage && planType !== 'reseller') continue
-    if (!wantsResellerPackage && form.value.role !== 'admin' && planType === 'reseller') continue
+    if (!wantsResellerPackage && role !== 'admin' && planType === 'reseller') continue
     names.add(name)
   }
 
@@ -223,7 +330,7 @@ async function loadUsers() {
   error.value = null
   try {
     const res = await api.get('/users/list')
-    users.value = res.data.data || []
+    users.value = res.data?.data || []
   } catch (e) {
     error.value = t('common.error')
   } finally {
@@ -240,16 +347,39 @@ async function loadPackages() {
   }
 }
 
+async function loadPolicies() {
+  try {
+    const res = await api.get('/acl/policies')
+    rolePolicies.value = res.data?.data || []
+  } catch {
+    rolePolicies.value = []
+  }
+}
+
+function policyNameById(policyID) {
+  return rolePolicies.value.find((item) => item.id === policyID)?.name || policyID || 'Sistem Varsayılanı'
+}
+
 async function addUser() {
   if (!form.value.username || !form.value.email) return
   addLoading.value = true
   try {
-    await api.post('/users/create', form.value)
+    await api.post('/users/create', {
+      ...form.value,
+      role_policy_id: form.value.role_policy_id || '',
+    })
     showAddModal.value = false
-    form.value = { username: '', email: '', password: '', role: 'user', package: addPackageOptions.value[0] || 'default' }
+    form.value = {
+      username: '',
+      email: '',
+      password: '',
+      role: 'user',
+      role_policy_id: '',
+      package: addPackageOptions.value[0] || 'default',
+    }
     await loadUsers()
   } catch (e) {
-    error.value = t('common.error')
+    error.value = e?.response?.data?.message || t('common.error')
   } finally {
     addLoading.value = false
   }
@@ -271,15 +401,17 @@ function openEditModal(user) {
     name: user.name || '',
     email: user.email || '',
     role: user.role || 'user',
+    role_policy_id: user.role_policy_id || '',
     package: user.package || 'default',
     active: !!user.active,
+    is_owner: !!user.is_owner,
   }
   showEditModal.value = true
 }
 
 function closeEditModal() {
   showEditModal.value = false
-  editForm.value = { username: '', name: '', email: '', role: 'user', package: 'default', active: true }
+  editForm.value = { username: '', name: '', email: '', role: 'user', role_policy_id: '', package: 'default', active: true, is_owner: false }
 }
 
 async function updateUser() {
@@ -291,6 +423,7 @@ async function updateUser() {
       name: editForm.value.name,
       email: editForm.value.email,
       role: editForm.value.role,
+      role_policy_id: editForm.value.role_policy_id || '',
       package: editForm.value.package,
       active: !!editForm.value.active,
     })
@@ -332,6 +465,87 @@ async function changePassword() {
   }
 }
 
+function resetPolicyForm() {
+  policyForm.value = { id: '', name: '', description: '', permissions: [] }
+}
+
+function policyHasPermission(permissionKey) {
+  return (policyForm.value.permissions || []).includes(permissionKey)
+}
+
+function togglePolicyPermission(permissionKey, checked) {
+  const current = new Set(policyForm.value.permissions || [])
+  if (checked) {
+    current.add(permissionKey)
+  } else {
+    current.delete(permissionKey)
+  }
+  policyForm.value.permissions = Array.from(current)
+}
+
+function openRoleEditor() {
+  showRoleEditorModal.value = true
+  roleEditorError.value = ''
+  resetPolicyForm()
+  loadPolicies()
+}
+
+function closeRoleEditor() {
+  showRoleEditorModal.value = false
+  roleEditorError.value = ''
+  resetPolicyForm()
+}
+
+function editPolicy(policy) {
+  policyForm.value = {
+    id: policy.id || '',
+    name: policy.name || '',
+    description: policy.description || '',
+    permissions: [...(policy.permissions || [])],
+  }
+}
+
+async function savePolicy() {
+  if (!policyForm.value.name?.trim()) {
+    roleEditorError.value = 'Rol adı zorunludur.'
+    return
+  }
+  roleEditorLoading.value = true
+  roleEditorError.value = ''
+  try {
+    await api.post('/acl/policies', {
+      id: policyForm.value.id || '',
+      name: policyForm.value.name.trim(),
+      description: (policyForm.value.description || '').trim(),
+      permissions: [...(policyForm.value.permissions || [])],
+    })
+    resetPolicyForm()
+    await Promise.all([loadPolicies(), loadUsers()])
+  } catch (e) {
+    roleEditorError.value = e?.response?.data?.message || t('common.error')
+  } finally {
+    roleEditorLoading.value = false
+  }
+}
+
+async function deletePolicy(policy) {
+  if (!policy?.id) return
+  if (!window.confirm(`"${policy.name}" rolünü silmek istiyor musunuz?`)) return
+  roleEditorLoading.value = true
+  roleEditorError.value = ''
+  try {
+    await api.delete('/acl/policies', { params: { id: policy.id } })
+    await Promise.all([loadPolicies(), loadUsers()])
+    if (policyForm.value.id === policy.id) {
+      resetPolicyForm()
+    }
+  } catch (e) {
+    roleEditorError.value = e?.response?.data?.message || t('common.error')
+  } finally {
+    roleEditorLoading.value = false
+  }
+}
+
 watch(addPackageOptions, (options) => {
   if (!options.length) return
   if (!options.includes(form.value.package)) {
@@ -347,6 +561,6 @@ watch(editPackageOptions, (options) => {
 }, { immediate: true })
 
 onMounted(async () => {
-  await Promise.all([loadUsers(), loadPackages()])
+  await Promise.all([loadUsers(), loadPackages(), loadPolicies()])
 })
 </script>

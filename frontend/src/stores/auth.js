@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import api from '../services/api'
 import i18n from '../i18n'
 import { useNotificationStore } from './notifications'
-import { normalizeRole } from '../security/rbac'
+import { normalizePermissions, normalizeRole } from '../security/rbac'
 
 const TOKEN_KEY = 'aura_token'
 const USER_KEY = 'aura_user'
@@ -48,10 +48,12 @@ function normalizeUserPayload(raw) {
   if (!raw || typeof raw !== 'object') return null
   const email = typeof raw.email === 'string' ? raw.email : ''
   const username = raw.username || raw.name || (email.includes('@') ? email.split('@')[0] : '')
+  const permissions = normalizePermissions(raw.permissions)
   return {
     ...raw,
     username,
     name: raw.name || username,
+    permissions,
   }
 }
 
@@ -106,6 +108,7 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     role: (state) => normalizeRole(state.user?.role),
+    permissions: (state) => normalizePermissions(state.user?.permissions),
     isAdmin: (state) => normalizeRole(state.user?.role) === 'admin',
     isReseller: (state) => normalizeRole(state.user?.role) === 'reseller',
     isUser: (state) => normalizeRole(state.user?.role) === 'user',

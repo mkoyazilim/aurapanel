@@ -9,7 +9,85 @@ const (
 	roleAdmin    = "admin"
 	roleReseller = "reseller"
 	roleUser     = "user"
+
+	permissionUsersManage      = "users.manage"
+	permissionPackagesManage   = "packages.manage"
+	permissionResellerManage   = "reseller.manage"
+	permissionWebsitesManage   = "websites.manage"
+	permissionDNSManage        = "dns.manage"
+	permissionDatabasesManage  = "databases.manage"
+	permissionMailManage       = "mail.manage"
+	permissionFTPManage        = "ftp.manage"
+	permissionSFTPManage       = "sftp.manage"
+	permissionBackupsManage    = "backups.manage"
+	permissionAppsManage       = "apps.manage"
+	permissionRuntimeManage    = "runtime.manage"
+	permissionFilesManage      = "files.manage"
+	permissionTerminalManage   = "terminal.manage"
+	permissionPHPManage        = "php.manage"
+	permissionSSLManage        = "ssl.manage"
+	permissionSecurityManage   = "security.manage"
+	permissionMonitoringRead   = "monitoring.read"
+	permissionLogsRead         = "logs.read"
+	permissionCronManage       = "cron.manage"
+	permissionCloudflareManage = "cloudflare.manage"
+	permissionMigrationManage  = "migration.manage"
+	permissionCloudlinuxManage = "cloudlinux.manage"
+	permissionMinioManage      = "minio.manage"
+	permissionActivityRead     = "activity.read"
+	permissionOpsManage        = "ops.manage"
+	permissionPanelManage      = "panel.manage"
+	permissionAIManage         = "ai.manage"
 )
+
+type permissionRule struct {
+	prefix      string
+	permissions []string
+}
+
+var permissionRules = []permissionRule{
+	{prefix: "/api/v1/users", permissions: []string{permissionUsersManage}},
+	{prefix: "/api/v1/acl", permissions: []string{permissionUsersManage}},
+	{prefix: "/api/v1/packages", permissions: []string{permissionPackagesManage, permissionUsersManage}},
+	{prefix: "/api/v1/reseller", permissions: []string{permissionResellerManage}},
+	{prefix: "/api/v1/vhost", permissions: []string{permissionWebsitesManage}},
+	{prefix: "/api/v1/websites", permissions: []string{permissionWebsitesManage}},
+	{prefix: "/api/v1/analytics", permissions: []string{permissionWebsitesManage}},
+	{prefix: "/api/v1/dns", permissions: []string{permissionDNSManage}},
+	{prefix: "/api/v1/db/backup", permissions: []string{permissionBackupsManage}},
+	{prefix: "/api/v1/db", permissions: []string{permissionDatabasesManage}},
+	{prefix: "/api/v1/mail", permissions: []string{permissionMailManage}},
+	{prefix: "/api/v1/ftp", permissions: []string{permissionFTPManage}},
+	{prefix: "/api/v1/sftp", permissions: []string{permissionSFTPManage}},
+	{prefix: "/api/v1/backup", permissions: []string{permissionBackupsManage}},
+	{prefix: "/api/v1/apps", permissions: []string{permissionAppsManage}},
+	{prefix: "/api/v1/wordpress", permissions: []string{permissionAppsManage}},
+	{prefix: "/api/v1/plugins", permissions: []string{permissionAppsManage}},
+	{prefix: "/api/v1/docker", permissions: []string{permissionRuntimeManage}},
+	{prefix: "/api/v1/runtime", permissions: []string{permissionRuntimeManage}},
+	{prefix: "/api/v1/files", permissions: []string{permissionFilesManage}},
+	{prefix: "/api/v1/terminal", permissions: []string{permissionTerminalManage}},
+	{prefix: "/api/v1/php", permissions: []string{permissionPHPManage}},
+	{prefix: "/api/v1/ssl", permissions: []string{permissionSSLManage}},
+	{prefix: "/api/v1/security", permissions: []string{permissionSecurityManage}},
+	{prefix: "/api/v1/status", permissions: []string{permissionMonitoringRead}},
+	{prefix: "/api/v1/monitor/logs", permissions: []string{permissionLogsRead}},
+	{prefix: "/api/v1/monitor/cron", permissions: []string{permissionCronManage}},
+	{prefix: "/api/v1/monitor", permissions: []string{permissionMonitoringRead}},
+	{prefix: "/api/v1/cloudflare", permissions: []string{permissionCloudflareManage}},
+	{prefix: "/api/v1/migration", permissions: []string{permissionMigrationManage}},
+	{prefix: "/api/v1/cloudlinux", permissions: []string{permissionCloudlinuxManage}},
+	{prefix: "/api/v1/minio", permissions: []string{permissionMinioManage}},
+	{prefix: "/api/v1/activity", permissions: []string{permissionActivityRead}},
+	{prefix: "/api/v1/ops", permissions: []string{permissionOpsManage}},
+	{prefix: "/api/v1/federated", permissions: []string{permissionOpsManage}},
+	{prefix: "/api/v1/panel", permissions: []string{permissionPanelManage}},
+	{prefix: "/api/v1/update", permissions: []string{permissionPanelManage}},
+	{prefix: "/api/v1/system", permissions: []string{permissionPanelManage}},
+	{prefix: "/api/v1/ai", permissions: []string{permissionAIManage}},
+	{prefix: "/phpmyadmin", permissions: []string{permissionDatabasesManage}},
+	{prefix: "/pgadmin4", permissions: []string{permissionDatabasesManage}},
+}
 
 func normalizeRole(role string) string {
 	switch strings.ToLower(strings.TrimSpace(role)) {
@@ -114,16 +192,66 @@ func userAllowed(method, path string) bool {
 }
 
 func isAuthorized(role, method, path string) bool {
+	return isAuthorizedWithPermissions(role, nil, method, path)
+}
+
+func normalizePermissionSet(permissions []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(permissions))
+	for _, item := range permissions {
+		key := strings.TrimSpace(item)
+		if key == "" {
+			continue
+		}
+		set[key] = struct{}{}
+	}
+	return set
+}
+
+func requiredPermissionsForPath(path string) ([]string, bool) {
+	if path == "/api/v1/auth/me" || path == "/api/v1/auth/logout" {
+		return []string{}, true
+	}
+	for _, rule := range permissionRules {
+		if pathMatchesPrefix(path, rule.prefix) {
+			return rule.permissions, true
+		}
+	}
+	return nil, false
+}
+
+func isAuthorizedWithPermissions(role string, permissions []string, method, path string) bool {
 	switch normalizeRole(role) {
 	case roleAdmin:
 		return true
+	}
+
+	if len(permissions) > 0 {
+		required, mapped := requiredPermissionsForPath(path)
+		if !mapped {
+			return false
+		}
+		if len(required) == 0 {
+			return true
+		}
+		permissionSet := normalizePermissionSet(permissions)
+		if _, ok := permissionSet["*"]; ok {
+			return true
+		}
+		for _, requiredPermission := range required {
+			if _, ok := permissionSet[requiredPermission]; ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	switch normalizeRole(role) {
 	case roleReseller:
 		return resellerAllowed(path)
 	case roleUser:
 		return userAllowed(method, path)
-	default:
-		return false
 	}
+	return false
 }
 
 // RBACMiddleware enforces endpoint-level role permissions after authentication.
@@ -135,7 +263,7 @@ func RBACMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !isAuthorized(user.Role, r.Method, r.URL.Path) {
+		if !isAuthorizedWithPermissions(user.Role, user.Permissions, r.Method, r.URL.Path) {
 			WriteError(w, r, http.StatusForbidden, "AUTH_FORBIDDEN", "Role is not allowed for this endpoint")
 			return
 		}

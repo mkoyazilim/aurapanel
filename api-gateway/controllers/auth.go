@@ -27,11 +27,14 @@ type AuthResponse struct {
 }
 
 type User struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Role     string `json:"role"`
-	Username string `json:"username,omitempty"`
+	ID           int      `json:"id"`
+	Name         string   `json:"name"`
+	Email        string   `json:"email"`
+	Role         string   `json:"role"`
+	Username     string   `json:"username,omitempty"`
+	Permissions  []string `json:"permissions,omitempty"`
+	RolePolicyID string   `json:"role_policy_id,omitempty"`
+	RolePolicy   string   `json:"role_policy_name,omitempty"`
 }
 
 type adminCredentials struct {
@@ -300,10 +303,13 @@ func Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, User{
-		ID:       1,
-		Name:     authUser.Name,
-		Email:    authUser.Email,
-		Role:     authUser.Role,
-		Username: authUser.Username,
+		ID:           1,
+		Name:         authUser.Name,
+		Email:        authUser.Email,
+		Role:         authUser.Role,
+		Username:     authUser.Username,
+		Permissions:  append([]string(nil), authUser.Permissions...),
+		RolePolicyID: authUser.RolePolicyID,
+		RolePolicy:   authUser.RolePolicy,
 	})
 }

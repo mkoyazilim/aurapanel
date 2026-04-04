@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -102,7 +103,11 @@ func writeManagedFile(path, content string) error {
 	if err := os.MkdirAll(filepath.Dir(resolved), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(resolved, []byte(content), 0o644)
+	if err := os.WriteFile(resolved, []byte(content), 0o644); err != nil {
+		return err
+	}
+	applyManagedPathOwnershipFromParent(resolved)
+	return nil
 }
 
 func renameManagedPath(oldPath, newPath string) error {
@@ -117,7 +122,11 @@ func renameManagedPath(oldPath, newPath string) error {
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		return err
 	}
-	return os.Rename(from, to)
+	if err := os.Rename(from, to); err != nil {
+		return err
+	}
+	applyManagedPathOwnershipFromParent(to)
+	return nil
 }
 
 func trashManagedPath(path string) error {
@@ -147,7 +156,11 @@ func createManagedDir(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.MkdirAll(resolved, 0o755)
+	if err := os.MkdirAll(resolved, 0o755); err != nil {
+		return err
+	}
+	applyManagedPathOwnershipFromParent(resolved)
+	return nil
 }
 
 func setManagedPermissions(path, modeValue string) error {
@@ -374,17 +387,74 @@ func extractManagedArchive(archivePath, destDir string) error {
 		return err
 	}
 	lower := strings.ToLower(archive)
+	var extractErr error
 	switch {
 	case strings.HasSuffix(lower, ".zip"):
 		if binaryAvailable("unzip") {
-			return runManagedArchiveCommand("unzip", "-o", archive, "-d", dest)
+			extractErr = runManagedArchiveCommand("unzip", "-o", archive, "-d", dest)
+			break
 		}
-		return extractZipArchive(archive, dest)
+		extractErr = extractZipArchive(archive, dest)
 	case strings.HasSuffix(lower, ".tar"):
-		return runManagedArchiveCommand("tar", "-xf", archive, "-C", dest)
+		extractErr = runManagedArchiveCommand("tar", "-xf", archive, "-C", dest)
 	default:
-		return runManagedArchiveCommand("tar", "-xzf", archive, "-C", dest)
+		extractErr = runManagedArchiveCommand("tar", "-xzf", archive, "-C", dest)
 	}
+	if extractErr != nil {
+		return extractErr
+	}
+	applyManagedTreeOwnershipFromParent(dest)
+	return nil
+}
+
+func applyManagedPathOwnershipFromParent(path string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	parent := filepath.Dir(path)
+	uid, gid, err := managedPathOwnerIDs(parent)
+	if err != nil {
+		return
+	}
+	_ = os.Chown(path, uid, gid)
+}
+
+func applyManagedTreeOwnershipFromParent(path string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	parent := filepath.Dir(path)
+	uid, gid, err := managedPathOwnerIDs(parent)
+	if err != nil {
+		return
+	}
+	_ = filepath.Walk(path, func(current string, _ os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		_ = os.Chown(current, uid, gid)
+		return nil
+	})
+}
+
+func managedPathOwnerIDs(path string) (int, int, error) {
+	output, err := commandOutputTrimmed("stat", "-c", "%u:%g", path)
+	if err != nil {
+		return 0, 0, err
+	}
+	parts := strings.Split(strings.TrimSpace(output), ":")
+	if len(parts) != 2 {
+		return 0, 0, errors.New("path ownership metadata unavailable")
+	}
+	uid, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	gid, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return uid, gid, nil
 }
 
 func tailManagedFile(path string, limit int) ([]string, error) {

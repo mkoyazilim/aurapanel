@@ -102,16 +102,20 @@ type Package struct {
 }
 
 type PanelUser struct {
-	ID           int    `json:"id"`
-	Username     string `json:"username"`
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	Role         string `json:"role"`
-	Package      string `json:"package"`
-	Sites        int    `json:"sites"`
-	Active       bool   `json:"active"`
-	TwoFAEnabled bool   `json:"two_fa_enabled"`
-	PasswordHash string `json:"password_hash,omitempty"`
+	ID           int      `json:"id"`
+	Username     string   `json:"username"`
+	Name         string   `json:"name"`
+	Email        string   `json:"email"`
+	Role         string   `json:"role"`
+	Package      string   `json:"package"`
+	IsOwner      bool     `json:"is_owner,omitempty"`
+	RolePolicyID string   `json:"role_policy_id,omitempty"`
+	RolePolicy   string   `json:"role_policy_name,omitempty"`
+	Permissions  []string `json:"permissions,omitempty"`
+	Sites        int      `json:"sites"`
+	Active       bool     `json:"active"`
+	TwoFAEnabled bool     `json:"two_fa_enabled"`
+	PasswordHash string   `json:"password_hash,omitempty"`
 }
 
 type DatabaseRecord struct {
@@ -315,10 +319,13 @@ type service struct {
 }
 
 type jwtClaims struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	Username string `json:"username,omitempty"`
+	Email        string   `json:"email"`
+	Name         string   `json:"name"`
+	Role         string   `json:"role"`
+	Username     string   `json:"username,omitempty"`
+	Permissions  []string `json:"permissions,omitempty"`
+	RolePolicyID string   `json:"role_policy_id,omitempty"`
+	RolePolicy   string   `json:"role_policy_name,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -327,10 +334,13 @@ type serviceContextKey string
 const servicePrincipalContextKey serviceContextKey = "service_principal"
 
 type servicePrincipal struct {
-	Email    string
-	Name     string
-	Role     string
-	Username string
+	Email        string
+	Name         string
+	Role         string
+	Username     string
+	Permissions  []string
+	RolePolicyID string
+	RolePolicy   string
 }
 
 type serviceLoginAttempt struct {
@@ -386,6 +396,10 @@ func newService() *service {
 	if err := svc.loadRuntimeState(); err != nil {
 		log.Printf("runtime state load skipped: %v", err)
 	}
+	svc.mu.Lock()
+	svc.ensureOwnerConsistencyLocked()
+	svc.reconcileUserRolePoliciesLocked()
+	svc.mu.Unlock()
 	svc.bootstrapModules()
 	svc.initializeDBToolAccessRuntime()
 	svc.startStatePersistenceWorker()
@@ -404,6 +418,7 @@ func seedState() appState {
 			Email:        adminEmail,
 			Role:         "admin",
 			Package:      "default",
+			IsOwner:      true,
 			Sites:        0,
 			Active:       true,
 			TwoFAEnabled: false,
@@ -599,6 +614,9 @@ func servicePrincipalFromHeaders(r *http.Request) (servicePrincipal, bool) {
 	role := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Aura-Auth-Role")))
 	name := strings.TrimSpace(r.Header.Get("X-Aura-Auth-Name"))
 	username := sanitizeName(strings.TrimSpace(r.Header.Get("X-Aura-Auth-Username")))
+	rolePolicyID := strings.TrimSpace(r.Header.Get("X-Aura-Auth-Role-Policy-Id"))
+	rolePolicy := strings.TrimSpace(r.Header.Get("X-Aura-Auth-Role-Policy-Name"))
+	permissions := splitCSV(strings.TrimSpace(r.Header.Get("X-Aura-Auth-Permissions")))
 	if username == "" {
 		username = sanitizeName(strings.Split(strings.ToLower(email), "@")[0])
 	}
@@ -609,10 +627,13 @@ func servicePrincipalFromHeaders(r *http.Request) (servicePrincipal, bool) {
 		return servicePrincipal{}, false
 	}
 	return servicePrincipal{
-		Email:    strings.ToLower(email),
-		Name:     name,
-		Role:     role,
-		Username: username,
+		Email:        strings.ToLower(email),
+		Name:         name,
+		Role:         role,
+		Username:     username,
+		Permissions:  permissions,
+		RolePolicyID: rolePolicyID,
+		RolePolicy:   rolePolicy,
 	}, true
 }
 
@@ -1652,15 +1673,19 @@ func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	var (
-		matchedUser PanelUser
-		matchedOK   bool
-		totpSecret  string
+		matchedUser    PanelUser
+		matchedOK      bool
+		totpSecret     string
+		rolePolicyID   string
+		rolePolicyName string
+		permissions    []string
 	)
 	for i := range s.state.Users {
 		user := s.state.Users[i]
 		if strings.EqualFold(user.Email, email) || strings.EqualFold(user.Username, email) {
 			matchedUser = user
 			totpSecret = s.state.TwoFASecrets[user.Username]
+			rolePolicyID, rolePolicyName, permissions = s.resolveUserACLLocked(user)
 			matchedOK = true
 			break
 		}
@@ -1691,7 +1716,7 @@ func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	serviceClearLoginAttempts(attemptKey)
 
-	token, err := issueToken(matchedUser)
+	token, err := issueToken(matchedUser, permissions, rolePolicyID, rolePolicyName)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Token generation failed.")
 		return
@@ -1702,7 +1727,7 @@ func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"token":  token,
-		"user":   publicUser(matchedUser),
+		"user":   buildAuthUserPayload(matchedUser, permissions, rolePolicyID, rolePolicyName),
 	})
 }
 
@@ -1851,6 +1876,17 @@ func (s *service) ownerPackageLocked(owner string) (Package, bool) {
 	return Package{}, false
 }
 
+func (s *service) ownerIsUnlimitedLocked(owner string) bool {
+	owner = sanitizeName(owner)
+	if owner == "" {
+		return false
+	}
+	if user := s.findUserLocked(owner); user != nil {
+		return user.IsOwner || normalizeRole(user.Role) == "admin"
+	}
+	return owner == "admin"
+}
+
 func ownerMatches(candidate, owner string) bool {
 	return sanitizeName(candidate) == sanitizeName(owner)
 }
@@ -1891,6 +1927,9 @@ func (s *service) ownerEmailCountLocked(owner string) int {
 }
 
 func (s *service) enforceOwnerDomainsLimitLocked(owner string) error {
+	if s.ownerIsUnlimitedLocked(owner) {
+		return nil
+	}
 	pkg, ok := s.ownerPackageLocked(owner)
 	if !ok || pkg.Domains <= 0 {
 		return nil
@@ -1902,6 +1941,9 @@ func (s *service) enforceOwnerDomainsLimitLocked(owner string) error {
 }
 
 func (s *service) enforceOwnerDatabasesLimitLocked(owner string) error {
+	if s.ownerIsUnlimitedLocked(owner) {
+		return nil
+	}
 	pkg, ok := s.ownerPackageLocked(owner)
 	if !ok || pkg.Databases <= 0 {
 		return nil
@@ -1913,6 +1955,9 @@ func (s *service) enforceOwnerDatabasesLimitLocked(owner string) error {
 }
 
 func (s *service) enforceOwnerEmailsLimitLocked(owner string) error {
+	if s.ownerIsUnlimitedLocked(owner) {
+		return nil
+	}
 	pkg, ok := s.ownerPackageLocked(owner)
 	if !ok || pkg.Emails <= 0 {
 		return nil
@@ -2203,16 +2248,17 @@ func (s *service) handleVhostUpdate(w http.ResponseWriter, r *http.Request) {
 func (s *service) handleUsersList(w http.ResponseWriter) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: publicUsers(s.state.Users)})
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.publicUsersLocked(s.state.Users)})
 }
 
 func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Username string `json:"username"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
-		Package  string `json:"package"`
+		Username     string `json:"username"`
+		Email        string `json:"email"`
+		Password     string `json:"password"`
+		Role         string `json:"role"`
+		Package      string `json:"package"`
+		RolePolicyID string `json:"role_policy_id"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user payload.")
@@ -2249,6 +2295,13 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	passwordHash := mustHashPassword(rawPassword)
+	rolePolicyID := strings.TrimSpace(payload.RolePolicyID)
+	if rolePolicyID != "" {
+		if !s.policyExistsLocked(rolePolicyID) {
+			writeError(w, http.StatusBadRequest, "Selected role policy was not found.")
+			return
+		}
+	}
 	user := PanelUser{
 		ID:           s.state.NextUserID,
 		Username:     username,
@@ -2256,6 +2309,7 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		Email:        email,
 		Role:         normalizeRole(payload.Role),
 		Package:      firstNonEmpty(strings.TrimSpace(payload.Package), "default"),
+		RolePolicyID: rolePolicyID,
 		Sites:        0,
 		Active:       true,
 		TwoFAEnabled: false,
@@ -2263,18 +2317,20 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	s.state.NextUserID++
 	s.state.Users = append(s.state.Users, user)
+	s.setACLAssignmentLocked(user.Username, rolePolicyID)
 
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "User created.", Data: publicUser(user)})
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "User created.", Data: s.publicUserLocked(user)})
 }
 
 func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Username string `json:"username"`
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Role     string `json:"role"`
-		Package  string `json:"package"`
-		Active   *bool  `json:"active"`
+		Username     string  `json:"username"`
+		Name         string  `json:"name"`
+		Email        string  `json:"email"`
+		Role         string  `json:"role"`
+		Package      string  `json:"package"`
+		RolePolicyID *string `json:"role_policy_id"`
+		Active       *bool   `json:"active"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user update payload.")
@@ -2298,6 +2354,11 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 
 	current := s.state.Users[index]
 	updated := current
+	if strings.TrimSpace(updated.RolePolicyID) == "" {
+		if policyID, _, _ := s.resolveUserACLLocked(updated); policyID != "" {
+			updated.RolePolicyID = policyID
+		}
+	}
 
 	if name := strings.TrimSpace(payload.Name); name != "" {
 		updated.Name = name
@@ -2314,6 +2375,14 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if pkg := strings.TrimSpace(payload.Package); pkg != "" {
 		updated.Package = pkg
+	}
+	if payload.RolePolicyID != nil {
+		rolePolicyID := strings.TrimSpace(*payload.RolePolicyID)
+		if rolePolicyID != "" && !s.policyExistsLocked(rolePolicyID) {
+			writeError(w, http.StatusBadRequest, "Selected role policy was not found.")
+			return
+		}
+		updated.RolePolicyID = rolePolicyID
 	}
 	if updated.Package == "" {
 		updated.Package = "default"
@@ -2345,6 +2414,17 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "At least one active admin user is required.")
 		return
 	}
+	if current.IsOwner {
+		if normalizeRole(updated.Role) != "admin" {
+			writeError(w, http.StatusForbidden, "Owner account role cannot be changed.")
+			return
+		}
+		if !updated.Active {
+			writeError(w, http.StatusForbidden, "Owner account cannot be deactivated.")
+			return
+		}
+		updated.IsOwner = true
+	}
 
 	adminEmail, _ := loadAdminSeedCredentials()
 	oldEmail := strings.TrimSpace(current.Email)
@@ -2375,15 +2455,17 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.state.Users[index] = updated
+	s.setACLAssignmentLocked(updated.Username, updated.RolePolicyID)
 	s.recountSitesLocked()
 	if err := s.saveRuntimeStateLocked(); err != nil {
 		s.state.Users[index] = current
+		s.setACLAssignmentLocked(current.Username, current.RolePolicyID)
 		rollbackEnv()
 		writeError(w, http.StatusInternalServerError, "User update could not be persisted.")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "User updated.", Data: publicUser(updated)})
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "User updated.", Data: s.publicUserLocked(updated)})
 }
 
 func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
@@ -2411,8 +2493,10 @@ func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 
 	previousUsers := append([]PanelUser(nil), s.state.Users...)
 	previousWebsites := append([]Website(nil), s.state.Websites...)
+	previousAssignments := append([]ACLAssignment(nil), s.modules.ACLAssignments...)
 
 	s.state.Users = append(s.state.Users[:index], s.state.Users[index+1:]...)
+	s.setACLAssignmentLocked(username, "")
 	reassignOwner := s.defaultOwnerLocked()
 	for i := range s.state.Websites {
 		if s.state.Websites[i].Owner == username || s.state.Websites[i].User == username {
@@ -2424,6 +2508,7 @@ func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 	if err := s.saveRuntimeStateLocked(); err != nil {
 		s.state.Users = previousUsers
 		s.state.Websites = previousWebsites
+		s.modules.ACLAssignments = previousAssignments
 		s.recountSitesLocked()
 		writeError(w, http.StatusInternalServerError, "User deletion could not be persisted.")
 		return
@@ -4078,13 +4163,16 @@ func (s *service) removeSiteArtifactsLocked(domain string) error {
 	return s.syncOLSVhostsLocked()
 }
 
-func issueToken(user PanelUser) (string, error) {
+func issueToken(user PanelUser, permissions []string, rolePolicyID, rolePolicyName string) (string, error) {
 	now := time.Now().UTC()
 	claims := jwtClaims{
-		Email:    user.Email,
-		Name:     firstNonEmpty(user.Name, user.Username),
-		Role:     normalizeRole(user.Role),
-		Username: sanitizeName(user.Username),
+		Email:        user.Email,
+		Name:         firstNonEmpty(user.Name, user.Username),
+		Role:         normalizeRole(user.Role),
+		Username:     sanitizeName(user.Username),
+		Permissions:  append([]string(nil), permissions...),
+		RolePolicyID: strings.TrimSpace(rolePolicyID),
+		RolePolicy:   strings.TrimSpace(rolePolicyName),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.Email,
 			Issuer:    envOr("AURAPANEL_JWT_ISSUER", "aurapanel-gateway"),
@@ -4123,7 +4211,138 @@ func publicUsers(users []PanelUser) []PanelUser {
 
 func publicUser(user PanelUser) PanelUser {
 	user.PasswordHash = ""
+	user.Permissions = nil
+	user.RolePolicy = ""
 	return user
+}
+
+func buildAuthUserPayload(user PanelUser, permissions []string, rolePolicyID, rolePolicyName string) PanelUser {
+	item := publicUser(user)
+	item.RolePolicyID = strings.TrimSpace(rolePolicyID)
+	item.RolePolicy = strings.TrimSpace(rolePolicyName)
+	item.Permissions = append([]string(nil), permissions...)
+	return item
+}
+
+func (s *service) publicUsersLocked(users []PanelUser) []PanelUser {
+	out := make([]PanelUser, 0, len(users))
+	for _, user := range users {
+		out = append(out, s.publicUserLocked(user))
+	}
+	return out
+}
+
+func (s *service) publicUserLocked(user PanelUser) PanelUser {
+	policyID, policyName, permissions := s.resolveUserACLLocked(user)
+	return buildAuthUserPayload(user, permissions, policyID, policyName)
+}
+
+func (s *service) resolveUserACLLocked(user PanelUser) (string, string, []string) {
+	policyID := strings.TrimSpace(user.RolePolicyID)
+	if policyID == "" {
+		for _, assignment := range s.modules.ACLAssignments {
+			if sanitizeName(assignment.Username) == sanitizeName(user.Username) {
+				policyID = strings.TrimSpace(assignment.PolicyID)
+				break
+			}
+		}
+	}
+	if policyID == "" {
+		return "", "", []string{}
+	}
+	for _, policy := range s.modules.ACLPolicies {
+		if strings.TrimSpace(policy.ID) == policyID {
+			return policyID, strings.TrimSpace(policy.Name), append([]string(nil), policy.Permissions...)
+		}
+	}
+	return "", "", []string{}
+}
+
+func (s *service) policyExistsLocked(policyID string) bool {
+	policyID = strings.TrimSpace(policyID)
+	if policyID == "" {
+		return false
+	}
+	for _, item := range s.modules.ACLPolicies {
+		if strings.TrimSpace(item.ID) == policyID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *service) setACLAssignmentLocked(username, policyID string) {
+	username = sanitizeName(username)
+	policyID = strings.TrimSpace(policyID)
+	if username == "" {
+		return
+	}
+
+	updated := make([]ACLAssignment, 0, len(s.modules.ACLAssignments))
+	for _, item := range s.modules.ACLAssignments {
+		if sanitizeName(item.Username) == username {
+			continue
+		}
+		updated = append(updated, item)
+	}
+	if policyID != "" {
+		updated = append(updated, ACLAssignment{
+			Username:  username,
+			PolicyID:  policyID,
+			UpdatedAt: time.Now().UTC().Unix(),
+		})
+	}
+	s.modules.ACLAssignments = updated
+}
+
+func (s *service) reconcileUserRolePoliciesLocked() {
+	for i := range s.state.Users {
+		user := &s.state.Users[i]
+		if strings.TrimSpace(user.RolePolicyID) != "" {
+			s.setACLAssignmentLocked(user.Username, user.RolePolicyID)
+			continue
+		}
+		for _, assignment := range s.modules.ACLAssignments {
+			if sanitizeName(assignment.Username) == sanitizeName(user.Username) {
+				user.RolePolicyID = strings.TrimSpace(assignment.PolicyID)
+				break
+			}
+		}
+	}
+}
+
+func (s *service) ensureOwnerConsistencyLocked() {
+	if len(s.state.Users) == 0 {
+		return
+	}
+	ownerFound := false
+	for i := range s.state.Users {
+		user := &s.state.Users[i]
+		if user.IsOwner {
+			user.Role = "admin"
+			user.Active = true
+			ownerFound = true
+		}
+	}
+	if ownerFound {
+		return
+	}
+	for i := range s.state.Users {
+		user := &s.state.Users[i]
+		if sanitizeName(user.Username) == "admin" && normalizeRole(user.Role) == "admin" {
+			user.IsOwner = true
+			user.Active = true
+			return
+		}
+	}
+	for i := range s.state.Users {
+		user := &s.state.Users[i]
+		if normalizeRole(user.Role) == "admin" {
+			user.IsOwner = true
+			user.Active = true
+			return
+		}
+	}
 }
 
 func publicDBUsers(users []DatabaseUser) []DatabaseUser {
@@ -4226,6 +4445,19 @@ func sanitizeName(value string) string {
 		return -1
 	}, cleaned)
 	return cleaned
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(strings.TrimSpace(value), ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func sanitizeDBName(value string) string {

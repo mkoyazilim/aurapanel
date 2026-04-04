@@ -302,6 +302,26 @@ func (s *service) handleACLPolicySet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid ACL policy payload.")
 		return
 	}
+	payload.Name = strings.TrimSpace(payload.Name)
+	payload.Description = strings.TrimSpace(payload.Description)
+	if payload.Name == "" {
+		writeError(w, http.StatusBadRequest, "ACL policy name is required.")
+		return
+	}
+	normalizedPermissions := make([]string, 0, len(payload.Permissions))
+	seen := map[string]struct{}{}
+	for _, item := range payload.Permissions {
+		key := strings.TrimSpace(item)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalizedPermissions = append(normalizedPermissions, key)
+	}
+	payload.Permissions = normalizedPermissions
 	payload.ID = firstNonEmpty(payload.ID, "acl-"+generateSecret(5))
 	payload.UpdatedAt = time.Now().UTC().Unix()
 	s.mu.Lock()
@@ -339,13 +359,54 @@ func (s *service) handleACLPolicyDelete(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusNotFound, "ACL policy not found.")
 		return
 	}
+	cleanAssignments := s.modules.ACLAssignments[:0]
+	for _, assignment := range s.modules.ACLAssignments {
+		if strings.TrimSpace(assignment.PolicyID) == id {
+			if user := s.findUserLocked(assignment.Username); user != nil {
+				user.RolePolicyID = ""
+			}
+			continue
+		}
+		cleanAssignments = append(cleanAssignments, assignment)
+	}
+	s.modules.ACLAssignments = cleanAssignments
+	for i := range s.state.Users {
+		if strings.TrimSpace(s.state.Users[i].RolePolicyID) == id {
+			s.state.Users[i].RolePolicyID = ""
+		}
+	}
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "ACL policy deleted."})
 }
 
 func (s *service) handleACLAssignmentsGet(w http.ResponseWriter) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.modules.ACLAssignments})
+	updatedAtByUser := map[string]int64{}
+	for _, assignment := range s.modules.ACLAssignments {
+		updatedAtByUser[sanitizeName(assignment.Username)] = assignment.UpdatedAt
+	}
+	items := make([]ACLAssignment, 0, len(s.state.Users))
+	for _, user := range s.state.Users {
+		username := sanitizeName(user.Username)
+		policyID := strings.TrimSpace(user.RolePolicyID)
+		if policyID == "" {
+			for _, assignment := range s.modules.ACLAssignments {
+				if sanitizeName(assignment.Username) == username {
+					policyID = strings.TrimSpace(assignment.PolicyID)
+					break
+				}
+			}
+		}
+		if policyID == "" {
+			continue
+		}
+		items = append(items, ACLAssignment{
+			Username:  user.Username,
+			PolicyID:  policyID,
+			UpdatedAt: updatedAtByUser[username],
+		})
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: items})
 }
 
 func (s *service) handleACLAssignmentSet(w http.ResponseWriter, r *http.Request) {
@@ -354,9 +415,19 @@ func (s *service) handleACLAssignmentSet(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "Invalid ACL assignment payload.")
 		return
 	}
+	payload.Username = sanitizeName(payload.Username)
+	payload.PolicyID = strings.TrimSpace(payload.PolicyID)
+	if payload.Username == "" || payload.PolicyID == "" {
+		writeError(w, http.StatusBadRequest, "Username and policy_id are required.")
+		return
+	}
 	payload.UpdatedAt = time.Now().UTC().Unix()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if !s.policyExistsLocked(payload.PolicyID) {
+		writeError(w, http.StatusBadRequest, "ACL policy not found.")
+		return
+	}
 	replaced := false
 	for i := range s.modules.ACLAssignments {
 		if s.modules.ACLAssignments[i].Username == payload.Username {
@@ -368,11 +439,15 @@ func (s *service) handleACLAssignmentSet(w http.ResponseWriter, r *http.Request)
 	if !replaced {
 		s.modules.ACLAssignments = append(s.modules.ACLAssignments, payload)
 	}
+	if user := s.findUserLocked(payload.Username); user != nil {
+		user.RolePolicyID = payload.PolicyID
+	}
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "ACL assignment saved.", Data: payload})
 }
 
 func (s *service) handleACLAssignmentDelete(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	username = sanitizeName(username)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	items := s.modules.ACLAssignments
@@ -386,6 +461,9 @@ func (s *service) handleACLAssignmentDelete(w http.ResponseWriter, r *http.Reque
 		filtered = append(filtered, item)
 	}
 	s.modules.ACLAssignments = filtered
+	if user := s.findUserLocked(username); user != nil {
+		user.RolePolicyID = ""
+	}
 	if !deleted {
 		writeError(w, http.StatusNotFound, "ACL assignment not found.")
 		return
@@ -394,21 +472,17 @@ func (s *service) handleACLAssignmentDelete(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *service) handleACLEffectiveGet(w http.ResponseWriter, r *http.Request) {
-	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	username := sanitizeName(strings.TrimSpace(r.URL.Query().Get("username")))
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	policyID := ""
-	for _, item := range s.modules.ACLAssignments {
-		if item.Username == username {
-			policyID = item.PolicyID
-			break
-		}
+	if username == "" {
+		writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: []string{}})
+		return
 	}
-	for _, policy := range s.modules.ACLPolicies {
-		if policy.ID == policyID {
-			writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: policy.Permissions})
-			return
-		}
+	if user := s.findUserLocked(username); user != nil {
+		_, _, permissions := s.resolveUserACLLocked(*user)
+		writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: permissions})
+		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: []string{}})
 }

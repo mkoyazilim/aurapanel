@@ -269,7 +269,7 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     next('/')
-  } else if (to.meta.requiresAuth && !canAccessPath(to.path, authStore.role)) {
+  } else if (to.meta.requiresAuth && !canAccessPath(to.path, authStore.role, authStore.permissions)) {
     next('/')
   } else {
     next()

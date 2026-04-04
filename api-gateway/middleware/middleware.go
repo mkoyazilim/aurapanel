@@ -31,17 +31,23 @@ const (
 )
 
 type AuthUser struct {
-	Email    string
-	Role     string
-	Name     string
-	Username string
+	Email        string
+	Role         string
+	Name         string
+	Username     string
+	Permissions  []string
+	RolePolicyID string
+	RolePolicy   string
 }
 
 type gatewayClaims struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	Username string `json:"username,omitempty"`
+	Email        string   `json:"email"`
+	Name         string   `json:"name"`
+	Role         string   `json:"role"`
+	Username     string   `json:"username,omitempty"`
+	Permissions  []string `json:"permissions,omitempty"`
+	RolePolicyID string   `json:"role_policy_id,omitempty"`
+	RolePolicy   string   `json:"role_policy_name,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -201,10 +207,13 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), authUserContextKey, AuthUser{
-			Email:    claims.Email,
-			Role:     role,
-			Name:     claims.Name,
-			Username: username,
+			Email:        claims.Email,
+			Role:         role,
+			Name:         claims.Name,
+			Username:     username,
+			Permissions:  append([]string(nil), claims.Permissions...),
+			RolePolicyID: strings.TrimSpace(claims.RolePolicyID),
+			RolePolicy:   strings.TrimSpace(claims.RolePolicy),
 		})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

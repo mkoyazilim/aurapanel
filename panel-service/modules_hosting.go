@@ -2207,6 +2207,7 @@ func (s *service) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 		_ = dst.Close()
 		_ = src.Close()
+		applyManagedPathOwnershipFromParent(destPath)
 		uploaded++
 	}
 

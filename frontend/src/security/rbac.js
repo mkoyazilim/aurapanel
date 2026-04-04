@@ -13,7 +13,6 @@ const PATH_RULES = [
   { prefix: '/ai-tools', roles: [ROLE_ADMIN] },
   { prefix: '/cloudlinux', roles: [ROLE_ADMIN] },
   { prefix: '/ols-tuning', roles: [ROLE_ADMIN] },
-  { prefix: '/mail-tuning', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/docker', roles: [ROLE_ADMIN] },
   { prefix: '/federated', roles: [ROLE_ADMIN] },
   { prefix: '/ops-center', roles: [ROLE_ADMIN] },
@@ -30,6 +29,7 @@ const PATH_RULES = [
   { prefix: '/minio', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/wordpress', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/app-runtime', roles: [ROLE_ADMIN, ROLE_RESELLER] },
+  { prefix: '/mail-tuning', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/php', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/ssl', roles: [ROLE_ADMIN, ROLE_RESELLER, ROLE_USER] },
   { prefix: '/dns', roles: [ROLE_ADMIN, ROLE_RESELLER, ROLE_USER] },
@@ -42,7 +42,78 @@ const PATH_RULES = [
   { prefix: '/', roles: [ROLE_ADMIN, ROLE_RESELLER, ROLE_USER] },
 ]
 
+export const ROLE_PERMISSION_CATALOG = Object.freeze([
+  { key: 'users.manage', label: 'Kullanıcı Yönetimi' },
+  { key: 'packages.manage', label: 'Paket Yönetimi' },
+  { key: 'reseller.manage', label: 'Bayi/ACL Yönetimi' },
+  { key: 'websites.manage', label: 'Web Site Yönetimi' },
+  { key: 'dns.manage', label: 'DNS Yönetimi' },
+  { key: 'databases.manage', label: 'Veritabanı Yönetimi' },
+  { key: 'mail.manage', label: 'E-Posta Yönetimi' },
+  { key: 'ftp.manage', label: 'FTP Yönetimi' },
+  { key: 'sftp.manage', label: 'SFTP Yönetimi' },
+  { key: 'backups.manage', label: 'Yedekleme Yönetimi' },
+  { key: 'apps.manage', label: 'App/WordPress/Plugin' },
+  { key: 'runtime.manage', label: 'Docker/Runtime Yönetimi' },
+  { key: 'files.manage', label: 'Dosya Yöneticisi' },
+  { key: 'terminal.manage', label: 'Web Terminal' },
+  { key: 'php.manage', label: 'PHP Yönetimi' },
+  { key: 'ssl.manage', label: 'SSL Yönetimi' },
+  { key: 'security.manage', label: 'Güvenlik Yönetimi' },
+  { key: 'monitoring.read', label: 'Sunucu Durumu' },
+  { key: 'logs.read', label: 'Log Görüntüleme' },
+  { key: 'cron.manage', label: 'Cron Yönetimi' },
+  { key: 'cloudflare.manage', label: 'Cloudflare Yönetimi' },
+  { key: 'migration.manage', label: 'Migration Wizard' },
+  { key: 'cloudlinux.manage', label: 'CloudLinux Yönetimi' },
+  { key: 'minio.manage', label: 'MinIO Yönetimi' },
+  { key: 'activity.read', label: 'Aktivite Logları' },
+  { key: 'ops.manage', label: 'Ops/Federated Yönetimi' },
+  { key: 'panel.manage', label: 'Panel Yönetimi' },
+  { key: 'ai.manage', label: 'AI Tools' },
+])
+
+const PERMISSION_PATH_RULES = [
+  { prefix: '/users', permissions: ['users.manage'] },
+  { prefix: '/packages', permissions: ['packages.manage', 'users.manage'] },
+  { prefix: '/reseller', permissions: ['reseller.manage'] },
+  { prefix: '/activity-log', permissions: ['activity.read'] },
+  { prefix: '/panel-control', permissions: ['panel.manage'] },
+  { prefix: '/panel-update', permissions: ['panel.manage'] },
+  { prefix: '/panel-port', permissions: ['panel.manage'] },
+  { prefix: '/ai-tools', permissions: ['ai.manage'] },
+  { prefix: '/cloudlinux', permissions: ['cloudlinux.manage'] },
+  { prefix: '/ols-tuning', permissions: ['panel.manage'] },
+  { prefix: '/mail-tuning', permissions: ['mail.manage'] },
+  { prefix: '/docker', permissions: ['runtime.manage'] },
+  { prefix: '/federated', permissions: ['ops.manage'] },
+  { prefix: '/ops-center', permissions: ['ops.manage'] },
+  { prefix: '/cloudflare', permissions: ['cloudflare.manage'] },
+  { prefix: '/plugins', permissions: ['apps.manage'] },
+  { prefix: '/migration', permissions: ['migration.manage'] },
+  { prefix: '/cron-jobs', permissions: ['cron.manage'] },
+  { prefix: '/db-backup', permissions: ['backups.manage'] },
+  { prefix: '/backups', permissions: ['backups.manage'] },
+  { prefix: '/databases', permissions: ['databases.manage'] },
+  { prefix: '/emails', permissions: ['mail.manage'] },
+  { prefix: '/ftp', permissions: ['ftp.manage'] },
+  { prefix: '/sftp', permissions: ['sftp.manage'] },
+  { prefix: '/minio', permissions: ['minio.manage'] },
+  { prefix: '/wordpress', permissions: ['apps.manage'] },
+  { prefix: '/app-runtime', permissions: ['runtime.manage', 'apps.manage'] },
+  { prefix: '/php', permissions: ['php.manage'] },
+  { prefix: '/ssl', permissions: ['ssl.manage'] },
+  { prefix: '/dns', permissions: ['dns.manage'] },
+  { prefix: '/websites', permissions: ['websites.manage'] },
+  { prefix: '/filemanager', permissions: ['files.manage'] },
+  { prefix: '/terminal', permissions: ['terminal.manage'] },
+  { prefix: '/security', permissions: ['security.manage'] },
+  { prefix: '/log-viewer', permissions: ['logs.read'] },
+  { prefix: '/server-status', permissions: ['monitoring.read'] },
+]
+
 const normalizedRules = [...PATH_RULES].sort((a, b) => b.prefix.length - a.prefix.length)
+const normalizedPermissionRules = [...PERMISSION_PATH_RULES].sort((a, b) => b.prefix.length - a.prefix.length)
 
 export function normalizeRole(role) {
   const value = String(role || '').trim().toLowerCase()
@@ -52,11 +123,46 @@ export function normalizeRole(role) {
   return ROLE_USER
 }
 
-export function canAccessPath(path, role) {
+export function normalizePermissions(permissions) {
+  if (!Array.isArray(permissions)) return []
+  const seen = new Set()
+  const out = []
+  for (const item of permissions) {
+    const key = String(item || '').trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(key)
+  }
+  return out
+}
+
+function hasAnyPermission(permissionSet, requiredPermissions) {
+  if (permissionSet.has('*')) return true
+  for (const required of requiredPermissions) {
+    if (permissionSet.has(required)) return true
+  }
+  return false
+}
+
+export function canAccessPath(path, role, permissions = []) {
   const rawPath = String(path || '/').trim() || '/'
   const normalizedPath = rawPath.split('?')[0].split('#')[0] || '/'
   const normalizedRole = normalizeRole(role)
   if (normalizedRole === ROLE_ADMIN) return true
+
+  const normalizedPermissionList = normalizePermissions(permissions)
+  if (normalizedPermissionList.length > 0) {
+    if (normalizedPath === '/') {
+      return true
+    }
+    const permissionRule = normalizedPermissionRules.find((item) =>
+      normalizedPath === item.prefix || normalizedPath.startsWith(`${item.prefix}/`),
+    )
+    if (!permissionRule) {
+      return false
+    }
+    return hasAnyPermission(new Set(normalizedPermissionList), permissionRule.permissions)
+  }
 
   const rule = normalizedRules.find((item) =>
     normalizedPath === item.prefix || normalizedPath.startsWith(`${item.prefix}/`),

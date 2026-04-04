@@ -87,12 +87,18 @@ func NewServiceProxy() (http.Handler, error) {
 		req.Header.Del("X-Aura-Auth-Role")
 		req.Header.Del("X-Aura-Auth-Name")
 		req.Header.Del("X-Aura-Auth-Username")
+		req.Header.Del("X-Aura-Auth-Permissions")
+		req.Header.Del("X-Aura-Auth-Role-Policy-Id")
+		req.Header.Del("X-Aura-Auth-Role-Policy-Name")
 		req.Header.Del("X-Aura-Proxy-Token")
 		if hasAuthUser {
 			req.Header.Set("X-Aura-Auth-Email", strings.TrimSpace(authUser.Email))
 			req.Header.Set("X-Aura-Auth-Role", strings.TrimSpace(authUser.Role))
 			req.Header.Set("X-Aura-Auth-Name", strings.TrimSpace(authUser.Name))
 			req.Header.Set("X-Aura-Auth-Username", strings.TrimSpace(authUser.Username))
+			req.Header.Set("X-Aura-Auth-Permissions", strings.Join(authUser.Permissions, ","))
+			req.Header.Set("X-Aura-Auth-Role-Policy-Id", strings.TrimSpace(authUser.RolePolicyID))
+			req.Header.Set("X-Aura-Auth-Role-Policy-Name", strings.TrimSpace(authUser.RolePolicy))
 		}
 		if token := strings.TrimSpace(os.Getenv("AURAPANEL_INTERNAL_PROXY_TOKEN")); token != "" {
 			req.Header.Set("X-Aura-Proxy-Token", token)
