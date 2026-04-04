@@ -67,7 +67,11 @@ func syncOLSRuntimeState(sites []Website, advanced map[string]WebsiteAdvancedCon
 		}
 		vhostDir := olsManagedVhostDir(item.Site.Domain)
 		desiredDirs[vhostDir] = struct{}{}
-		if err := os.WriteFile(filepath.Join(vhostDir, "vhconf.conf"), []byte(renderOLSVhostConfig(item)), 0o644); err != nil {
+		vhostConfPath := filepath.Join(vhostDir, "vhconf.conf")
+		if err := os.WriteFile(vhostConfPath, []byte(renderOLSVhostConfig(item)), 0o600); err != nil {
+			return err
+		}
+		if err := ensureOLSManagedVhostOwnership(item.Site.Domain); err != nil {
 			return err
 		}
 	}
@@ -153,13 +157,17 @@ func olsAliasNames(domain string, aliases []DomainAlias) []string {
 
 func ensureOLSManagedFilesystem(item olsManagedSite) error {
 	docroot := domainDocroot(item.Site.Domain)
+	siteRoot := filepath.Dir(docroot)
 	if err := ensureOLSManagedOwnerAccount(item.Site); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(docroot, 0o755); err != nil {
+	if err := ensureOLSPathMode("/home", 0o711); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join("/usr/local/lsws/logs"), 0o750); err != nil {
+	if err := os.MkdirAll(siteRoot, 0o711); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(docroot, 0o755); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(olsManagedVhostDir(item.Site.Domain), 0o755); err != nil {
@@ -251,6 +259,10 @@ func olsManagedSocket(domain string) string {
 	return "uds://tmp/lshttpd/" + olsManagedVhostName(domain) + ".sock"
 }
 
+func olsSiteLogDir(domain string) string {
+	return filepath.Join("/home", normalizeDomain(domain), "logs")
+}
+
 func resolveOLSPHPBinary(version string) (string, error) {
 	token := phpVersionPackageToken(version)
 	candidates := []string{
@@ -275,10 +287,12 @@ func resolveOLSPHPBinary(version string) (string, error) {
 func renderOLSVhostConfig(item olsManagedSite) string {
 	phpBinary, _ := resolveOLSPHPBinary(item.Site.PHPVersion)
 	socketName := olsManagedVhostName(item.Site.Domain) + "_lsphp"
-	accessLog := filepath.ToSlash(filepath.Join("/usr/local/lsws/logs", item.Site.Domain+".access.log"))
-	errorLog := filepath.ToSlash(filepath.Join("/usr/local/lsws/logs", item.Site.Domain+".error.log"))
-	phpErrorLog := filepath.ToSlash(filepath.Join("/usr/local/lsws/logs", item.Site.Domain+".php.error.log"))
+	logDir := olsSiteLogDir(item.Site.Domain)
+	accessLog := filepath.ToSlash(filepath.Join(logDir, item.Site.Domain+".access_log"))
+	errorLog := filepath.ToSlash(filepath.Join(logDir, item.Site.Domain+".error_log"))
+	phpErrorLog := filepath.ToSlash(filepath.Join(logDir, item.Site.Domain+".php.error.log"))
 	docroot := filepath.ToSlash(domainDocroot(item.Site.Domain))
+	siteOwner := siteSystemOwner(item.Site)
 
 	var builder strings.Builder
 	builder.WriteString("# AuraPanel managed OpenLiteSpeed vhost config\n")
@@ -335,6 +349,8 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	builder.WriteString("  respBuffer              0\n")
 	builder.WriteString("  autoStart               1\n")
 	builder.WriteString("  path                    " + filepath.ToSlash(phpBinary) + "\n")
+	builder.WriteString("  extUser                 " + siteOwner + "\n")
+	builder.WriteString("  extGroup                " + siteOwner + "\n")
 	builder.WriteString("  backlog                 100\n")
 	builder.WriteString("  instances               1\n")
 	builder.WriteString("  extMaxIdleTime          300\n")
@@ -476,14 +492,129 @@ func ensureOLSManagedOwnership(site Website) error {
 	if owner == "" || owner == "root" {
 		return nil
 	}
-	siteRoot := filepath.Dir(domainDocroot(site.Domain))
-	if !fileExists(siteRoot) {
+	runtimeGroup := olsSharedRuntimeGroup()
+	if runtimeGroup == "" {
+		return fmt.Errorf("failed to determine OpenLiteSpeed runtime group (nogroup/nobody)")
+	}
+
+	docroot := domainDocroot(site.Domain)
+	siteRoot := filepath.Dir(docroot)
+	logDir := olsSiteLogDir(site.Domain)
+	if !fileExists(docroot) {
 		return nil
 	}
-	if output, err := exec.Command("chown", "-R", owner+":"+owner, siteRoot).CombinedOutput(); err != nil {
-		return fmt.Errorf("website ownership sync failed for %s: %s", site.Domain, strings.TrimSpace(string(output)))
+	if err := ensureOLSPathMode(siteRoot, 0o711); err != nil {
+		return err
+	}
+	if err := runOLSChown(siteRoot, owner, owner, false); err != nil {
+		return err
+	}
+	if err := runOLSChown(docroot, owner, owner, true); err != nil {
+		return err
+	}
+	if err := runOLSChown(docroot, owner, runtimeGroup, false); err != nil {
+		return err
+	}
+	if err := ensureOLSPathMode(docroot, 0o750); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
+		return err
+	}
+	if err := runOLSChown(logDir, "root", runtimeGroup, true); err != nil {
+		return err
+	}
+	if err := ensureOLSPathMode(logDir, 0o750); err != nil {
+		return err
+	}
+
+	htaccessPath := filepath.Join(docroot, ".htaccess")
+	if fileExists(htaccessPath) {
+		if err := runOLSChown(htaccessPath, owner, owner, false); err != nil {
+			return err
+		}
+	}
+	indexPath := filepath.Join(docroot, "index.html")
+	if fileExists(indexPath) {
+		if err := runOLSChown(indexPath, owner, owner, false); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func ensureOLSManagedVhostOwnership(domain string) error {
+	vhostDir := olsManagedVhostDir(domain)
+	return ensureOLSManagedVhostDirOwnership(vhostDir)
+}
+
+func ensureOLSManagedVhostDirOwnership(vhostDir string) error {
+	if !fileExists(vhostDir) {
+		return nil
+	}
+	ownerUser := "lsadm"
+	if !systemUserExists(ownerUser) {
+		ownerUser = "root"
+	}
+	group := "lsadm"
+	if !systemGroupExists(group) {
+		group = "root"
+	}
+	if err := runOLSChown(vhostDir, ownerUser, group, true); err != nil {
+		return err
+	}
+	if err := ensureOLSPathMode(vhostDir, 0o750); err != nil {
+		return err
+	}
+	vhostConf := filepath.Join(vhostDir, "vhconf.conf")
+	if fileExists(vhostConf) {
+		if err := runOLSChown(vhostConf, ownerUser, group, false); err != nil {
+			return err
+		}
+		if err := os.Chmod(vhostConf, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureOLSPathMode(path string, mode os.FileMode) error {
+	if !fileExists(path) {
+		return nil
+	}
+	if err := os.Chmod(path, mode); err != nil {
+		return fmt.Errorf("chmod failed for %s: %w", path, err)
+	}
+	return nil
+}
+
+func runOLSChown(path, owner, group string, recursive bool) error {
+	if strings.TrimSpace(path) == "" || strings.TrimSpace(owner) == "" {
+		return nil
+	}
+	spec := owner
+	if strings.TrimSpace(group) != "" {
+		spec = owner + ":" + group
+	}
+	args := []string{}
+	if recursive {
+		args = append(args, "-R")
+	}
+	args = append(args, spec, path)
+	output, err := exec.Command("chown", args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("chown %s failed for %s: %s", spec, path, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func olsSharedRuntimeGroup() string {
+	for _, group := range []string{"nogroup", "nobody"} {
+		if systemGroupExists(group) {
+			return group
+		}
+	}
+	return ""
 }
 
 func replaceOrInsertManagedBlock(current, beginMarker, endMarker, replacement, anchor string) string {
@@ -635,10 +766,14 @@ func restoreOLSManagedVhostFiles(backups map[string][]byte) error {
 		_ = os.Remove(filepath.Dir(match))
 	}
 	for path, content := range backups {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		vhostDir := filepath.Dir(path)
+		if err := os.MkdirAll(vhostDir, 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(path, content, 0o644); err != nil {
+		if err := os.WriteFile(path, content, 0o600); err != nil {
+			return err
+		}
+		if err := ensureOLSManagedVhostDirOwnership(vhostDir); err != nil {
 			return err
 		}
 	}

@@ -33,6 +33,30 @@ func TestSiteSystemOwnerSanitizesWebsiteOwner(t *testing.T) {
 	}
 }
 
+func TestRenderOLSVhostConfigUsesOwnerExtProcessorAndHomeLogs(t *testing.T) {
+	config := renderOLSVhostConfig(olsManagedSite{
+		Site: Website{
+			Domain:     "example.com",
+			Owner:      "Demo Owner",
+			PHPVersion: "8.3",
+		},
+		Config: defaultWebsiteAdvancedConfig(),
+	})
+
+	if !strings.Contains(config, "extUser                 demo_owner") {
+		t.Fatalf("expected extUser to follow site owner, got:\n%s", config)
+	}
+	if !strings.Contains(config, "extGroup                demo_owner") {
+		t.Fatalf("expected extGroup to follow site owner, got:\n%s", config)
+	}
+	if !strings.Contains(config, "/home/example.com/logs/example.com.access_log") {
+		t.Fatalf("expected site access log path under /home/<domain>/logs, got:\n%s", config)
+	}
+	if !strings.Contains(config, "/home/example.com/logs/example.com.error_log") {
+		t.Fatalf("expected site error log path under /home/<domain>/logs, got:\n%s", config)
+	}
+}
+
 func TestReloadOpenLiteSpeedWithHooksAcceptsSuccessfulTransitionAfterReloadError(t *testing.T) {
 	phase := 0
 	calls := []string{}

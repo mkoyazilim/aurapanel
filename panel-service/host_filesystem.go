@@ -625,6 +625,8 @@ func tailManagedFile(path string, limit int) ([]string, error) {
 
 func discoverSiteLogPaths(domain, kind string) []string {
 	candidates := []string{
+		fmt.Sprintf("/home/%s/logs/%s.%s_log", domain, domain, kind),
+		fmt.Sprintf("/home/%s/logs/%s.%s.log", domain, domain, kind),
 		fmt.Sprintf("/usr/local/lsws/logs/%s.%s.log", domain, kind),
 		fmt.Sprintf("/usr/local/lsws/logs/%s_%s.log", domain, kind),
 		fmt.Sprintf("/usr/local/lsws/logs/%s/%s.log", domain, kind),
