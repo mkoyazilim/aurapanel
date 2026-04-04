@@ -1090,8 +1090,11 @@ func (s *service) handleMailboxesList(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 	items := loadSystemMailboxes(quotaByAddress)
 	if principal.Role != "admin" {
+		ids := principalAliases(principal)
 		s.mu.RLock()
-		ids := s.principalScopedUsernamesLocked(principal)
+		if user := s.findUserByEmailLocked(principal.Email); user != nil {
+			ids[sanitizeName(user.Username)] = struct{}{}
+		}
 		s.mu.RUnlock()
 		filtered := make([]Mailbox, 0, len(items))
 		for _, item := range items {
