@@ -1,0 +1,135 @@
+name: Mirror Sync
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-sync-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync Downloads Mirror
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      MIRROR_HOST: ${{ secrets.MIRROR_SSH_HOST }}
+      MIRROR_USER: ${{ secrets.MIRROR_SSH_USER }}
+      MIRROR_PRIVATE_KEY: ${{ secrets.MIRROR_SSH_PRIVATE_KEY }}
+      MIRROR_PORT: ${{ vars.MIRROR_SSH_PORT || '22' }}
+      MIRROR_DIR: ${{ vars.MIRROR_BASE_DIR || '/home/downloads.aurapanel.info/public_html/mirror' }}
+      MIRROR_OWNER: ${{ vars.MIRROR_OWNER || '' }}
+      MIRROR_PUBLIC_BASE_URL: ${{ vars.MIRROR_PUBLIC_BASE_URL || 'https://downloads.aurapanel.info/mirror' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate mirror configuration
+        run: |
+          set -euo pipefail
+          [ -n "${MIRROR_HOST}" ] || { echo "Missing secret: MIRROR_SSH_HOST"; exit 1; }
+          [ -n "${MIRROR_USER}" ] || { echo "Missing secret: MIRROR_SSH_USER"; exit 1; }
+          [ -n "${MIRROR_PRIVATE_KEY}" ] || { echo "Missing secret: MIRROR_SSH_PRIVATE_KEY"; exit 1; }
+          [ -n "${MIRROR_DIR}" ] || { echo "Missing mirror dir"; exit 1; }
+
+      - name: Build source archive artifact
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tar \
+            --exclude='.git' \
+            --exclude='frontend/node_modules' \
+            --exclude='panel-service/panel-service' \
+            --exclude='panel-service/panel-service.exe' \
+            -czf dist/aurapanel-source-latest.tar.gz \
+            .
+          sha256sum dist/aurapanel-source-latest.tar.gz > dist/aurapanel-source-latest.tar.gz.sha256
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${MIRROR_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${MIRROR_PORT}" -H "${MIRROR_HOST}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Sync installer and release files
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes -p ${MIRROR_PORT}"
+
+          ${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "install -d '${MIRROR_DIR}/installer' '${MIRROR_DIR}/releases'"
+
+          rsync -az --delete -e "${SSH_CMD}" installer/ "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/installer/"
+          rsync -az -e "${SSH_CMD}" install.sh "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/install.sh"
+          rsync -az -e "${SSH_CMD}" install.sh "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/installer/install.sh"
+          rsync -az -e "${SSH_CMD}" aurapanel_bootstrap.sh "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/installer/aurapanel_bootstrap.sh"
+
+          rsync -az -e "${SSH_CMD}" dist/aurapanel-source-latest.tar.gz "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/releases/aurapanel-source-latest.tar.gz"
+          rsync -az -e "${SSH_CMD}" dist/aurapanel-source-latest.tar.gz.sha256 "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/releases/aurapanel-source-latest.tar.gz.sha256"
+
+      - name: Fix mirror permissions
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes -p ${MIRROR_PORT}"
+          ${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "MIRROR_DIR='${MIRROR_DIR}' MIRROR_OWNER='${MIRROR_OWNER}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          find "${MIRROR_DIR}" -type d -exec chmod 755 {} \;
+          find "${MIRROR_DIR}" -type f -exec chmod 644 {} \;
+          chmod 755 "${MIRROR_DIR}/install.sh" "${MIRROR_DIR}/installer"/*.sh
+          if [ -n "${MIRROR_OWNER}" ]; then
+            chown -R "${MIRROR_OWNER}" "${MIRROR_DIR}"
+          fi
+REMOTE
+
+      - name: Verify remote checksums
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes -p ${MIRROR_PORT}"
+
+          local_installer="$(sha256sum installer/aurapanel.sh | awk '{print $1}')"
+          local_hardening="$(sha256sum installer/db-tools-hardening.sh | awk '{print $1}')"
+          local_install="$(sha256sum install.sh | awk '{print $1}')"
+
+          remote_installer="$(${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "sha256sum '${MIRROR_DIR}/installer/aurapanel.sh' | awk '{print \$1}'")"
+          remote_hardening="$(${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "sha256sum '${MIRROR_DIR}/installer/db-tools-hardening.sh' | awk '{print \$1}'")"
+          remote_install="$(${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "sha256sum '${MIRROR_DIR}/install.sh' | awk '{print \$1}'")"
+
+          [ "${local_installer}" = "${remote_installer}" ] || { echo "Remote installer hash mismatch"; exit 1; }
+          [ "${local_hardening}" = "${remote_hardening}" ] || { echo "Remote hardening hash mismatch"; exit 1; }
+          [ "${local_install}" = "${remote_install}" ] || { echo "Remote install.sh hash mismatch"; exit 1; }
+
+      - name: Verify public mirror checksum
+        run: |
+          set -euo pipefail
+          local_installer="$(sha256sum installer/aurapanel.sh | awk '{print $1}')"
+          local_hardening="$(sha256sum installer/db-tools-hardening.sh | awk '{print $1}')"
+          local_install="$(sha256sum install.sh | awk '{print $1}')"
+
+          verify_public_hash() {
+            local url="$1"
+            local expected="$2"
+            local label="$3"
+            local attempt=1
+            local current=""
+            while [ "${attempt}" -le 12 ]; do
+              if current="$(curl -fsSL "${url}" | sha256sum | awk '{print $1}')"; then
+                if [ "${current}" = "${expected}" ]; then
+                  echo "Public hash verified for ${label}"
+                  return 0
+                fi
+              fi
+              echo "Public hash mismatch for ${label} (attempt ${attempt}/12), retrying..."
+              attempt=$((attempt + 1))
+              sleep 5
+            done
+            echo "Public hash verification failed for ${label}. expected=${expected} got=${current}"
+            return 1
+          }
+
+          verify_public_hash "${MIRROR_PUBLIC_BASE_URL}/installer/aurapanel.sh" "${local_installer}" "installer/aurapanel.sh"
+          verify_public_hash "${MIRROR_PUBLIC_BASE_URL}/installer/db-tools-hardening.sh" "${local_hardening}" "installer/db-tools-hardening.sh"
+          verify_public_hash "${MIRROR_PUBLIC_BASE_URL}/install.sh" "${local_install}" "install.sh"

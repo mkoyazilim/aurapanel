@@ -204,6 +204,16 @@ powershell -ExecutionPolicy Bypass -File scripts/publish-wiki.ps1
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
+### 1.1 Emergency Mirror Bypass (Installer)
+
+If mirror installer files are stale, force installer entrypoints from GitHub `main`:
+
+```bash
+export AURAPANEL_INSTALLER_BASE="https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer"
+export AURAPANEL_MAIN_INSTALLER_URL="https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh"
+curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
+```
+
 ### 2. Verified Release Bootstrap
 
 ```bash
@@ -224,6 +234,22 @@ curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.s
 cd /opt/aurapanel
 bash scripts/deploy-main.sh
 ```
+
+### Mirror Sync Automation
+
+Workflow file: [.github/workflows/mirror-sync.yml](.github/workflows/mirror-sync.yml)
+
+Required GitHub settings:
+
+- `Secrets`
+- `MIRROR_SSH_HOST`
+- `MIRROR_SSH_USER`
+- `MIRROR_SSH_PRIVATE_KEY`
+- `Variables` (optional)
+- `MIRROR_SSH_PORT` (default: `22`)
+- `MIRROR_BASE_DIR` (default: `/home/downloads.aurapanel.info/public_html/mirror`)
+- `MIRROR_OWNER` (example: `aura:aura`)
+- `MIRROR_PUBLIC_BASE_URL` (default: `https://downloads.aurapanel.info/mirror`)
 
 ## Local Development
 

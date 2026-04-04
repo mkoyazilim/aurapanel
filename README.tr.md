@@ -193,6 +193,16 @@ powershell -ExecutionPolicy Bypass -File scripts/publish-wiki.ps1
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
+### Acil Mirror Bypass (Installer)
+
+Mirror güncel değilse sadece installer giriş dosyalarını GitHub `main` üzerinden zorlayabilirsiniz:
+
+```bash
+export AURAPANEL_INSTALLER_BASE="https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer"
+export AURAPANEL_MAIN_INSTALLER_URL="https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh"
+curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
+```
+
 ### Verified Release Bootstrap
 
 ```bash
@@ -206,6 +216,22 @@ curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.s
 cd /opt/aurapanel
 bash scripts/deploy-main.sh
 ```
+
+### Mirror Senkron Otomasyonu
+
+`main` branch'ine her push'tan sonra mirror'ı otomatik güncelleyen workflow: [mirror-sync.yml](.github/workflows/mirror-sync.yml)
+
+GitHub ayarlarında tanımlanması gerekenler:
+
+- `Secrets`
+- `MIRROR_SSH_HOST`
+- `MIRROR_SSH_USER`
+- `MIRROR_SSH_PRIVATE_KEY`
+- `Variables` (opsiyonel)
+- `MIRROR_SSH_PORT` (varsayılan: `22`)
+- `MIRROR_BASE_DIR` (varsayılan: `/home/downloads.aurapanel.info/public_html/mirror`)
+- `MIRROR_OWNER` (örnek: `aura:aura`)
+- `MIRROR_PUBLIC_BASE_URL` (varsayılan: `https://downloads.aurapanel.info/mirror`)
 
 ## Yerel Geliştirme
 
