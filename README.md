@@ -251,6 +251,17 @@ Required GitHub settings:
 - `MIRROR_OWNER` (example: `aura:aura`)
 - `MIRROR_PUBLIC_BASE_URL` (default: `https://downloads.aurapanel.info/mirror`)
 
+Mirror sync now also publishes pinned OpenLiteSpeed packages and:
+
+- `deps/litespeed/openlitespeed-manifest.env`
+- `deps/litespeed/pinned/*`
+
+Installer behavior:
+
+- Tries pinned mirror package first (`AURAPANEL_OLS_USE_MIRROR_PACKAGE=1` by default)
+- Falls back to repository install if pinned package is unavailable
+- Override manifest URL with `AURAPANEL_OLS_MANIFEST_URL`
+
 ## Local Development
 
 ### Requirements

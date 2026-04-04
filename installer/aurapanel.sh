@@ -36,6 +36,8 @@ GO_VERSION="${AURAPANEL_GO_VERSION:-1.22.1}"
 GO_TARBALL="go${GO_VERSION}.linux-amd64.tar.gz"
 GO_TARBALL_URL="${AURAPANEL_GO_TARBALL_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/go/${GO_TARBALL}}"
 LITESPEED_REPO_SCRIPT_URL="${AURAPANEL_LITESPEED_REPO_SCRIPT_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/litespeed/repo.sh}"
+OLS_MANIFEST_URL="${AURAPANEL_OLS_MANIFEST_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/litespeed/openlitespeed-manifest.env}"
+AURAPANEL_OLS_USE_MIRROR_PACKAGE="${AURAPANEL_OLS_USE_MIRROR_PACKAGE:-1}"
 MINIO_BIN_URL="${AURAPANEL_MINIO_BIN_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/minio/minio}"
 MINIO_MC_URL="${AURAPANEL_MINIO_MC_URL:-${AURAPANEL_DOWNLOAD_BASE_URL}/deps/minio/mc}"
 ROUNDCUBE_VERSION="${AURAPANEL_ROUNDCUBE_VERSION:-1.6.11}"
@@ -579,6 +581,96 @@ download_file() {
   fi
 
   return 1
+}
+
+manifest_read_value() {
+  local file="$1"
+  local key="$2"
+  if [ ! -f "${file}" ] || [ -z "${key}" ]; then
+    return 1
+  fi
+  grep -E "^${key}=" "${file}" | head -n1 | cut -d'=' -f2- | tr -d '\r'
+}
+
+ols_manifest_key_prefix() {
+  local arch codename major
+  arch="$(uname -m)"
+  if [ "${PKG_MGR}" = "apt" ]; then
+    codename="${VERSION_CODENAME:-}"
+    if [ -z "${codename}" ] && command -v lsb_release >/dev/null 2>&1; then
+      codename="$(lsb_release -cs 2>/dev/null || true)"
+    fi
+    case "${arch}" in
+      x86_64) arch="amd64" ;;
+      aarch64) arch="arm64" ;;
+    esac
+    if [ -z "${codename}" ] || [ -z "${arch}" ]; then
+      return 1
+    fi
+    codename="$(printf '%s' "${codename}" | tr '[:lower:]-' '[:upper:]_')"
+    arch="$(printf '%s' "${arch}" | tr '[:lower:]-' '[:upper:]_')"
+    printf 'AURAPANEL_OLS_DEB_%s_%s' "${codename}" "${arch}"
+    return 0
+  fi
+
+  major="$(printf '%s' "${VERSION_ID:-}" | cut -d. -f1)"
+  if [ -z "${major}" ]; then
+    return 1
+  fi
+  arch="$(printf '%s' "${arch}" | tr '[:lower:]-' '[:upper:]_')"
+  printf 'AURAPANEL_OLS_RPM_EL%s_%s' "${major}" "${arch}"
+  return 0
+}
+
+install_openlitespeed_from_mirror_manifest() {
+  local manifest tmp_pkg key_prefix pkg_url pkg_sha pkg_version computed_sha
+  manifest="/tmp/aurapanel-openlitespeed-manifest.env"
+  tmp_pkg="/tmp/aurapanel-openlitespeed.pkg"
+  rm -f "${manifest}" "${tmp_pkg}" >/dev/null 2>&1 || true
+
+  if ! download_file "${OLS_MANIFEST_URL}" "${manifest}"; then
+    warn "Mirror OLS manifest could not be downloaded (${OLS_MANIFEST_URL})."
+    return 1
+  fi
+
+  key_prefix="$(ols_manifest_key_prefix || true)"
+  if [ -z "${key_prefix}" ]; then
+    warn "Could not resolve OLS manifest key prefix for this OS."
+    return 1
+  fi
+
+  pkg_url="$(manifest_read_value "${manifest}" "${key_prefix}_URL" || true)"
+  pkg_sha="$(manifest_read_value "${manifest}" "${key_prefix}_SHA256" || true)"
+  pkg_version="$(manifest_read_value "${manifest}" "${key_prefix}_VERSION" || true)"
+  if [ -z "${pkg_url}" ]; then
+    warn "No pinned OLS package URL found in manifest for ${key_prefix}."
+    return 1
+  fi
+
+  log "Installing OpenLiteSpeed from mirror package (${pkg_version:-unknown})..."
+  if ! download_file "${pkg_url}" "${tmp_pkg}"; then
+    warn "Pinned OLS package download failed: ${pkg_url}"
+    return 1
+  fi
+
+  if [ -n "${pkg_sha}" ]; then
+    computed_sha="$(sha256sum "${tmp_pkg}" | awk '{print $1}')"
+    if [ "${computed_sha}" != "${pkg_sha}" ]; then
+      warn "Pinned OLS package checksum mismatch (expected ${pkg_sha}, got ${computed_sha})."
+      return 1
+    fi
+  fi
+
+  if [ "${PKG_MGR}" = "apt" ]; then
+    wait_for_package_manager
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${tmp_pkg}" || return 1
+  else
+    wait_for_package_manager
+    dnf install -y "${tmp_pkg}" || return 1
+  fi
+  ok "OpenLiteSpeed installed from mirror package (${pkg_version:-unknown})."
+  rm -f "${manifest}" "${tmp_pkg}" >/dev/null 2>&1 || true
+  return 0
 }
 
 upsert_env() {
@@ -1286,14 +1378,26 @@ ensure_go() {
 }
 
 ensure_openlitespeed() {
+  local installed_from_mirror="0"
+  local use_pinned="${AURAPANEL_OLS_USE_MIRROR_PACKAGE:-1}"
   if [ -x /usr/local/lsws/bin/lswsctrl ]; then
     ok "OpenLiteSpeed already installed."
   else
     log "Installing OpenLiteSpeed..."
-    wait_for_package_manager
-    curl -fsSL "${LITESPEED_REPO_SCRIPT_URL}" | bash
-
-    install_packages openlitespeed || fail "OpenLiteSpeed installation failed."
+    case "$(printf '%s' "${use_pinned}" | tr '[:upper:]' '[:lower:]')" in
+      1|true|yes|on)
+      if install_openlitespeed_from_mirror_manifest; then
+        installed_from_mirror="1"
+      else
+        warn "Pinned mirror package install failed, falling back to repository install."
+      fi
+      ;;
+    esac
+    if [ "${installed_from_mirror}" != "1" ]; then
+      wait_for_package_manager
+      curl -fsSL "${LITESPEED_REPO_SCRIPT_URL}" | bash
+      install_packages openlitespeed || fail "OpenLiteSpeed installation failed."
+    fi
   fi
 
   # Ensure lsphp toolchain is present even when OpenLiteSpeed was preinstalled.

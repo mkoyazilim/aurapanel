@@ -233,6 +233,17 @@ GitHub ayarlarında tanımlanması gerekenler:
 - `MIRROR_OWNER` (örnek: `aura:aura`)
 - `MIRROR_PUBLIC_BASE_URL` (varsayılan: `https://downloads.aurapanel.info/mirror`)
 
+Mirror senkronu artık pinlenmiş OpenLiteSpeed paketlerini de yayınlar:
+
+- `deps/litespeed/openlitespeed-manifest.env`
+- `deps/litespeed/pinned/*`
+
+Installer davranışı:
+
+- Önce mirror'daki pinli OLS paketini dener (`AURAPANEL_OLS_USE_MIRROR_PACKAGE=1` varsayılan)
+- Pinli paket uygun değilse repository kurulumuna fallback yapar
+- Manifest URL'i `AURAPANEL_OLS_MANIFEST_URL` ile override edilebilir
+
 ## Yerel Geliştirme
 
 Gereksinimler:

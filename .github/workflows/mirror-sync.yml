@@ -47,6 +47,16 @@ jobs:
             .
           sha256sum dist/aurapanel-source-latest.tar.gz > dist/aurapanel-source-latest.tar.gz.sha256
 
+      - name: Install mirror build dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip zstandard
+
+      - name: Prepare pinned OpenLiteSpeed mirror assets
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_ols_mirror_assets.py --output dist/mirror/deps/litespeed
+
       - name: Configure SSH
         run: |
           set -euo pipefail
@@ -61,7 +71,7 @@ jobs:
           set -euo pipefail
           SSH_CMD="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes -p ${MIRROR_PORT}"
 
-          ${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "install -d '${MIRROR_DIR}/installer' '${MIRROR_DIR}/releases'"
+          ${SSH_CMD} "${MIRROR_USER}@${MIRROR_HOST}" "install -d '${MIRROR_DIR}/installer' '${MIRROR_DIR}/releases' '${MIRROR_DIR}/deps/litespeed/pinned'"
 
           rsync -az --delete -e "${SSH_CMD}" installer/ "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/installer/"
           rsync -az -e "${SSH_CMD}" install.sh "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/install.sh"
@@ -70,6 +80,10 @@ jobs:
 
           rsync -az -e "${SSH_CMD}" dist/aurapanel-source-latest.tar.gz "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/releases/aurapanel-source-latest.tar.gz"
           rsync -az -e "${SSH_CMD}" dist/aurapanel-source-latest.tar.gz.sha256 "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/releases/aurapanel-source-latest.tar.gz.sha256"
+
+          sed "s|{MIRROR_BASE}|${MIRROR_PUBLIC_BASE_URL}|g" dist/mirror/deps/litespeed/openlitespeed-manifest.env > dist/mirror/deps/litespeed/openlitespeed-manifest.resolved.env
+          rsync -az -e "${SSH_CMD}" dist/mirror/deps/litespeed/openlitespeed-manifest.resolved.env "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/deps/litespeed/openlitespeed-manifest.env"
+          rsync -az --delete -e "${SSH_CMD}" dist/mirror/deps/litespeed/pinned/ "${MIRROR_USER}@${MIRROR_HOST}:${MIRROR_DIR}/deps/litespeed/pinned/"
 
       - name: Fix mirror permissions
         run: |
