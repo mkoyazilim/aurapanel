@@ -77,12 +77,20 @@
       <div v-if="loadingServices" class="col-span-1 md:col-span-2 text-center py-6 text-gray-500">{{ t('common.loading') }}</div>
       <div v-for="s in services" :key="s.name" class="bg-panel-card border border-panel-border rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p class="text-white font-medium text-sm">{{ s.name }}</p>
+          <div class="flex items-center gap-2">
+            <p class="text-white font-medium text-sm">{{ s.name }}</p>
+            <span
+              class="px-2 py-0.5 rounded-full text-[11px] font-medium"
+              :class="serviceStatusBadgeClass(s.status)"
+            >
+              {{ serviceStatusLabel(s.status) }}
+            </span>
+          </div>
           <p class="text-gray-500 text-xs">{{ s.desc }}</p>
         </div>
         <div class="flex gap-2">
           <button
-            v-if="s.status === 'running'"
+            v-if="isServiceRunning(s.status)"
             @click="controlService(s.name, 'stop')"
             class="px-2 py-1 bg-red-600/20 text-red-400 rounded text-xs hover:bg-red-600/40 transition"
           >
@@ -178,6 +186,34 @@ const showNotif = (message) => {
   setTimeout(() => {
     notification.value = ''
   }, 2200)
+}
+
+const normalizeServiceStatus = (value) => {
+  const status = String(value || '').trim().toLowerCase()
+  if (status === 'running' || status === 'starting' || status === 'failed' || status === 'stopped') {
+    return status
+  }
+  if (status === 'active') return 'running'
+  if (status === 'inactive') return 'stopped'
+  return 'stopped'
+}
+
+const isServiceRunning = (value) => normalizeServiceStatus(value) === 'running'
+
+const serviceStatusLabel = (value) => {
+  const status = normalizeServiceStatus(value)
+  if (status === 'running') return t('server_status.running')
+  if (status === 'starting') return t('server_status.starting')
+  if (status === 'failed') return t('server_status.failed')
+  return t('server_status.stopped')
+}
+
+const serviceStatusBadgeClass = (value) => {
+  const status = normalizeServiceStatus(value)
+  if (status === 'running') return 'bg-green-500/20 text-green-300 border border-green-500/30'
+  if (status === 'starting') return 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+  if (status === 'failed') return 'bg-red-500/20 text-red-300 border border-red-500/30'
+  return 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
 }
 
 const fetchMetrics = async () => {
