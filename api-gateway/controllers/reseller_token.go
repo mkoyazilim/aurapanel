@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -53,4 +54,14 @@ func UpdateResellerToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, BaseResponse{Status: "success", Message: "Token updated successfully"})
+}
+
+func DeleteResellerToken(w http.ResponseWriter, r *http.Request) {
+	tokenFile := "data/reseller.token"
+	if err := os.Remove(tokenFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+		writeJSON(w, http.StatusInternalServerError, BaseResponse{Status: "error", Message: "Could not delete token"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, BaseResponse{Status: "success", Message: "Token deleted successfully"})
 }

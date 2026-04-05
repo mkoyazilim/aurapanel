@@ -45,6 +45,43 @@
           </p>
         </div>
 
+        <div class="rounded-lg border border-panel-border/70 bg-panel-bg/40 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm font-medium text-gray-300">Saved Token</p>
+            <p class="text-xs text-gray-500">{{ savedStatusText }}</p>
+          </div>
+
+          <div v-if="savedToken" class="flex items-center gap-3">
+            <input
+              :type="showSavedToken ? 'text' : 'password'"
+              :value="savedTokenDisplay"
+              class="aura-input flex-1"
+              readonly
+            />
+            <button
+              @click="showSavedToken = !showSavedToken"
+              class="btn-secondary px-3 py-2 flex-shrink-0"
+              title="Show/Hide Saved Token"
+            >
+              <Eye v-if="!showSavedToken" class="w-4 h-4" />
+              <EyeOff v-else class="w-4 h-4" />
+            </button>
+            <button
+              @click="deleteToken"
+              :disabled="deleting"
+              class="btn-secondary px-3 py-2 flex-shrink-0 text-red-300 hover:text-red-200 disabled:opacity-60"
+              title="Delete Saved Token"
+            >
+              <Loader2 v-if="deleting" class="w-4 h-4 animate-spin" />
+              <Trash2 v-else class="w-4 h-4" />
+            </button>
+          </div>
+
+          <p v-else class="text-xs text-gray-500">
+            No token is saved yet.
+          </p>
+        </div>
+
         <div class="flex items-center gap-4 pt-4 border-t border-panel-border/50">
           <button
             @click="saveToken"
@@ -63,15 +100,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useNotificationStore } from '../stores/notifications'
 import api from '../services/api'
-import { Save, RefreshCw, Loader2, Eye, EyeOff } from 'lucide-vue-next'
+import { Save, RefreshCw, Loader2, Eye, EyeOff, Trash2 } from 'lucide-vue-next'
 
 const notifications = useNotificationStore()
 const token = ref('')
 const showToken = ref(false)
 const saving = ref(false)
+const deleting = ref(false)
+const savedToken = ref('')
+const showSavedToken = ref(false)
+const lastSavedAt = ref(null)
 const silentHeaders = { headers: { 'X-Aura-Silent-Error': '1' } }
 
 const notify = (type, message) => {
@@ -83,11 +124,32 @@ const notify = (type, message) => {
   })
 }
 
+const maskToken = (raw) => {
+  const value = String(raw || '')
+  if (!value) return ''
+  if (value.length <= 10) return '*'.repeat(value.length)
+  return `${value.slice(0, 4)}${'*'.repeat(value.length - 8)}${value.slice(-4)}`
+}
+
+const savedTokenDisplay = computed(() => {
+  if (!savedToken.value) return ''
+  return showSavedToken.value ? savedToken.value : maskToken(savedToken.value)
+})
+
+const savedStatusText = computed(() => {
+  if (!savedToken.value) return 'Not saved'
+  if (!lastSavedAt.value) return 'Saved'
+  return `Saved at ${new Date(lastSavedAt.value).toLocaleString()}`
+})
+
 const loadToken = async () => {
   try {
     const res = await api.get('/system/reseller-token', silentHeaders)
-    if (res.data?.token) {
-      token.value = res.data.token
+    token.value = res.data?.token || ''
+    savedToken.value = token.value
+    showSavedToken.value = false
+    if (savedToken.value && !lastSavedAt.value) {
+      lastSavedAt.value = Date.now()
     }
   } catch (err) {
     const message = err?.response?.data?.message || 'Failed to load API token'
@@ -114,12 +176,33 @@ const saveToken = async () => {
   saving.value = true
   try {
     await api.post('/system/reseller-token', { token: token.value }, silentHeaders)
+    savedToken.value = token.value
+    showSavedToken.value = false
+    lastSavedAt.value = Date.now()
     notify('success', 'API token updated successfully')
   } catch (err) {
     const message = err?.response?.data?.message || 'Failed to save API token'
     notify('error', message)
   } finally {
     saving.value = false
+  }
+}
+
+const deleteToken = async () => {
+  deleting.value = true
+  try {
+    await api.delete('/system/reseller-token', silentHeaders)
+    token.value = ''
+    savedToken.value = ''
+    showToken.value = false
+    showSavedToken.value = false
+    lastSavedAt.value = null
+    notify('success', 'API token deleted successfully')
+  } catch (err) {
+    const message = err?.response?.data?.message || 'Failed to delete API token'
+    notify('error', message)
+  } finally {
+    deleting.value = false
   }
 }
 
