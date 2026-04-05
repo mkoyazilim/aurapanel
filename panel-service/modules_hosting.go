@@ -626,6 +626,10 @@ func (s *service) handleWebsiteRewriteSet(w http.ResponseWriter, r *http.Request
 	defer s.mu.Unlock()
 	s.ensureDefaultSiteArtifactsLocked(domain)
 	resolvedRules := firstNonEmpty(payload.Rules, payload.RewriteRules)
+	if err := validateWebsiteRewriteRules(domain, resolvedRules); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	cfg := s.state.AdvancedConfig[domain]
 	cfg.RewriteRules = resolvedRules
 	s.state.AdvancedConfig[domain] = cfg
