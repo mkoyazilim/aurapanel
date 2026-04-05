@@ -106,6 +106,26 @@ func main() {
 		),
 	)
 
+	resellerMux := http.NewServeMux()
+	resellerMux.HandleFunc("/api/v1/reseller/account/create", controllers.ResellerCreateAccount)
+	resellerMux.HandleFunc("/api/v1/reseller/account/suspend", controllers.ResellerSuspendAccount)
+	resellerMux.HandleFunc("/api/v1/reseller/account/unsuspend", controllers.ResellerUnsuspendAccount)
+	resellerMux.HandleFunc("/api/v1/reseller/account/terminate", controllers.ResellerTerminateAccount)
+	resellerMux.HandleFunc("/api/v1/reseller/account/password", controllers.ResellerChangePassword)
+	resellerMux.HandleFunc("/api/v1/reseller/account/package", controllers.ResellerChangePackage)
+	resellerMux.HandleFunc("/api/v1/reseller/packages", controllers.ResellerListPackages)
+	resellerMux.HandleFunc("/api/v1/reseller/sso", controllers.ResellerSSO)
+
+	resellerHandler := middleware.RequestIDMiddleware(
+		middleware.CorsMiddleware(
+			middleware.Logger(
+				middleware.DDoSGuardMiddleware(
+					middleware.ResellerAuthMiddleware(resellerMux),
+				),
+			),
+		),
+	)
+
 	mainRouter := http.NewServeMux()
 
 	// Public
@@ -117,6 +137,7 @@ func main() {
 	mainRouter.Handle("/api/v1/db/tools/pgadmin/sso/consume", publicHandler)
 
 	// Protected
+	mainRouter.Handle("/api/v1/reseller/", resellerHandler)
 	mainRouter.Handle("/api/auth/me", protectedHandler)
 	mainRouter.Handle("/api/v1/auth/me", protectedHandler)
 	mainRouter.Handle("/api/system/", protectedHandler)

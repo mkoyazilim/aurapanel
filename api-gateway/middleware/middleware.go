@@ -163,6 +163,35 @@ func WriteError(w http.ResponseWriter, r *http.Request, status int, code, messag
 	})
 }
 
+// ResellerAuthMiddleware validates static API tokens for WHMCS/Billing integrations.
+func ResellerAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenString := r.Header.Get("Authorization")
+		if strings.HasPrefix(tokenString, "Bearer ") {
+			tokenString = tokenString[7:]
+		}
+		
+		expectedToken := strings.TrimSpace(os.Getenv("AURAPANEL_RESELLER_TOKEN"))
+		if expectedToken == "" {
+			WriteError(w, r, http.StatusUnauthorized, "RESELLER_API_DISABLED", "Reseller API is not enabled on this server")
+			return
+		}
+		if tokenString != expectedToken {
+			WriteError(w, r, http.StatusUnauthorized, "AUTH_INVALID_RESELLER_TOKEN", "Invalid reseller token")
+			return
+		}
+
+		// Inject an admin principal for reseller operations
+		authUser := &AuthUser{
+			Role:     "admin",
+			Username: "reseller_api",
+			Name:     "Reseller API",
+		}
+		ctx := context.WithValue(r.Context(), authUserContextKey, authUser)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // AuthMiddleware validates JWT coming from headers.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
