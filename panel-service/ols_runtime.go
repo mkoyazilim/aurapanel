@@ -221,11 +221,26 @@ func writeOLSHTAccess(domain, rules string) error {
 	if err := os.MkdirAll(docroot, 0o755); err != nil {
 		return err
 	}
+	return writeOLSHTAccessFile(filepath.Join(docroot, ".htaccess"), rules, shouldOverwriteOLSHTAccess(rules))
+}
+
+func shouldOverwriteOLSHTAccess(rules string) bool {
+	rules = strings.TrimSpace(rules)
+	if rules == "" {
+		return false
+	}
+	return !strings.EqualFold(rules, "RewriteEngine On")
+}
+
+func writeOLSHTAccessFile(path, rules string, overwrite bool) error {
+	if !overwrite && fileExists(path) {
+		return nil
+	}
 	rules = strings.TrimSpace(rules)
 	if rules == "" {
 		rules = "RewriteEngine On"
 	}
-	return os.WriteFile(filepath.Join(docroot, ".htaccess"), []byte(rules+"\n"), 0o644)
+	return os.WriteFile(path, []byte(rules+"\n"), 0o644)
 }
 
 func olsManagedVhostName(domain string) string {

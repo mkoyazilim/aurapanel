@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -142,5 +144,76 @@ func TestReloadOpenLiteSpeedWithHooksReturnsCombinedErrorWhenRecoveryFails(t *te
 	}
 	if !strings.Contains(message, "restart failed") {
 		t.Fatalf("expected restart failure details, got %q", message)
+	}
+}
+
+func TestWriteOLSHTAccessFilePreservesExistingWhenOverwriteDisabled(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".htaccess")
+	original := "RewriteEngine On\nRewriteRule ^ index.php [L]\n"
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatalf("seed .htaccess: %v", err)
+	}
+
+	if err := writeOLSHTAccessFile(path, "RewriteEngine On", false); err != nil {
+		t.Fatalf("writeOLSHTAccessFile: %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read .htaccess: %v", err)
+	}
+	if string(got) != original {
+		t.Fatalf("expected file to stay unchanged, got %q", string(got))
+	}
+}
+
+func TestWriteOLSHTAccessFileOverwritesWhenEnabled(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".htaccess")
+	if err := os.WriteFile(path, []byte("old rules\n"), 0o644); err != nil {
+		t.Fatalf("seed .htaccess: %v", err)
+	}
+
+	if err := writeOLSHTAccessFile(path, "RewriteEngine On\nRewriteRule ^ index.php [L]", true); err != nil {
+		t.Fatalf("writeOLSHTAccessFile: %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read .htaccess: %v", err)
+	}
+	want := "RewriteEngine On\nRewriteRule ^ index.php [L]\n"
+	if string(got) != want {
+		t.Fatalf("expected %q, got %q", want, string(got))
+	}
+}
+
+func TestWriteOLSHTAccessFileDefaultsWhenRulesEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".htaccess")
+
+	if err := writeOLSHTAccessFile(path, "   ", true); err != nil {
+		t.Fatalf("writeOLSHTAccessFile: %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read .htaccess: %v", err)
+	}
+	if string(got) != "RewriteEngine On\n" {
+		t.Fatalf("expected default rewrite content, got %q", string(got))
+	}
+}
+
+func TestShouldOverwriteOLSHTAccess(t *testing.T) {
+	if shouldOverwriteOLSHTAccess("") {
+		t.Fatalf("empty rules should not overwrite existing .htaccess")
+	}
+	if shouldOverwriteOLSHTAccess("RewriteEngine On") {
+		t.Fatalf("default rewrite bootstrap should not overwrite existing .htaccess")
+	}
+	if !shouldOverwriteOLSHTAccess("RewriteEngine On\nRewriteRule ^ index.php [L]") {
+		t.Fatalf("custom rewrite rules should overwrite existing .htaccess")
 	}
 }
