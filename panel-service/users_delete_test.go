@@ -92,3 +92,53 @@ func TestHandleUsersDeleteRejectsAdmin(t *testing.T) {
 		t.Fatalf("admin user should remain in runtime state")
 	}
 }
+
+func TestHandleUsersDeleteClearsChildParentReference(t *testing.T) {
+	t.Setenv("AURAPANEL_STATE_FILE", filepath.Join(t.TempDir(), "panel-service-state.json"))
+
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+	svc.state.Users = append(svc.state.Users,
+		PanelUser{
+			ID:           2,
+			Username:     "agency",
+			Name:         "Agency",
+			Email:        "agency@example.com",
+			Role:         "reseller",
+			Package:      "reseller-starter",
+			Active:       true,
+			PasswordHash: mustHashPassword("agencypass"),
+		},
+		PanelUser{
+			ID:             3,
+			Username:       "tenant1",
+			Name:           "Tenant One",
+			Email:          "tenant1@example.com",
+			Role:           "user",
+			Package:        "default",
+			ParentUsername: "agency",
+			Active:         true,
+			PasswordHash:   mustHashPassword("tenantpass"),
+		},
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/delete", strings.NewReader(`{"username":"agency"}`))
+	rec := httptest.NewRecorder()
+
+	svc.handleUsersDelete(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	child := svc.findUserLocked("tenant1")
+	if child == nil {
+		t.Fatalf("child user should remain")
+	}
+	if child.ParentUsername != "" {
+		t.Fatalf("expected child parent to be cleared, got %q", child.ParentUsername)
+	}
+}

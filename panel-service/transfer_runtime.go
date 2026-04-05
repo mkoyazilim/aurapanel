@@ -33,7 +33,11 @@ func ensureSystemGroup(group string) error {
 	return err
 }
 
-func resolvedTransferOwner(homeDir string) string {
+func resolvedTransferOwner(homeDir, ownerHint string) string {
+	ownerHint = sanitizeName(ownerHint)
+	if ownerHint != "" && systemUserExists(ownerHint) {
+		return ownerHint
+	}
 	homeDir = filepath.Clean(strings.TrimSpace(homeDir))
 	parts := strings.Split(filepath.ToSlash(homeDir), "/")
 	if len(parts) >= 3 && parts[1] == "home" && systemUserExists(parts[2]) {
@@ -96,11 +100,11 @@ func pureFTPdList() ([]TransferAccount, error) {
 	return accounts, nil
 }
 
-func createRuntimeFTPAccount(username, password, homeDir string) error {
+func createRuntimeFTPAccount(username, password, homeDir, ownerHint string) error {
 	if _, err := exec.LookPath("pure-pw"); err != nil {
 		return fmt.Errorf("pure-pw not found")
 	}
-	owner := resolvedTransferOwner(homeDir)
+	owner := resolvedTransferOwner(homeDir, ownerHint)
 	if err := ensureOwnedDirectory(homeDir, owner); err != nil {
 		return err
 	}
@@ -242,11 +246,11 @@ func runtimeTransferAccounts(kind string) ([]TransferAccount, error) {
 	return pureFTPdList()
 }
 
-func createRuntimeTransferAccount(kind, username, password, homeDir string) error {
+func createRuntimeTransferAccount(kind, username, password, homeDir, ownerHint string) error {
 	if kind == "sftp" {
 		return createRuntimeSFTPAccount(username, password, homeDir)
 	}
-	return createRuntimeFTPAccount(username, password, homeDir)
+	return createRuntimeFTPAccount(username, password, homeDir, ownerHint)
 }
 
 func updateRuntimeTransferPassword(kind, username, password string) error {
@@ -275,6 +279,9 @@ func mergeTransferMetadata(runtimeItems, existing []TransferAccount) []TransferA
 			}
 			if runtimeItems[i].HomeDir == "" {
 				runtimeItems[i].HomeDir = stored.HomeDir
+			}
+			if !runtimeItems[i].Primary {
+				runtimeItems[i].Primary = stored.Primary
 			}
 			if runtimeItems[i].CreatedAt == 0 {
 				runtimeItems[i].CreatedAt = stored.CreatedAt

@@ -210,6 +210,7 @@ type TransferAccount struct {
 	Username  string `json:"username"`
 	Domain    string `json:"domain,omitempty"`
 	HomeDir   string `json:"home_dir"`
+	Primary   bool   `json:"primary,omitempty"`
 	CreatedAt int64  `json:"created_at"`
 }
 

@@ -123,6 +123,7 @@ func resellerAllowed(path string) bool {
 
 	allowedPrefixes := []string{
 		"/api/v1/auth/me",
+		"/api/v1/users",
 		"/api/v1/vhost",
 		"/api/v1/websites",
 		"/api/v1/dns",

@@ -83,3 +83,52 @@ func TestHandleUsersUpdateRejectsRemovingLastActiveAdmin(t *testing.T) {
 		t.Fatalf("admin user should remain active admin")
 	}
 }
+
+func TestHandleUsersUpdateSetsParentUsername(t *testing.T) {
+	t.Setenv("AURAPANEL_STATE_FILE", filepath.Join(t.TempDir(), "panel-service-state.json"))
+
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+	svc.state.Users = append(svc.state.Users,
+		PanelUser{
+			ID:           2,
+			Username:     "agency",
+			Name:         "Agency",
+			Email:        "agency@example.com",
+			Role:         "reseller",
+			Package:      "reseller-starter",
+			Active:       true,
+			PasswordHash: mustHashPassword("agencypass"),
+		},
+		PanelUser{
+			ID:           3,
+			Username:     "alice",
+			Name:         "Alice",
+			Email:        "alice@example.com",
+			Role:         "user",
+			Package:      "default",
+			Active:       true,
+			PasswordHash: mustHashPassword("alicepass"),
+		},
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/update", strings.NewReader(`{"username":"alice","parent_username":"agency"}`))
+	rec := httptest.NewRecorder()
+
+	svc.handleUsersUpdate(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	updated := svc.findUserLocked("alice")
+	if updated == nil {
+		t.Fatalf("expected updated user")
+	}
+	if updated.ParentUsername != "agency" {
+		t.Fatalf("expected parent_username=agency, got %q", updated.ParentUsername)
+	}
+}

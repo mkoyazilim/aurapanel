@@ -453,6 +453,7 @@ const baseEn = {
     actions: {
       password: 'Password',
       delete: 'Delete',
+      primary: 'Primary',
     },
     modal: {
       create_title: 'Create FTP User',

@@ -53,6 +53,47 @@ func TestHandleVhostListFiltersByPrincipalOwnership(t *testing.T) {
 	}
 }
 
+func TestHandleVhostListIncludesResellerChildTenantSites(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+	svc.state.Users = append(svc.state.Users,
+		PanelUser{ID: 20, Username: "agency", Email: "agency@example.com", Name: "Agency", Role: "reseller", Active: true},
+		PanelUser{ID: 21, Username: "tenant1", Email: "tenant1@example.com", Name: "Tenant One", Role: "user", ParentUsername: "agency", Active: true},
+		PanelUser{ID: 22, Username: "tenant2", Email: "tenant2@example.com", Name: "Tenant Two", Role: "user", Active: true},
+	)
+	svc.state.Websites = []Website{
+		{Domain: "child.example.com", Owner: "tenant1", User: "tenant1", Email: "webmaster@child.example.com", Status: "active"},
+		{Domain: "other.example.com", Owner: "tenant2", User: "tenant2", Email: "webmaster@other.example.com", Status: "active"},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/vhost/list", nil)
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "agency@example.com",
+		Role:     "reseller",
+		Username: "agency",
+		Name:     "Agency",
+	}))
+	rec := httptest.NewRecorder()
+	svc.handleVhostList(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		Data []Website `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(payload.Data) != 1 || payload.Data[0].Domain != "child.example.com" {
+		t.Fatalf("expected only child tenant domain, got %+v", payload.Data)
+	}
+}
+
 func TestRequireDomainAccessBlocksNonOwner(t *testing.T) {
 	svc := &service{
 		startedAt: seedTime(),
@@ -102,6 +143,26 @@ func TestNonAdminRoutePolicyBlocksAdminOnlyRoutes(t *testing.T) {
 	}
 }
 
+func TestNonAdminRoutePolicyAllowsResellerUsersRoutes(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/list", nil)
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "reseller@example.com",
+		Role:     "reseller",
+		Username: "reseller",
+		Name:     "Reseller",
+	}))
+	rec := httptest.NewRecorder()
+
+	if ok := svc.nonAdminRoutePolicy(rec, req); !ok {
+		t.Fatalf("expected policy to allow reseller users route, got status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestNonAdminRoutePolicyAllowsProvisionForMatchingOwner(t *testing.T) {
 	svc := &service{
 		startedAt: seedTime(),
@@ -120,6 +181,60 @@ func TestNonAdminRoutePolicyAllowsProvisionForMatchingOwner(t *testing.T) {
 
 	if ok := svc.nonAdminRoutePolicy(rec, req); !ok {
 		t.Fatalf("expected policy to allow self-owned provisioning, got status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNonAdminRoutePolicyAllowsResellerProvisionForChildOwner(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.state.Users = append(svc.state.Users,
+		PanelUser{ID: 50, Username: "agency", Email: "agency@example.com", Name: "Agency", Role: "reseller", Active: true},
+		PanelUser{ID: 51, Username: "tenant1", Email: "tenant1@example.com", Name: "Tenant One", Role: "user", ParentUsername: "agency", Active: true},
+	)
+	body := `{"domain":"newtenant.example.com","owner":"tenant1","user":"tenant1"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/vhost/create", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "agency@example.com",
+		Role:     "reseller",
+		Username: "agency",
+		Name:     "Agency",
+	}))
+	rec := httptest.NewRecorder()
+
+	if ok := svc.nonAdminRoutePolicy(rec, req); !ok {
+		t.Fatalf("expected policy to allow child-tenant provisioning, got status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNonAdminRoutePolicyBlocksResellerProvisionForForeignOwner(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.state.Users = append(svc.state.Users,
+		PanelUser{ID: 60, Username: "agency", Email: "agency@example.com", Name: "Agency", Role: "reseller", Active: true},
+		PanelUser{ID: 61, Username: "tenant1", Email: "tenant1@example.com", Name: "Tenant One", Role: "user", ParentUsername: "agency", Active: true},
+		PanelUser{ID: 62, Username: "external", Email: "external@example.com", Name: "External", Role: "user", Active: true},
+	)
+	body := `{"domain":"foreign.example.com","owner":"external","user":"external"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/vhost/create", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "agency@example.com",
+		Role:     "reseller",
+		Username: "agency",
+		Name:     "Agency",
+	}))
+	rec := httptest.NewRecorder()
+
+	if ok := svc.nonAdminRoutePolicy(rec, req); ok {
+		t.Fatalf("expected policy to block foreign owner provisioning")
+	}
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

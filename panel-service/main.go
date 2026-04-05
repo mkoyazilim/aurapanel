@@ -102,20 +102,21 @@ type Package struct {
 }
 
 type PanelUser struct {
-	ID           int      `json:"id"`
-	Username     string   `json:"username"`
-	Name         string   `json:"name"`
-	Email        string   `json:"email"`
-	Role         string   `json:"role"`
-	Package      string   `json:"package"`
-	IsOwner      bool     `json:"is_owner,omitempty"`
-	RolePolicyID string   `json:"role_policy_id,omitempty"`
-	RolePolicy   string   `json:"role_policy_name,omitempty"`
-	Permissions  []string `json:"permissions,omitempty"`
-	Sites        int      `json:"sites"`
-	Active       bool     `json:"active"`
-	TwoFAEnabled bool     `json:"two_fa_enabled"`
-	PasswordHash string   `json:"password_hash,omitempty"`
+	ID             int      `json:"id"`
+	Username       string   `json:"username"`
+	Name           string   `json:"name"`
+	Email          string   `json:"email"`
+	Role           string   `json:"role"`
+	Package        string   `json:"package"`
+	ParentUsername string   `json:"parent_username,omitempty"`
+	IsOwner        bool     `json:"is_owner,omitempty"`
+	RolePolicyID   string   `json:"role_policy_id,omitempty"`
+	RolePolicy     string   `json:"role_policy_name,omitempty"`
+	Permissions    []string `json:"permissions,omitempty"`
+	Sites          int      `json:"sites"`
+	Active         bool     `json:"active"`
+	TwoFAEnabled   bool     `json:"two_fa_enabled"`
+	PasswordHash   string   `json:"password_hash,omitempty"`
 }
 
 type DatabaseRecord struct {
@@ -398,6 +399,7 @@ func newService() *service {
 	}
 	svc.mu.Lock()
 	svc.ensureOwnerConsistencyLocked()
+	svc.ensureUserHierarchyLocked()
 	svc.reconcileUserRolePoliciesLocked()
 	svc.mu.Unlock()
 	svc.bootstrapModules()
@@ -783,9 +785,9 @@ func (s *service) nonAdminCanProvisionDomain(principal servicePrincipal, r *http
 		s.mu.RUnlock()
 		return true
 	}
+	ids := s.principalScopedUsernamesLocked(principal)
 	s.mu.RUnlock()
 	payload := s.readRequestJSONMap(r)
-	ids := principalAliases(principal)
 	for _, key := range []string{"user", "owner", "email"} {
 		value := strings.TrimSpace(requestStringField(payload, key))
 		if value == "" {
@@ -834,7 +836,6 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 
 	adminOnlyPrefixes := []string{
 		"/api/v1/ai",
-		"/api/v1/users",
 		"/api/v1/packages",
 		"/api/v1/platform/capabilities",
 		"/api/v1/cloudlinux",
@@ -881,6 +882,14 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 			writeError(w, http.StatusForbidden, "This endpoint is restricted to admin users.")
 			return false
 		}
+	}
+
+	if servicePathMatchesPrefix(path, "/api/v1/users") {
+		if normalizeRole(principal.Role) != "reseller" {
+			writeError(w, http.StatusForbidden, "This endpoint is restricted to reseller or admin users.")
+			return false
+		}
+		return true
 	}
 
 	if (path == "/api/v1/vhost" || path == "/api/v1/vhost/create") && method == http.MethodPost {
@@ -1040,7 +1049,7 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vhost/update":
 		s.handleVhostUpdate(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/users/list":
-		s.handleUsersList(w)
+		s.handleUsersList(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/users/create":
 		s.handleUsersCreate(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/users/update":
@@ -1786,14 +1795,84 @@ func principalDefaultOwner(pr servicePrincipal) string {
 	return ""
 }
 
+func (s *service) principalScopedUsernamesLocked(pr servicePrincipal) map[string]struct{} {
+	ids := principalAliases(pr)
+	expansionRoots := map[string]struct{}{}
+	if username := sanitizeName(pr.Username); username != "" {
+		ids[username] = struct{}{}
+		expansionRoots[username] = struct{}{}
+	}
+	if user := s.findUserByEmailLocked(pr.Email); user != nil {
+		username := sanitizeName(user.Username)
+		if username != "" {
+			ids[username] = struct{}{}
+			expansionRoots[username] = struct{}{}
+		}
+	}
+	if normalizeRole(pr.Role) != "reseller" {
+		return ids
+	}
+
+	queue := make([]string, 0, len(expansionRoots))
+	for root := range expansionRoots {
+		queue = append(queue, root)
+	}
+	visited := map[string]struct{}{}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if _, seen := visited[current]; seen {
+			continue
+		}
+		visited[current] = struct{}{}
+		for _, user := range s.state.Users {
+			parent := sanitizeName(user.ParentUsername)
+			child := sanitizeName(user.Username)
+			if child == "" || parent == "" || parent != current {
+				continue
+			}
+			if _, known := ids[child]; !known {
+				ids[child] = struct{}{}
+				queue = append(queue, child)
+			}
+		}
+	}
+	return ids
+}
+
+func (s *service) principalCanManageOwnerLocked(pr servicePrincipal, owner string) bool {
+	if normalizeRole(pr.Role) == "admin" {
+		return true
+	}
+	owner = sanitizeName(owner)
+	if owner == "" {
+		return false
+	}
+	ids := s.principalScopedUsernamesLocked(pr)
+	_, ok := ids[owner]
+	return ok
+}
+
+func (s *service) principalCanManageUserLocked(pr servicePrincipal, target PanelUser) bool {
+	if normalizeRole(pr.Role) == "admin" {
+		return true
+	}
+	if normalizeRole(pr.Role) != "reseller" {
+		return false
+	}
+	if normalizeRole(target.Role) == "admin" || target.IsOwner {
+		return false
+	}
+	ids := s.principalScopedUsernamesLocked(pr)
+	_, ok := ids[sanitizeName(target.Username)]
+	return ok
+}
+
 func (s *service) principalOwnsWebsiteLocked(pr servicePrincipal, site Website) bool {
 	if pr.Role == "admin" {
 		return true
 	}
-	ids := principalAliases(pr)
-	if user := s.findUserByEmailLocked(pr.Email); user != nil {
-		ids[sanitizeName(user.Username)] = struct{}{}
-	}
+	ids := s.principalScopedUsernamesLocked(pr)
 	owner := sanitizeName(site.Owner)
 	if _, ok := ids[owner]; ok && owner != "" {
 		return true
@@ -1833,12 +1912,21 @@ func (s *service) defaultOwnerLocked() string {
 }
 
 func (s *service) resolveRequestedOwner(r *http.Request, values ...string) string {
+	principal, hasPrincipal := principalFromContext(r.Context())
 	for _, value := range values {
 		if normalized := sanitizeName(value); normalized != "" {
+			if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+				s.mu.RLock()
+				allowed := s.principalCanManageOwnerLocked(principal, normalized)
+				s.mu.RUnlock()
+				if !allowed {
+					continue
+				}
+			}
 			return normalized
 		}
 	}
-	if principal, ok := principalFromContext(r.Context()); ok {
+	if hasPrincipal {
 		if candidate := principalDefaultOwner(principal); candidate != "" {
 			return candidate
 		}
@@ -1975,10 +2063,7 @@ func (s *service) principalCanAccessDatabaseLocked(pr servicePrincipal, item Dat
 	if normalizeDomain(item.SiteDomain) != "" && s.canAccessDomainLocked(pr, item.SiteDomain) {
 		return true
 	}
-	ids := principalAliases(pr)
-	if user := s.findUserByEmailLocked(pr.Email); user != nil {
-		ids[sanitizeName(user.Username)] = struct{}{}
-	}
+	ids := s.principalScopedUsernamesLocked(pr)
 	owner := sanitizeName(item.Owner)
 	_, ok := ids[owner]
 	return owner != "" && ok
@@ -2147,7 +2232,7 @@ func (s *service) handleVhostCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	s.ensureDefaultFTPAccountLocked(site.Domain)
+	s.ensureDefaultFTPAccountLocked(site)
 
 	s.saveRuntimeStateLocked()
 
@@ -2245,20 +2330,39 @@ func (s *service) handleVhostUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Website updated.", Data: site})
 }
 
-func (s *service) handleUsersList(w http.ResponseWriter) {
+func (s *service) handleUsersList(w http.ResponseWriter, r *http.Request) {
+	principal, hasPrincipal := principalFromContext(r.Context())
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+		if normalizeRole(principal.Role) != "reseller" {
+			writeError(w, http.StatusForbidden, "Only reseller or admin can list users.")
+			return
+		}
+		filtered := make([]PanelUser, 0, len(s.state.Users))
+		for _, user := range s.state.Users {
+			if !s.principalCanManageUserLocked(principal, user) {
+				continue
+			}
+			filtered = append(filtered, user)
+		}
+		writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.publicUsersLocked(filtered)})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.publicUsersLocked(s.state.Users)})
 }
 
 func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Username     string `json:"username"`
-		Email        string `json:"email"`
-		Password     string `json:"password"`
-		Role         string `json:"role"`
-		Package      string `json:"package"`
-		RolePolicyID string `json:"role_policy_id"`
+		Username       string `json:"username"`
+		Email          string `json:"email"`
+		Password       string `json:"password"`
+		Role           string `json:"role"`
+		Package        string `json:"package"`
+		ParentUsername string `json:"parent_username"`
+		RolePolicyID   string `json:"role_policy_id"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user payload.")
@@ -2295,6 +2399,35 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	passwordHash := mustHashPassword(rawPassword)
+	principal, hasPrincipal := principalFromContext(r.Context())
+	role := normalizeRole(payload.Role)
+	parentUsername := ""
+	parentCandidate := strings.TrimSpace(payload.ParentUsername)
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+		if normalizeRole(principal.Role) != "reseller" {
+			writeError(w, http.StatusForbidden, "Only reseller or admin can create users.")
+			return
+		}
+		if role == "admin" {
+			writeError(w, http.StatusForbidden, "Reseller cannot create admin users.")
+			return
+		}
+		if parentCandidate == "" {
+			parentCandidate = principalDefaultOwner(principal)
+		}
+	}
+	if role != "admin" {
+		resolvedParent, err := s.resolveParentUsernameLocked(username, parentCandidate)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if hasPrincipal && normalizeRole(principal.Role) != "admin" && !s.principalCanManageOwnerLocked(principal, resolvedParent) {
+			writeError(w, http.StatusForbidden, "You cannot assign parent outside your scope.")
+			return
+		}
+		parentUsername = resolvedParent
+	}
 	rolePolicyID := strings.TrimSpace(payload.RolePolicyID)
 	if rolePolicyID != "" {
 		if !s.policyExistsLocked(rolePolicyID) {
@@ -2303,17 +2436,18 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	user := PanelUser{
-		ID:           s.state.NextUserID,
-		Username:     username,
-		Name:         strings.Title(username),
-		Email:        email,
-		Role:         normalizeRole(payload.Role),
-		Package:      firstNonEmpty(strings.TrimSpace(payload.Package), "default"),
-		RolePolicyID: rolePolicyID,
-		Sites:        0,
-		Active:       true,
-		TwoFAEnabled: false,
-		PasswordHash: passwordHash,
+		ID:             s.state.NextUserID,
+		Username:       username,
+		Name:           strings.Title(username),
+		Email:          email,
+		Role:           role,
+		Package:        firstNonEmpty(strings.TrimSpace(payload.Package), "default"),
+		ParentUsername: parentUsername,
+		RolePolicyID:   rolePolicyID,
+		Sites:          0,
+		Active:         true,
+		TwoFAEnabled:   false,
+		PasswordHash:   passwordHash,
 	}
 	s.state.NextUserID++
 	s.state.Users = append(s.state.Users, user)
@@ -2324,13 +2458,14 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Username     string  `json:"username"`
-		Name         string  `json:"name"`
-		Email        string  `json:"email"`
-		Role         string  `json:"role"`
-		Package      string  `json:"package"`
-		RolePolicyID *string `json:"role_policy_id"`
-		Active       *bool   `json:"active"`
+		Username       string  `json:"username"`
+		Name           string  `json:"name"`
+		Email          string  `json:"email"`
+		Role           string  `json:"role"`
+		Package        string  `json:"package"`
+		ParentUsername *string `json:"parent_username"`
+		RolePolicyID   *string `json:"role_policy_id"`
+		Active         *bool   `json:"active"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user update payload.")
@@ -2342,6 +2477,7 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Username is required.")
 		return
 	}
+	principal, hasPrincipal := principalFromContext(r.Context())
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -2354,6 +2490,16 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 
 	current := s.state.Users[index]
 	updated := current
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+		if normalizeRole(principal.Role) != "reseller" {
+			writeError(w, http.StatusForbidden, "Only reseller or admin can update users.")
+			return
+		}
+		if !s.principalCanManageUserLocked(principal, current) {
+			writeError(w, http.StatusForbidden, "User is outside your management scope.")
+			return
+		}
+	}
 	if strings.TrimSpace(updated.RolePolicyID) == "" {
 		if policyID, _, _ := s.resolveUserACLLocked(updated); policyID != "" {
 			updated.RolePolicyID = policyID
@@ -2373,6 +2519,24 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	if role := strings.TrimSpace(payload.Role); role != "" {
 		updated.Role = normalizeRole(role)
 	}
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" && normalizeRole(updated.Role) == "admin" {
+		writeError(w, http.StatusForbidden, "Reseller cannot promote users to admin.")
+		return
+	}
+	if normalizeRole(updated.Role) == "admin" {
+		updated.ParentUsername = ""
+	} else if payload.ParentUsername != nil {
+		resolvedParent, err := s.resolveParentUsernameLocked(updated.Username, *payload.ParentUsername)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if hasPrincipal && normalizeRole(principal.Role) != "admin" && !s.principalCanManageOwnerLocked(principal, resolvedParent) {
+			writeError(w, http.StatusForbidden, "You cannot assign parent outside your scope.")
+			return
+		}
+		updated.ParentUsername = resolvedParent
+	}
 	if pkg := strings.TrimSpace(payload.Package); pkg != "" {
 		updated.Package = pkg
 	}
@@ -2389,6 +2553,12 @@ func (s *service) handleUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if payload.Active != nil {
 		updated.Active = *payload.Active
+	}
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+		if !s.principalCanManageUserLocked(principal, updated) {
+			writeError(w, http.StatusForbidden, "Updated user scope is not allowed.")
+			return
+		}
 	}
 
 	for i := range s.state.Users {
@@ -2477,6 +2647,7 @@ func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := sanitizeName(payload.Username)
+	principal, hasPrincipal := principalFromContext(r.Context())
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -2490,6 +2661,21 @@ func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "Admin user cannot be deleted.")
 		return
 	}
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+		if normalizeRole(principal.Role) != "reseller" {
+			writeError(w, http.StatusForbidden, "Only reseller or admin can delete users.")
+			return
+		}
+		target := s.state.Users[index]
+		if !s.principalCanManageUserLocked(principal, target) {
+			writeError(w, http.StatusForbidden, "User is outside your management scope.")
+			return
+		}
+		if sanitizeName(target.Username) == principalDefaultOwner(principal) {
+			writeError(w, http.StatusForbidden, "You cannot delete your own account.")
+			return
+		}
+	}
 
 	previousUsers := append([]PanelUser(nil), s.state.Users...)
 	previousWebsites := append([]Website(nil), s.state.Websites...)
@@ -2502,6 +2688,11 @@ func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 		if s.state.Websites[i].Owner == username || s.state.Websites[i].User == username {
 			s.state.Websites[i].Owner = reassignOwner
 			s.state.Websites[i].User = reassignOwner
+		}
+	}
+	for i := range s.state.Users {
+		if sanitizeName(s.state.Users[i].ParentUsername) == username {
+			s.state.Users[i].ParentUsername = ""
 		}
 	}
 	s.recountSitesLocked()
@@ -2529,6 +2720,7 @@ func (s *service) handleUsersChangePassword(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "New password is required.")
 		return
 	}
+	principal, hasPrincipal := principalFromContext(r.Context())
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -2537,6 +2729,16 @@ func (s *service) handleUsersChangePassword(w http.ResponseWriter, r *http.Reque
 	if user == nil {
 		writeError(w, http.StatusNotFound, "User not found.")
 		return
+	}
+	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
+		if normalizeRole(principal.Role) != "reseller" {
+			writeError(w, http.StatusForbidden, "Only reseller or admin can change user password.")
+			return
+		}
+		if !s.principalCanManageUserLocked(principal, *user) {
+			writeError(w, http.StatusForbidden, "User is outside your management scope.")
+			return
+		}
 	}
 
 	adminEmail, _ := loadAdminSeedCredentials()
@@ -3780,6 +3982,54 @@ func (s *service) findUserIndexLocked(username string) int {
 	return -1
 }
 
+func (s *service) resolveParentUsernameLocked(username, parent string) (string, error) {
+	parent = sanitizeName(parent)
+	username = sanitizeName(username)
+	if parent == "" {
+		return "", nil
+	}
+	if username != "" && parent == username {
+		return "", fmt.Errorf("Parent user cannot be same as user.")
+	}
+	parentUser := s.findUserLocked(parent)
+	if parentUser == nil {
+		return "", fmt.Errorf("Parent user was not found.")
+	}
+	parentRole := normalizeRole(parentUser.Role)
+	if parentRole != "admin" && parentRole != "reseller" {
+		return "", fmt.Errorf("Parent user must be admin or reseller.")
+	}
+	if username != "" && s.wouldCreateParentCycleLocked(username, parent) {
+		return "", fmt.Errorf("Parent relationship creates a cycle.")
+	}
+	return parent, nil
+}
+
+func (s *service) wouldCreateParentCycleLocked(username, candidateParent string) bool {
+	username = sanitizeName(username)
+	candidateParent = sanitizeName(candidateParent)
+	if username == "" || candidateParent == "" {
+		return false
+	}
+	current := candidateParent
+	visited := map[string]struct{}{}
+	for current != "" {
+		if current == username {
+			return true
+		}
+		if _, seen := visited[current]; seen {
+			return true
+		}
+		visited[current] = struct{}{}
+		user := s.findUserLocked(current)
+		if user == nil {
+			return false
+		}
+		current = sanitizeName(user.ParentUsername)
+	}
+	return false
+}
+
 func (s *service) ensureUserLocked(username, email, role, pkg, password string) {
 	key := sanitizeName(username)
 	if key == "" {
@@ -3846,10 +4096,10 @@ func (s *service) ensureDefaultSiteArtifactsLocked(domain string) {
 
 func (s *service) provisionWebsiteArtifactsLocked(site Website) error {
 	s.ensureDefaultSiteArtifactsLocked(site.Domain)
-	s.ensureDNSArtifactsLocked(site.Domain, site.MailDomain)
 	if site.MailDomain {
 		s.ensureMailArtifactsLocked(site)
 	}
+	s.ensureDNSArtifactsLocked(site.Domain, site.MailDomain)
 	_ = s.syncCloudflareZoneRecordsLocked(site.Domain)
 	return s.syncOLSVhostsLocked()
 }
@@ -3889,14 +4139,29 @@ func (s *service) ensureDNSArtifactsLocked(domain string, mailDomain bool) {
 		s.modules.DNSRecords[normalizedDomain] = []DNSRecord{}
 	}
 
-	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: normalizedDomain, Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "@", Content: serverIP, TTL: 3600})
 	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "www", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "ftp", Content: serverIP, TTL: 3600})
 	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "panel", Content: serverIP, TTL: 3600})
-	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "TXT", Name: normalizedDomain, Content: "v=spf1 mx a ~all", TTL: 3600})
+	s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "TXT", Name: "@", Content: buildSPFRecord(), TTL: 3600})
 
 	if mailDomain {
 		s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "A", Name: "mail", Content: serverIP, TTL: 3600})
-		s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "MX", Name: normalizedDomain, Content: fmt.Sprintf("mail.%s", normalizedDomain), TTL: 3600})
+		s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{RecordType: "MX", Name: "@", Content: fmt.Sprintf("mail.%s", normalizedDomain), TTL: 3600})
+		s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{
+			RecordType: "TXT",
+			Name:       "_dmarc",
+			Content:    buildDMARCRecord("quarantine", "mailto:postmaster@"+normalizedDomain, "", "r", "r", 100),
+			TTL:        3600,
+		})
+		if record, ok := s.modules.MailDKIM[normalizedDomain]; ok && strings.TrimSpace(record.PublicKey) != "" {
+			s.upsertDNSRecordLocked(normalizedDomain, DNSRecord{
+				RecordType: "TXT",
+				Name:       firstNonEmpty(strings.TrimSpace(record.Selector), "selector1") + "._domainkey",
+				Content:    strings.TrimSpace(record.PublicKey),
+				TTL:        3600,
+			})
+		}
 	}
 
 	s.recalcDNSZoneLocked(normalizedDomain)
@@ -3985,7 +4250,13 @@ func transferUsernameExists(items []TransferAccount, username string) bool {
 }
 
 func buildDefaultFTPUsername(domain string, existing []TransferAccount) string {
-	base := sanitizeName(strings.ReplaceAll(normalizeDomain(domain), ".", "_"))
+	base := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return -1
+	}, normalizeDomain(domain))
+	base = strings.ToLower(strings.TrimSpace(base))
 	if base == "" {
 		base = "ftpuser"
 	}
@@ -4004,26 +4275,61 @@ func buildDefaultFTPUsername(domain string, existing []TransferAccount) string {
 	return sanitizeName(fmt.Sprintf("%s_%s", base, generateSecret(4)))
 }
 
-func (s *service) ensureDefaultFTPAccountLocked(domain string) {
-	normalizedDomain := normalizeDomain(domain)
+func primaryFTPUsernameForDomain(domain string) string {
+	return buildDefaultFTPUsername(domain, nil)
+}
+
+func inferTransferDomainFromHomeDir(homeDir string) string {
+	normalizedHome := normalizeVirtualPath(homeDir)
+	parts := strings.Split(strings.TrimPrefix(normalizedHome, "/"), "/")
+	if len(parts) >= 2 && parts[0] == "home" {
+		return normalizeDomain(parts[1])
+	}
+	return ""
+}
+
+func (s *service) websiteOwnerForDomainLocked(domain string) string {
+	site := s.findWebsiteLocked(domain)
+	if site == nil {
+		return ""
+	}
+	return sanitizeName(firstNonEmpty(site.Owner, site.User))
+}
+
+func normalizeFTPAccountMetadata(account TransferAccount) TransferAccount {
+	if account.Domain == "" {
+		account.Domain = inferTransferDomainFromHomeDir(account.HomeDir)
+	}
+	if account.Domain != "" && sanitizeName(account.Username) == primaryFTPUsernameForDomain(account.Domain) {
+		account.Primary = true
+	}
+	return account
+}
+
+func (s *service) ensureDefaultFTPAccountLocked(site Website) {
+	normalizedDomain := normalizeDomain(site.Domain)
 	if normalizedDomain == "" {
 		return
 	}
 	homeDir := domainDocroot(normalizedDomain)
+	ownerHint := sanitizeName(firstNonEmpty(site.Owner, site.User))
 	runtimeItems := append([]TransferAccount(nil), s.modules.FTPUsers...)
 	if liveItems, err := runtimeTransferAccounts("ftp"); err == nil {
 		runtimeItems = mergeTransferMetadata(liveItems, runtimeItems)
 	} else {
 		log.Printf("ftp account discovery warning for %s: %v", normalizedDomain, err)
 	}
+	for i := range runtimeItems {
+		runtimeItems[i] = normalizeFTPAccountMetadata(runtimeItems[i])
+	}
 	s.modules.FTPUsers = runtimeItems
+	primaryUsername := primaryFTPUsernameForDomain(normalizedDomain)
 	for _, item := range runtimeItems {
-		if transferAccountBelongsToDomain(item, normalizedDomain) {
+		if (item.Primary && transferAccountBelongsToDomain(item, normalizedDomain)) || sanitizeName(item.Username) == sanitizeName(primaryUsername) {
 			account := item
 			account.Domain = normalizedDomain
-			if account.HomeDir == "" {
-				account.HomeDir = homeDir
-			}
+			account.HomeDir = homeDir
+			account.Primary = true
 			if account.CreatedAt == 0 {
 				account.CreatedAt = time.Now().UTC().Unix()
 			}
@@ -4036,10 +4342,11 @@ func (s *service) ensureDefaultFTPAccountLocked(domain string) {
 		Username:  buildDefaultFTPUsername(normalizedDomain, runtimeItems),
 		Domain:    normalizedDomain,
 		HomeDir:   homeDir,
+		Primary:   true,
 		CreatedAt: time.Now().UTC().Unix(),
 	}
 	password := generateSecret(20)
-	if err := createRuntimeTransferAccount("ftp", account.Username, password, account.HomeDir); err != nil {
+	if err := createRuntimeTransferAccount("ftp", account.Username, password, account.HomeDir, ownerHint); err != nil {
 		log.Printf("ftp auto-provision failed for %s: %v", normalizedDomain, err)
 		return
 	}
@@ -4341,6 +4648,34 @@ func (s *service) ensureOwnerConsistencyLocked() {
 			user.IsOwner = true
 			user.Active = true
 			return
+		}
+	}
+}
+
+func (s *service) ensureUserHierarchyLocked() {
+	for i := range s.state.Users {
+		user := &s.state.Users[i]
+		user.ParentUsername = sanitizeName(user.ParentUsername)
+		if normalizeRole(user.Role) == "admin" {
+			user.ParentUsername = ""
+			continue
+		}
+		if user.ParentUsername == "" || user.ParentUsername == sanitizeName(user.Username) {
+			user.ParentUsername = ""
+			continue
+		}
+		parent := s.findUserLocked(user.ParentUsername)
+		if parent == nil {
+			user.ParentUsername = ""
+			continue
+		}
+		parentRole := normalizeRole(parent.Role)
+		if parentRole != "admin" && parentRole != "reseller" {
+			user.ParentUsername = ""
+			continue
+		}
+		if s.wouldCreateParentCycleLocked(user.Username, user.ParentUsername) {
+			user.ParentUsername = ""
 		}
 	}
 }

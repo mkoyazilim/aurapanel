@@ -100,14 +100,28 @@
               :key="item.username"
               class="border-b border-panel-border/50"
             >
-              <td class="py-2 px-2 text-white font-mono">{{ item.username }}</td>
+              <td class="py-2 px-2 text-white font-mono">
+                <div class="flex items-center gap-2">
+                  <span>{{ item.username }}</span>
+                  <span
+                    v-if="item.primary"
+                    class="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-300"
+                  >
+                    {{ t('ftp_manager.actions.primary') }}
+                  </span>
+                </div>
+              </td>
               <td class="py-2 px-2 text-gray-300">{{ item.domain || '-' }}</td>
               <td class="py-2 px-2 text-gray-400 font-mono text-xs break-all">{{ item.home_dir }}</td>
               <td class="py-2 px-2 text-gray-400">{{ formatTime(item.created_at) }}</td>
               <td class="py-2 px-2 text-right">
                 <div class="flex justify-end gap-2">
                   <button class="btn-secondary px-2 py-1 text-xs" @click="openReset(item.username)">{{ t('ftp_manager.actions.password') }}</button>
-                  <button class="btn-danger px-2 py-1 text-xs" @click="removeUser(item.username)">{{ t('ftp_manager.actions.delete') }}</button>
+                  <button
+                    v-if="!item.primary"
+                    class="btn-danger px-2 py-1 text-xs"
+                    @click="removeUser(item.username)"
+                  >{{ t('ftp_manager.actions.delete') }}</button>
                 </div>
               </td>
             </tr>

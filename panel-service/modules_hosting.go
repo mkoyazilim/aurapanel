@@ -911,11 +911,13 @@ func (s *service) handleDNSZoneCreate(w http.ResponseWriter, r *http.Request) {
 			serverIP = "127.0.0.1"
 		}
 	}
-	s.modules.DNSZones = append(s.modules.DNSZones, DNSZone{ID: generateSecret(6), Name: domain, Kind: "native", Records: 2, DNSSECEnabled: false})
-	s.modules.DNSRecords[domain] = []DNSRecord{
-		{RecordType: "A", Name: domain, Content: serverIP, TTL: 3600},
-		{RecordType: "TXT", Name: domain, Content: "v=spf1 mx a ~all", TTL: 3600},
-	}
+	s.ensureDNSArtifactsLocked(domain, true)
+	s.upsertDNSRecordLocked(domain, DNSRecord{RecordType: "A", Name: "@", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(domain, DNSRecord{RecordType: "A", Name: "www", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(domain, DNSRecord{RecordType: "A", Name: "ftp", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(domain, DNSRecord{RecordType: "A", Name: "panel", Content: serverIP, TTL: 3600})
+	s.upsertDNSRecordLocked(domain, DNSRecord{RecordType: "A", Name: "mail", Content: serverIP, TTL: 3600})
+	s.recalcDNSZoneLocked(domain)
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "DNS zone created."})
 }
 
@@ -1001,17 +1003,7 @@ func (s *service) handleDNSReconcile(w http.ResponseWriter, r *http.Request) {
 	domain := normalizeDomain(payload.Domain)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	serverIP := detectPrimaryIPv4()
-	if strings.TrimSpace(serverIP) == "" {
-		serverIP = "127.0.0.1"
-	}
-	if len(s.modules.DNSRecords[domain]) == 0 {
-		s.modules.DNSRecords[domain] = []DNSRecord{
-			{RecordType: "A", Name: domain, Content: serverIP, TTL: 3600},
-			{RecordType: "MX", Name: domain, Content: fmt.Sprintf("mail.%s", domain), TTL: 3600},
-			{RecordType: "TXT", Name: domain, Content: "v=spf1 mx a ~all", TTL: 3600},
-		}
-	}
+	s.ensureDNSArtifactsLocked(domain, true)
 	s.recalcDNSZoneLocked(domain)
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Zone reconciled.", Data: s.modules.DNSRecords[domain]})
 }
@@ -1527,6 +1519,48 @@ func (s *service) transferAccountsLocked(kind string) *[]TransferAccount {
 	return &s.modules.FTPUsers
 }
 
+func (s *service) normalizeTransferAccountLocked(kind string, account TransferAccount) TransferAccount {
+	account.Username = sanitizeName(account.Username)
+	account.Domain = normalizeDomain(account.Domain)
+	account.HomeDir = normalizeVirtualPath(account.HomeDir)
+	if account.Domain == "" {
+		account.Domain = inferTransferDomainFromHomeDir(account.HomeDir)
+	}
+	if kind == "ftp" && account.Domain != "" && sanitizeName(account.Username) == primaryFTPUsernameForDomain(account.Domain) {
+		account.Primary = true
+	}
+	return account
+}
+
+func (s *service) transferOwnerHint(kind string, account TransferAccount) string {
+	if kind != "ftp" {
+		return ""
+	}
+	domain := normalizeDomain(account.Domain)
+	if domain == "" {
+		domain = inferTransferDomainFromHomeDir(account.HomeDir)
+	}
+	if domain == "" {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.websiteOwnerForDomainLocked(domain)
+}
+
+func (s *service) syncRuntimeTransferAccountsLocked(kind string) ([]TransferAccount, error) {
+	source, err := runtimeTransferAccounts(kind)
+	if err != nil {
+		return nil, err
+	}
+	source = mergeTransferMetadata(source, *s.transferAccountsLocked(kind))
+	for i := range source {
+		source[i] = s.normalizeTransferAccountLocked(kind, source[i])
+	}
+	*s.transferAccountsLocked(kind) = source
+	return source, nil
+}
+
 func (s *service) transferAccountAccessibleToPrincipal(principal servicePrincipal, account TransferAccount) bool {
 	if principal.Role == "admin" {
 		return true
@@ -1553,15 +1587,13 @@ func (s *service) handleTransferList(w http.ResponseWriter, r *http.Request, kin
 		return
 	}
 	domain := normalizeDomain(r.URL.Query().Get("domain"))
-	source, err := runtimeTransferAccounts(kind)
+	s.mu.Lock()
+	source, err := s.syncRuntimeTransferAccountsLocked(kind)
+	s.mu.Unlock()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	s.mu.Lock()
-	source = mergeTransferMetadata(source, *s.transferAccountsLocked(kind))
-	*s.transferAccountsLocked(kind) = source
-	s.mu.Unlock()
 	items := make([]TransferAccount, 0, len(source))
 	for _, item := range source {
 		if domain != "" && normalizeDomain(item.Domain) != domain {
@@ -1601,15 +1633,23 @@ func (s *service) handleTransferCreate(w http.ResponseWriter, r *http.Request, k
 		HomeDir:   normalizeVirtualPath(payload.HomeDir),
 		CreatedAt: time.Now().UTC().Unix(),
 	}
+	s.mu.Lock()
+	account = s.normalizeTransferAccountLocked(kind, account)
+	s.mu.Unlock()
 	if !isAllowedTransferHomeDir(account.HomeDir) {
 		writeError(w, http.StatusBadRequest, "Home directory must be under /home/<account>/...")
+		return
+	}
+	if kind == "ftp" && account.Primary {
+		writeError(w, http.StatusConflict, "Primary FTP username is reserved. Use password reset for primary account.")
 		return
 	}
 	if principal.Role != "admin" && !s.transferAccountAccessibleToPrincipal(principal, account) {
 		writeError(w, http.StatusForbidden, "Access denied for this transfer home directory.")
 		return
 	}
-	if err := createRuntimeTransferAccount(kind, account.Username, payload.Password, account.HomeDir); err != nil {
+	ownerHint := s.transferOwnerHint(kind, account)
+	if err := createRuntimeTransferAccount(kind, account.Username, payload.Password, account.HomeDir, ownerHint); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1640,15 +1680,13 @@ func (s *service) handleTransferPassword(w http.ResponseWriter, r *http.Request,
 	}
 	key := sanitizeName(payload.Username)
 	if principal.Role != "admin" {
-		source, err := runtimeTransferAccounts(kind)
+		s.mu.Lock()
+		source, err := s.syncRuntimeTransferAccountsLocked(kind)
+		s.mu.Unlock()
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		s.mu.Lock()
-		source = mergeTransferMetadata(source, *s.transferAccountsLocked(kind))
-		*s.transferAccountsLocked(kind) = source
-		s.mu.Unlock()
 		target := TransferAccount{}
 		found := false
 		for _, item := range source {
@@ -1697,33 +1735,33 @@ func (s *service) handleTransferDelete(w http.ResponseWriter, r *http.Request, k
 		return
 	}
 	key := sanitizeName(payload.Username)
-	if principal.Role != "admin" {
-		source, err := runtimeTransferAccounts(kind)
-		if err != nil {
-			writeError(w, http.StatusBadGateway, err.Error())
-			return
+	s.mu.Lock()
+	source, err := s.syncRuntimeTransferAccountsLocked(kind)
+	s.mu.Unlock()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	target := TransferAccount{}
+	found := false
+	for _, item := range source {
+		if sanitizeName(item.Username) == key {
+			target = item
+			found = true
+			break
 		}
-		s.mu.Lock()
-		source = mergeTransferMetadata(source, *s.transferAccountsLocked(kind))
-		*s.transferAccountsLocked(kind) = source
-		s.mu.Unlock()
-		target := TransferAccount{}
-		found := false
-		for _, item := range source {
-			if sanitizeName(item.Username) == key {
-				target = item
-				found = true
-				break
-			}
-		}
-		if !found {
-			writeError(w, http.StatusNotFound, "Transfer account not found.")
-			return
-		}
-		if !s.transferAccountAccessibleToPrincipal(principal, target) {
-			writeError(w, http.StatusForbidden, "Access denied for this transfer account.")
-			return
-		}
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "Transfer account not found.")
+		return
+	}
+	if principal.Role != "admin" && !s.transferAccountAccessibleToPrincipal(principal, target) {
+		writeError(w, http.StatusForbidden, "Access denied for this transfer account.")
+		return
+	}
+	if kind == "ftp" && target.Primary {
+		writeError(w, http.StatusForbidden, "Primary FTP account cannot be deleted. Only password reset is allowed.")
+		return
 	}
 	if err := deleteRuntimeTransferAccount(kind, key); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())

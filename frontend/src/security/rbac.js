@@ -3,7 +3,7 @@ const ROLE_RESELLER = 'reseller'
 const ROLE_USER = 'user'
 
 const PATH_RULES = [
-  { prefix: '/users', roles: [ROLE_ADMIN] },
+  { prefix: '/users', roles: [ROLE_ADMIN, ROLE_RESELLER] },
   { prefix: '/packages', roles: [ROLE_ADMIN] },
   { prefix: '/reseller', roles: [ROLE_ADMIN] },
   { prefix: '/activity-log', roles: [ROLE_ADMIN] },
