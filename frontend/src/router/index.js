@@ -249,6 +249,12 @@ const routes = [
         path: 'ai-tools',
         name: 'AITools',
         component: () => import('../views/AITools.vue')
+      },
+      {
+        path: 'api-settings',
+        name: 'ApiSettings',
+        component: () => import('../views/ApiSettings.vue'),
+        meta: { title: 'Hosting Integration' }
       }
     ]
   }

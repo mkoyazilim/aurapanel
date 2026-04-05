@@ -171,7 +171,14 @@ func ResellerAuthMiddleware(next http.Handler) http.Handler {
 			tokenString = tokenString[7:]
 		}
 		
-		expectedToken := strings.TrimSpace(os.Getenv("AURAPANEL_RESELLER_TOKEN"))
+		expectedToken := ""
+		tokenFile := "data/reseller.token"
+		if b, err := os.ReadFile(tokenFile); err == nil {
+			expectedToken = strings.TrimSpace(string(b))
+		}
+		if expectedToken == "" {
+			expectedToken = strings.TrimSpace(os.Getenv("AURAPANEL_RESELLER_TOKEN"))
+		}
 		if expectedToken == "" {
 			WriteError(w, r, http.StatusUnauthorized, "RESELLER_API_DISABLED", "Reseller API is not enabled on this server")
 			return

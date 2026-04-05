@@ -425,6 +425,9 @@
               <router-link v-if="can('/ai-tools')" to="/ai-tools" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.AITools') }}</span>
               </router-link>
+              <router-link v-if="can('/api-settings')" to="/api-settings" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>Hosting Integration</span>
+              </router-link>
             </div>
           </transition>
         </div>
@@ -788,6 +791,7 @@ const commandItems = computed(() => [
   { label: t('layout.links.panel_port'), path: '/panel-control' },
   { label: t('panel_update.title'), path: '/panel-update' },
   { label: t('routes.AITools'), path: '/ai-tools' },
+  { label: 'Hosting Integration', path: '/api-settings' },
   { label: t('routes.Docker Images'), path: '/docker/images' },
   { label: t('routes.Docker Containers'), path: '/docker/containers' },
   { label: t('routes.Docker App Store'), path: '/docker/apps' },
