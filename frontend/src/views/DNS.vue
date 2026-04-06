@@ -38,7 +38,7 @@
           </div>
           <div>
             <h3 class="text-lg font-bold text-white">{{ zone.name }}</h3>
-            <p class="text-sm text-gray-400">{{ zone.kind }} · {{ zone.records }} {{ t('dns.add_record') }}</p>
+            <p class="text-sm text-gray-400">{{ zone.kind }} - {{ zone.records }} {{ t('dns.add_record') }}</p>
             <p class="text-xs mt-1" :class="zone.dnssec_enabled ? 'text-green-400' : 'text-yellow-400'">
               {{ t('dns.dnssec') }}: {{ zone.dnssec_enabled ? t('dns.active') : t('dns.passive') }}
             </p>
@@ -66,7 +66,7 @@
     <!-- DNS Records Panel -->
     <div v-if="selectedZone" class="aura-card">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-bold text-white">{{ selectedZone.name }} — {{ t('dns.manage_records') }}</h2>
+        <h2 class="text-lg font-bold text-white">{{ selectedZone.name }} - {{ t('dns.manage_records') }}</h2>
         <button class="btn-primary text-sm" @click="openAddRecordModal">
           <Plus class="w-4 h-4 mr-1 inline" />{{ t('dns.add_record') }}
         </button>
@@ -112,7 +112,7 @@
           <h2 class="text-xl font-bold text-white mb-6">{{ t('dns.add_zone') }}</h2>
           <div>
             <label class="block text-sm text-gray-400 mb-1">{{ t('dns.domain_label') }}</label>
-            <input v-model="newZone" list="dns-domain-options" type="text" class="aura-input w-full" placeholder="example.com" />
+            <input v-model="newZone" list="dns-domain-options" type="text" class="aura-input w-full" :placeholder="t('dns.placeholders.zone_domain')" />
             <datalist id="dns-domain-options">
               <option v-for="domainName in suggestedDomains" :key="`dns-zone-${domainName}`" :value="domainName" />
             </datalist>
@@ -150,7 +150,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('dns.record_value') }}</label>
-              <input v-model="newRecord.content" type="text" class="aura-input w-full" placeholder="192.168.1.1" />
+              <input v-model="newRecord.content" type="text" class="aura-input w-full" :placeholder="t('dns.placeholders.record_value')" />
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('dns.record_ttl') }}</label>
@@ -178,7 +178,7 @@
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('dns.wizard_base_domain') }}</label>
               <div class="flex gap-2">
-                <input v-model="wizardBaseDomain" list="dns-domain-options" type="text" class="aura-input w-full" placeholder="example.com" />
+                <input v-model="wizardBaseDomain" list="dns-domain-options" type="text" class="aura-input w-full" :placeholder="t('dns.placeholders.zone_domain')" />
                 <button class="btn-secondary whitespace-nowrap" :disabled="nsWizardLoading" @click="fillNsByWizard">
                   <Loader2 v-if="nsWizardLoading" class="w-4 h-4 mr-1 inline animate-spin" />
                   {{ t('dns.wizard_fill') }}
@@ -187,11 +187,11 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('dns.nameserver_1') }}</label>
-              <input v-model="nsConfig.ns1" type="text" class="aura-input w-full" placeholder="ns1.example.com" />
+              <input v-model="nsConfig.ns1" type="text" class="aura-input w-full" :placeholder="t('dns.placeholders.nameserver_1')" />
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('dns.nameserver_2') }}</label>
-              <input v-model="nsConfig.ns2" type="text" class="aura-input w-full" placeholder="ns2.example.com" />
+              <input v-model="nsConfig.ns2" type="text" class="aura-input w-full" :placeholder="t('dns.placeholders.nameserver_2')" />
             </div>
           </div>
           <div class="flex gap-3 mt-8">

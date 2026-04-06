@@ -1591,6 +1591,28 @@ ensure_nginx_for_edge_mode() {
   command -v nginx >/dev/null 2>&1 || fail "nginx installation failed for nginx-edge mode."
 }
 
+ols_runtime_group() {
+  if getent group nogroup >/dev/null 2>&1; then
+    echo "nogroup"
+    return
+  fi
+  if getent group nobody >/dev/null 2>&1; then
+    echo "nobody"
+    return
+  fi
+  echo "root"
+}
+
+ensure_ols_httpd_config_ownership() {
+  local ols_conf="/usr/local/lsws/conf/httpd_config.conf"
+  local runtime_group
+
+  [ -f "${ols_conf}" ] || return 0
+  runtime_group="$(ols_runtime_group)"
+  chown root:"${runtime_group}" "${ols_conf}" >/dev/null 2>&1 || true
+  chmod 640 "${ols_conf}" >/dev/null 2>&1 || true
+}
+
 ensure_ols_public_listeners() {
   local ols_conf="/usr/local/lsws/conf/httpd_config.conf"
   local tls_key="/usr/local/lsws/admin/conf/webadmin.key"
@@ -1635,6 +1657,7 @@ EOF
 
   # Template vhosts should be attached to both HTTP/HTTPS listeners.
   sed -i 's/^\([[:space:]]*listeners[[:space:]]\+\)Default[[:space:]]*$/\1Default,AuraPanelSSL/' "${ols_conf}"
+  ensure_ols_httpd_config_ownership
 
   if ! /usr/local/lsws/bin/lswsctrl restart >/dev/null 2>&1; then
     warn "OpenLiteSpeed restart failed after listener update. Check ${ols_conf}."
@@ -1818,6 +1841,7 @@ EOF
 
   install -m 640 "${tmp_conf}" "${ols_conf}"
   rm -f "${tmp_conf}"
+  ensure_ols_httpd_config_ownership
 
   if ! /usr/local/lsws/bin/lswsctrl restart >/dev/null 2>&1; then
     fail "OpenLiteSpeed restart failed after ModSecurity enable."

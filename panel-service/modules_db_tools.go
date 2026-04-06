@@ -1,11 +1,15 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +29,12 @@ type dbToolLaunchSecret struct {
 	Domain     string
 	ExpiresAt  time.Time
 	Credential dbToolCredential
+	PGAdmin    dbToolPGAdminSession
+}
+
+type dbToolPGAdminSession struct {
+	Email    string
+	Password string
 }
 
 type dbToolTempUser struct {
@@ -89,8 +99,9 @@ func (s *service) handleDBToolSSO(w http.ResponseWriter, r *http.Request, tool s
 	token := generateSecret(12)
 	expiresAt := time.Now().UTC().Add(time.Duration(ttlSeconds) * time.Second)
 
+	principal, hasPrincipal := principalFromContext(r.Context())
 	issuer := "system"
-	if principal, ok := principalFromContext(r.Context()); ok {
+	if hasPrincipal {
 		issuer = firstNonEmpty(principal.Email, principal.Username, principal.Name, "system")
 	}
 
@@ -134,21 +145,115 @@ func (s *service) handleDBToolSSO(w http.ResponseWriter, r *http.Request, tool s
 				},
 			}
 			hasLaunchSecret = true
+		} else {
+			if !hasPrincipal {
+				writeError(w, http.StatusUnauthorized, "Unauthorized.")
+				return
+			}
+			scopeDBs, primaryDB, err := s.resolvePrincipalMariaDBScope(principal)
+			if err != nil {
+				writeError(w, http.StatusConflict, err.Error())
+				return
+			}
+			tempUser, tempPass, tempHost, err := createRuntimeTemporaryDBUser("mariadb", primaryDB, "")
+			if err != nil {
+				writeError(w, http.StatusBadGateway, "Failed to prepare temporary database login user.")
+				return
+			}
+			if err := grantRuntimeTemporaryMariaDBUserScope(tempUser, scopeDBs); err != nil {
+				_ = dropRuntimeTemporaryDBUser("mariadb", tempUser)
+				writeError(w, http.StatusBadGateway, "Failed to grant scoped database privileges for temporary login user.")
+				return
+			}
+			tokenItem.DBName = primaryDB
+			tokenItem.DBUser = tempUser
+			launchSecret = dbToolLaunchSecret{
+				Tool:      tool,
+				Domain:    domain,
+				ExpiresAt: expiresAt,
+				Credential: dbToolCredential{
+					Engine:    "mariadb",
+					DBName:    primaryDB,
+					Username:  tempUser,
+					Password:  tempPass,
+					Host:      firstNonEmpty(tempHost, "localhost"),
+					Temporary: true,
+				},
+			}
+			hasLaunchSecret = true
 		}
 	case "pgadmin":
+		if !hasPrincipal {
+			writeError(w, http.StatusUnauthorized, "Unauthorized.")
+			return
+		}
+
+		var (
+			scopeDBs  []string
+			primaryDB string
+		)
 		if domain != "" {
 			link, err := s.resolveDomainDBLink(domain, "postgresql")
 			if err != nil {
 				writeError(w, http.StatusConflict, err.Error())
 				return
 			}
-			tokenItem.DBName = link.DBName
-			tokenItem.DBUser = link.DBUser
+			scopeDBs = []string{link.DBName}
+			primaryDB = link.DBName
+		} else {
+			resolvedScope, resolvedPrimary, err := s.resolvePrincipalPostgresScope(principal)
+			if err != nil {
+				writeError(w, http.StatusConflict, err.Error())
+				return
+			}
+			scopeDBs = resolvedScope
+			primaryDB = resolvedPrimary
 		}
-		if _, _, err := resolvePGAdminCredentials(); err != nil {
-			writeError(w, http.StatusConflict, err.Error())
+
+		tempUser, tempPass, tempHost, err := createRuntimeTemporaryDBUser("postgresql", primaryDB, "")
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Failed to prepare temporary PostgreSQL login user.")
 			return
 		}
+		if err := grantRuntimeTemporaryPostgresUserScope(tempUser, scopeDBs); err != nil {
+			_ = dropRuntimeTemporaryDBUser("postgresql", tempUser)
+			writeError(w, http.StatusBadGateway, "Failed to grant scoped PostgreSQL privileges for temporary login user.")
+			return
+		}
+
+		pgAdminEmail, pgAdminPassword, err := ensurePGAdminScopedCredentials(principal)
+		if err != nil {
+			_ = dropRuntimeTemporaryDBUser("postgresql", tempUser)
+			writeError(w, http.StatusBadGateway, "Failed to prepare scoped pgAdmin login user.")
+			return
+		}
+		credential := dbToolCredential{
+			Engine:    "postgresql",
+			DBName:    primaryDB,
+			Username:  tempUser,
+			Password:  tempPass,
+			Host:      firstNonEmpty(tempHost, "127.0.0.1"),
+			Temporary: true,
+		}
+		if err := prepareScopedPGAdminServerProfile(pgAdminEmail, credential); err != nil {
+			_ = dropRuntimeTemporaryDBUser("postgresql", tempUser)
+			writeError(w, http.StatusBadGateway, "Failed to prepare scoped pgAdmin server profile.")
+			return
+		}
+
+		tokenItem.DBName = primaryDB
+		tokenItem.DBUser = tempUser
+		launchSecret = dbToolLaunchSecret{
+			Tool:       tool,
+			Domain:     domain,
+			ExpiresAt:  expiresAt,
+			Credential: credential,
+			PGAdmin: dbToolPGAdminSession{
+				Email:    pgAdminEmail,
+				Password: pgAdminPassword,
+			},
+		}
+		hasLaunchSecret = true
 	}
 
 	s.mu.Lock()
@@ -174,6 +279,78 @@ func (s *service) handleDBToolSSO(w http.ResponseWriter, r *http.Request, tool s
 			"expires_at": expiresAt.Format(time.RFC3339),
 		},
 	})
+}
+
+func grantRuntimeTemporaryMariaDBUserScope(username string, dbNames []string) error {
+	username = sanitizeDBName(username)
+	if username == "" {
+		return fmt.Errorf("temporary user is required")
+	}
+	uniqueDBs := map[string]struct{}{}
+	for _, value := range dbNames {
+		dbName := sanitizeDBName(value)
+		if dbName == "" {
+			continue
+		}
+		uniqueDBs[dbName] = struct{}{}
+	}
+	if len(uniqueDBs) == 0 {
+		return nil
+	}
+	orderedDBs := make([]string, 0, len(uniqueDBs))
+	for dbName := range uniqueDBs {
+		orderedDBs = append(orderedDBs, dbName)
+	}
+	sort.Strings(orderedDBs)
+	for _, dbName := range orderedDBs {
+		query := fmt.Sprintf(
+			"GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost';",
+			dbName,
+			sqlQuote(username),
+		)
+		if _, err := mysqlExec(query); err != nil {
+			return err
+		}
+	}
+	_, err := mysqlExec("FLUSH PRIVILEGES;")
+	return err
+}
+
+func grantRuntimeTemporaryPostgresUserScope(username string, dbNames []string) error {
+	username = sanitizeDBName(username)
+	if username == "" {
+		return fmt.Errorf("temporary user is required")
+	}
+	uniqueDBs := map[string]struct{}{}
+	for _, value := range dbNames {
+		dbName := sanitizeDBName(value)
+		if dbName == "" {
+			continue
+		}
+		uniqueDBs[dbName] = struct{}{}
+	}
+	if len(uniqueDBs) == 0 {
+		return nil
+	}
+
+	roleIdent := postgresIdentifier(username)
+	orderedDBs := make([]string, 0, len(uniqueDBs))
+	for dbName := range uniqueDBs {
+		orderedDBs = append(orderedDBs, dbName)
+	}
+	sort.Strings(orderedDBs)
+	for _, dbName := range orderedDBs {
+		dbIdent := postgresIdentifier(dbName)
+		if _, err := postgresExec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s;", dbIdent, roleIdent)); err != nil {
+			return err
+		}
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("GRANT USAGE ON SCHEMA public TO %s;", roleIdent))
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO %s;", roleIdent))
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO %s;", roleIdent))
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO %s;", roleIdent))
+		_, _ = postgresExecDB(dbName, fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO %s;", roleIdent))
+	}
+	return nil
 }
 
 func (s *service) handleDBToolConsume(w http.ResponseWriter, r *http.Request, tool string) {
@@ -210,28 +387,32 @@ func (s *service) handleDBToolConsume(w http.ResponseWriter, r *http.Request, to
 	s.registerDBToolAccess(item.IssuedBy, serviceClientIP(r), item.ExpiresAt)
 
 	targetURL := resolveDBToolBaseURL(r, tool)
+	if hasSecret && secret.Credential.Password != "" && secret.Credential.Temporary {
+		expiresAt := now.Add(defaultDBToolTempUserTTL)
+		s.mu.Lock()
+		if s.dbToolTempUsers == nil {
+			s.dbToolTempUsers = map[string]dbToolTempUser{}
+		}
+		if key := dbToolTempUserKey(secret.Credential.Engine, secret.Credential.Username); key != "" {
+			s.dbToolTempUsers[key] = dbToolTempUser{
+				Engine:    secret.Credential.Engine,
+				Username:  secret.Credential.Username,
+				ExpiresAt: expiresAt,
+			}
+		}
+		s.mu.Unlock()
+	}
 	switch tool {
 	case "phpmyadmin":
 		if hasSecret && secret.Credential.Password != "" {
-			if secret.Credential.Temporary {
-				expiresAt := now.Add(defaultDBToolTempUserTTL)
-				s.mu.Lock()
-				if s.dbToolTempUsers == nil {
-					s.dbToolTempUsers = map[string]dbToolTempUser{}
-				}
-				if key := dbToolTempUserKey(secret.Credential.Engine, secret.Credential.Username); key != "" {
-					s.dbToolTempUsers[key] = dbToolTempUser{
-						Engine:    secret.Credential.Engine,
-						Username:  secret.Credential.Username,
-						ExpiresAt: expiresAt,
-					}
-				}
-				s.mu.Unlock()
-			}
 			writePHPMyAdminAutoLoginPage(w, targetURL, secret.Credential, item.Domain)
 			return
 		}
 	case "pgadmin":
+		if hasSecret && strings.TrimSpace(secret.PGAdmin.Email) != "" && strings.TrimSpace(secret.PGAdmin.Password) != "" {
+			writePGAdminAutoLoginPage(w, targetURL, secret.PGAdmin.Email, secret.PGAdmin.Password, item.Domain, item.DBName, item.DBUser)
+			return
+		}
 		email, password, err := resolvePGAdminCredentials()
 		if err == nil {
 			writePGAdminAutoLoginPage(w, targetURL, email, password, item.Domain, item.DBName, item.DBUser)
@@ -486,6 +667,339 @@ func (s *service) resolveDomainDBLink(domain, engine string) (WebsiteDBLink, err
 		toolName = "pgAdmin"
 	}
 	return WebsiteDBLink{}, fmt.Errorf("%s icin %s veritabani baglantisi bulunamadi", domain, toolName)
+}
+
+func (s *service) resolvePrincipalMariaDBScope(pr servicePrincipal) ([]string, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	allowed := map[string]struct{}{}
+	for _, item := range s.state.MariaDBs {
+		if !s.principalCanAccessDatabaseLocked(pr, item) {
+			continue
+		}
+		dbName := sanitizeDBName(item.Name)
+		if dbName == "" {
+			continue
+		}
+		allowed[dbName] = struct{}{}
+	}
+	if len(allowed) == 0 {
+		return nil, "", fmt.Errorf("Bu hesap icin erisilebilir MariaDB veritabani bulunamadi")
+	}
+
+	ordered := make([]string, 0, len(allowed))
+	for dbName := range allowed {
+		ordered = append(ordered, dbName)
+	}
+	sort.Strings(ordered)
+	primary := ordered[0]
+	bestLinkedAt := int64(-1)
+	for _, link := range s.state.DBLinks {
+		if normalizeEngine(link.Engine) != "mariadb" {
+			continue
+		}
+		dbName := sanitizeDBName(link.DBName)
+		if dbName == "" {
+			continue
+		}
+		if _, ok := allowed[dbName]; !ok {
+			continue
+		}
+		if link.LinkedAt > bestLinkedAt {
+			bestLinkedAt = link.LinkedAt
+			primary = dbName
+		}
+	}
+	return ordered, primary, nil
+}
+
+func (s *service) resolvePrincipalPostgresScope(pr servicePrincipal) ([]string, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	allowed := map[string]struct{}{}
+	for _, item := range s.state.PostgresDBs {
+		if !s.principalCanAccessDatabaseLocked(pr, item) {
+			continue
+		}
+		dbName := sanitizeDBName(item.Name)
+		if dbName == "" {
+			continue
+		}
+		allowed[dbName] = struct{}{}
+	}
+	if len(allowed) == 0 {
+		return nil, "", fmt.Errorf("Bu hesap icin erisilebilir PostgreSQL veritabani bulunamadi")
+	}
+
+	ordered := make([]string, 0, len(allowed))
+	for dbName := range allowed {
+		ordered = append(ordered, dbName)
+	}
+	sort.Strings(ordered)
+	primary := ordered[0]
+	bestLinkedAt := int64(-1)
+	for _, link := range s.state.DBLinks {
+		if normalizeEngine(link.Engine) != "postgresql" {
+			continue
+		}
+		dbName := sanitizeDBName(link.DBName)
+		if dbName == "" {
+			continue
+		}
+		if _, ok := allowed[dbName]; !ok {
+			continue
+		}
+		if link.LinkedAt > bestLinkedAt {
+			bestLinkedAt = link.LinkedAt
+			primary = dbName
+		}
+	}
+	return ordered, primary, nil
+}
+
+func ensurePGAdminScopedCredentials(pr servicePrincipal) (string, string, error) {
+	email := pgAdminScopedEmailForPrincipal(pr)
+	password := generateSecret(20)
+	if err := upsertPGAdminInternalUser(email, password); err != nil {
+		return "", "", err
+	}
+	return email, password, nil
+}
+
+func pgAdminScopedEmailForPrincipal(pr servicePrincipal) string {
+	identity := strings.ToLower(strings.TrimSpace(firstNonEmpty(pr.Email, pr.Username, pr.Name, "user")))
+	localPart := sanitizeName(strings.SplitN(identity, "@", 2)[0])
+	localPart = strings.Trim(localPart, "_-")
+	if localPart == "" {
+		localPart = "user"
+	}
+	if len(localPart) > 24 {
+		localPart = localPart[:24]
+	}
+	hash := sha1.Sum([]byte(identity + "|" + strings.ToLower(strings.TrimSpace(pr.Role))))
+	suffix := hex.EncodeToString(hash[:])[:10]
+	return fmt.Sprintf("apsso_%s_%s@%s", localPart, suffix, pgAdminScopedEmailDomain())
+}
+
+func pgAdminScopedEmailDomain() string {
+	explicit := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_PGADMIN_SCOPED_EMAIL_DOMAIN")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_PGADMIN_SCOPED_EMAIL_DOMAIN")),
+	)
+	if looksLikeDomain(explicit) {
+		return strings.ToLower(strings.TrimSpace(explicit))
+	}
+
+	defaultEmail := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_PGADMIN_DEFAULT_EMAIL")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_PGADMIN_DEFAULT_EMAIL")),
+	)
+	if at := strings.LastIndex(defaultEmail, "@"); at > 0 && at+1 < len(defaultEmail) {
+		domain := strings.ToLower(strings.TrimSpace(defaultEmail[at+1:]))
+		if looksLikeDomain(domain) {
+			return domain
+		}
+	}
+	return "aurapanel.info"
+}
+
+func looksLikeDomain(value string) bool {
+	value = strings.Trim(strings.ToLower(strings.TrimSpace(value)), ".")
+	if value == "" {
+		return false
+	}
+	if strings.Contains(value, " ") {
+		return false
+	}
+	return strings.Contains(value, ".")
+}
+
+func upsertPGAdminInternalUser(email, password string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	password = strings.TrimSpace(password)
+	if email == "" || password == "" {
+		return fmt.Errorf("pgAdmin user credentials are required")
+	}
+
+	if _, err := runPGAdminSetup("update-user", "--password", password, "--role", "Administrator", "--active", email); err == nil {
+		return nil
+	}
+	if _, err := runPGAdminSetup("add-user", "--role", "Administrator", email, password); err == nil {
+		return nil
+	}
+	if _, err := runPGAdminSetup("update-user", "--password", password, "--role", "Administrator", "--active", email); err == nil {
+		return nil
+	}
+	return fmt.Errorf("pgAdmin scoped user could not be created/updated")
+}
+
+func prepareScopedPGAdminServerProfile(email string, credential dbToolCredential) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return fmt.Errorf("pgAdmin user email is required")
+	}
+	if strings.TrimSpace(credential.Username) == "" || strings.TrimSpace(credential.Password) == "" {
+		return fmt.Errorf("temporary PostgreSQL credential is required")
+	}
+
+	container := pgAdminContainerName()
+	host, port := resolvePGAdminPostgresEndpoint(container)
+	passfilePath := fmt.Sprintf("/tmp/aurapanel-%s.pgpass", sanitizeDBName(credential.Username))
+	serverJSONPath := fmt.Sprintf("/tmp/aurapanel-%s-servers.json", sanitizeDBName(credential.Username))
+
+	passfileLine := fmt.Sprintf("%s:%d:*:%s:%s\n", host, port, credential.Username, credential.Password)
+	passTmpFile, err := os.CreateTemp("", "aurapanel-pgpass-*")
+	if err != nil {
+		return err
+	}
+	passTmpPath := passTmpFile.Name()
+	if _, writeErr := passTmpFile.WriteString(passfileLine); writeErr != nil {
+		passTmpFile.Close()
+		_ = os.Remove(passTmpPath)
+		return writeErr
+	}
+	if closeErr := passTmpFile.Close(); closeErr != nil {
+		_ = os.Remove(passTmpPath)
+		return closeErr
+	}
+	defer os.Remove(passTmpPath)
+
+	if _, err := runDockerCommandTrimmed(25*time.Second, "cp", passTmpPath, fmt.Sprintf("%s:%s", container, passfilePath)); err != nil {
+		return err
+	}
+	_, _ = runDockerCommandTrimmed(12*time.Second, "exec", container, "chown", "pgadmin:root", passfilePath)
+	if _, err := runDockerCommandTrimmed(12*time.Second, "exec", container, "chmod", "600", passfilePath); err != nil {
+		return err
+	}
+
+	serverPayload := map[string]interface{}{
+		"Servers": map[string]interface{}{
+			"1": map[string]interface{}{
+				"Name":          fmt.Sprintf("AuraPanel (%s)", credential.DBName),
+				"Group":         "AuraPanel",
+				"Host":          host,
+				"Port":          port,
+				"MaintenanceDB": credential.DBName,
+				"Username":      credential.Username,
+				"PassFile":      passfilePath,
+				"SSLMode":       "prefer",
+			},
+		},
+	}
+	serverBytes, err := json.Marshal(serverPayload)
+	if err != nil {
+		return err
+	}
+	serverTmpFile, err := os.CreateTemp("", "aurapanel-pgservers-*.json")
+	if err != nil {
+		return err
+	}
+	serverTmpPath := serverTmpFile.Name()
+	if _, writeErr := serverTmpFile.Write(serverBytes); writeErr != nil {
+		serverTmpFile.Close()
+		_ = os.Remove(serverTmpPath)
+		return writeErr
+	}
+	if closeErr := serverTmpFile.Close(); closeErr != nil {
+		_ = os.Remove(serverTmpPath)
+		return closeErr
+	}
+	defer os.Remove(serverTmpPath)
+
+	if _, err := runDockerCommandTrimmed(25*time.Second, "cp", serverTmpPath, fmt.Sprintf("%s:%s", container, serverJSONPath)); err != nil {
+		return err
+	}
+	defer runDockerCommandTrimmed(8*time.Second, "exec", container, "rm", "-f", serverJSONPath)
+
+	if _, err := runPGAdminSetup("load-servers", "--replace", "--user", email, serverJSONPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func resolvePGAdminPostgresEndpoint(container string) (string, int) {
+	host := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_PGADMIN_POSTGRES_HOST")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_PGADMIN_POSTGRES_HOST")),
+		strings.TrimSpace(os.Getenv("AURAPANEL_POSTGRES_HOST")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_POSTGRES_HOST")),
+	)
+	if host == "" {
+		if gateway, err := resolvePGAdminContainerGateway(container); err == nil && gateway != "" {
+			host = gateway
+		}
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
+	port := 5432
+	for _, raw := range []string{
+		strings.TrimSpace(os.Getenv("AURAPANEL_PGADMIN_POSTGRES_PORT")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_PGADMIN_POSTGRES_PORT")),
+		strings.TrimSpace(os.Getenv("AURAPANEL_POSTGRES_PORT")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_POSTGRES_PORT")),
+	} {
+		if raw == "" {
+			continue
+		}
+		if value, err := strconv.Atoi(raw); err == nil && value > 0 && value < 65536 {
+			port = value
+			break
+		}
+	}
+	return host, port
+}
+
+func resolvePGAdminContainerGateway(container string) (string, error) {
+	output, err := runDockerCommandTrimmed(10*time.Second, "exec", container, "ip", "route")
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(output, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 3 {
+			continue
+		}
+		if fields[0] == "default" && fields[1] == "via" {
+			candidate := strings.TrimSpace(fields[2])
+			if ip := net.ParseIP(candidate); ip != nil {
+				return candidate, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("docker gateway not found")
+}
+
+func runPGAdminSetup(args ...string) (string, error) {
+	container := pgAdminContainerName()
+	pythonBin := strings.TrimSpace(envOr("AURAPANEL_PGADMIN_SETUP_PYTHON", "/venv/bin/python3"))
+	setupPath := strings.TrimSpace(envOr("AURAPANEL_PGADMIN_SETUP_PATH", "/pgadmin4/setup.py"))
+	commandArgs := []string{"exec", container, pythonBin, setupPath}
+	commandArgs = append(commandArgs, args...)
+	return runDockerCommandTrimmed(45*time.Second, commandArgs...)
+}
+
+func runDockerCommandTrimmed(timeout time.Duration, args ...string) (string, error) {
+	output, err := runCommandCombinedOutputWithTimeout(timeout, "docker", args...)
+	trimmed := strings.TrimSpace(string(output))
+	if err != nil {
+		if trimmed == "" {
+			trimmed = err.Error()
+		}
+		return "", fmt.Errorf("%s", trimmed)
+	}
+	return trimmed, nil
+}
+
+func pgAdminContainerName() string {
+	return firstNonEmpty(
+		strings.TrimSpace(os.Getenv("AURAPANEL_PGADMIN_CONTAINER_NAME")),
+		strings.TrimSpace(readEnvFileValue(adminServiceEnvPath(), "AURAPANEL_PGADMIN_CONTAINER_NAME")),
+		"aurapanel-pgadmin",
+	)
 }
 
 func resolveDBToolBaseURL(r *http.Request, tool string) string {

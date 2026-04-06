@@ -165,40 +165,40 @@
         <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.name') }}</label>
-            <input v-model="newContainer.name" type="text" placeholder="my-app" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.name" type="text" :placeholder="t('docker_manager_screen.create.placeholders.name')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.image') }}</label>
-            <input v-model="newContainer.image" type="text" placeholder="nginx:latest" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.image" type="text" :placeholder="t('docker_manager_screen.create.placeholders.image')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.ports') }}</label>
-            <input v-model="newContainer.portsStr" type="text" placeholder="80:80, 443:443" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.portsStr" type="text" :placeholder="t('docker_manager_screen.create.placeholders.ports')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.env') }}</label>
-            <input v-model="newContainer.envStr" type="text" placeholder="MYSQL_ROOT_PASSWORD=secret" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.envStr" type="text" :placeholder="t('docker_manager_screen.create.placeholders.env')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.volumes') }}</label>
-            <input v-model="newContainer.volumesStr" type="text" placeholder="/data:/var/lib/mysql" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.volumesStr" type="text" :placeholder="t('docker_manager_screen.create.placeholders.volumes')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.restart_policy') }}</label>
             <select v-model="newContainer.restart_policy" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none">
               <option value="">{{ t('docker_manager_screen.create.none') }}</option>
-              <option value="always">Always</option>
-              <option value="unless-stopped">Unless Stopped</option>
-              <option value="on-failure">On Failure</option>
+              <option value="always">{{ t('docker_manager_screen.create.restart_options.always') }}</option>
+              <option value="unless-stopped">{{ t('docker_manager_screen.create.restart_options.unless_stopped') }}</option>
+              <option value="on-failure">{{ t('docker_manager_screen.create.restart_options.on_failure') }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.memory') }}</label>
-            <input v-model="newContainer.memory_limit" type="text" placeholder="512m or 1g" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.memory_limit" type="text" :placeholder="t('docker_manager_screen.create.placeholders.memory')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
             <label class="mb-1.5 block text-sm text-gray-400">{{ t('docker_manager_screen.create.cpu') }}</label>
-            <input v-model="newContainer.cpu_limit" type="text" placeholder="0.5 or 1.0" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+            <input v-model="newContainer.cpu_limit" type="text" :placeholder="t('docker_manager_screen.create.placeholders.cpu')" class="w-full rounded-lg border border-panel-border bg-panel-hover px-4 py-2.5 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
           </div>
         </div>
         <div class="pt-4">

@@ -52,7 +52,7 @@
         <input
           v-model="firewallForm.ip_address"
           class="aura-input"
-          placeholder="IP/CIDR (orn: 185.190.140.62 veya 185.190.140.0/24)"
+          :placeholder="t('security_center.firewall.ip_cidr_placeholder')"
         />
         <input v-model="firewallForm.reason" class="aura-input" :placeholder="t('security_center.firewall.reason')" />
         <select v-model="firewallForm.block" class="aura-input">
@@ -136,7 +136,7 @@
               >
                 <td class="py-2 font-mono">{{ rule.port }}</td>
                 <td class="py-2 uppercase">{{ rule.protocol }}</td>
-                <td class="py-2">{{ rule.block ? 'Block' : 'Allow' }}</td>
+                <td class="py-2">{{ rule.block ? t('security_center.firewall.block') : t('security_center.firewall.allow') }}</td>
                 <td class="py-2 text-gray-300">{{ rule.reason || '-' }}</td>
                 <td class="py-2 text-right">
                   <button class="btn-danger px-3 py-1 text-xs" @click="deleteFirewallPortRule(rule)">{{ t('common.delete') }}</button>
@@ -235,7 +235,7 @@
           <span :class="ddos.enabled ? 'text-emerald-400' : 'text-yellow-400'">
             {{ ddos.enabled ? t('common.active') : t('common.inactive') }}
           </span>
-          <span class="text-gray-400">Profile: {{ ddos.profile }}</span>
+          <span class="text-gray-400">{{ t('security_center.ddos.profile_label', { profile: ddos.profile }) }}</span>
         </div>
         <p class="mt-3 text-xs text-gray-400">{{ t('security_center.ddos.note') }}</p>
       </div>
@@ -339,7 +339,7 @@
       <div class="space-y-2">
         <div v-for="key in sshKeys" :key="key.id" class="flex items-center justify-between gap-3 rounded-lg border border-panel-border bg-panel-dark p-3">
           <div>
-            <p class="text-sm text-white">{{ key.user }} · {{ key.title }}</p>
+            <p class="text-sm text-white">{{ key.user }} - {{ key.title }}</p>
             <p class="break-all font-mono text-xs text-gray-400">{{ key.public_key }}</p>
           </div>
           <button class="btn-danger px-3 py-1 text-xs" @click="deleteSshKey(key)">{{ t('security_center.ssh.delete') }}</button>
@@ -361,7 +361,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('security_center.ssh_config.port_label') }}</label>
-          <input v-model="sshConfig.port" type="number" class="aura-input w-full" placeholder="22" />
+          <input v-model="sshConfig.port" type="number" class="aura-input w-full" :placeholder="t('security_center.ssh_config.port_placeholder')" />
           <p class="text-xs text-gray-500 mt-1">{{ t('security_center.ssh_config.port_desc') }}</p>
         </div>
         <div>
@@ -386,7 +386,7 @@
       <div class="aura-card space-y-4">
         <h2 class="text-lg font-bold text-white">{{ t('security_center.malware.title') }}</h2>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <input v-model="malwareForm.path" class="aura-input md:col-span-2" placeholder="/home/site/public_html" />
+          <input v-model="malwareForm.path" class="aura-input md:col-span-2" :placeholder="t('security_center.malware.path_placeholder')" />
           <select v-model="malwareForm.engine" class="aura-input">
             <option value="auto">{{ t('security_center.malware.engine_auto') }}</option>
             <option value="clamav">{{ t('security_center.malware.engine_clamav') }}</option>
@@ -450,9 +450,9 @@
         </div>
         <div v-if="quarantineRecords.length === 0" class="text-sm text-gray-400">{{ t('security_center.malware.quarantine_empty') }}</div>
         <div v-for="item in quarantineRecords" :key="item.id" class="rounded-lg border border-panel-border bg-panel-dark p-3 text-xs space-y-1">
-          <p class="text-gray-200 font-mono break-all">Orijinal: {{ item.original_path }}</p>
+          <p class="text-gray-200 font-mono break-all">{{ t('security_center.malware.original_label', { path: item.original_path }) }}</p>
           <p class="text-gray-400 font-mono break-all">{{ t('security_center.malware.quarantine_label', { path: item.quarantine_path }) }}</p>
-          <p class="text-gray-500">Job: {{ item.job_id }} • Finding: {{ item.finding_id }}</p>
+          <p class="text-gray-500">{{ t('security_center.malware.job_finding_label', { job: item.job_id, finding: item.finding_id }) }}</p>
           <button
             class="btn-secondary text-xs px-2 py-1 mt-2"
             :disabled="!!item.restored_at"

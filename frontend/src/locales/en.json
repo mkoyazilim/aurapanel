@@ -42,6 +42,36 @@
     "refresh": "Refresh",
     "confirm_action": "Confirm Action"
   },
+  "api_settings": {
+    "title": "Hosting Integration",
+    "subtitle": "Manage your AuraPanel API token for integration with billing systems (WHMCS, AuraPanel Customer, etc.).",
+    "integration_token": "API Integration Token",
+    "token_placeholder": "Enter your API token here...",
+    "toggle_visibility": "Toggle Visibility",
+    "generate_new_token": "Generate New Token",
+    "token_help": "This token is used by the billing system to authenticate requests to the AuraPanel API. Ensure you keep this token secure and update it in your billing system if changed.",
+    "saved_token": "Saved Token",
+    "show_hide_saved_token": "Show/Hide Saved Token",
+    "delete_saved_token": "Delete Saved Token",
+    "no_saved_token": "No token is saved yet.",
+    "save_settings": "Save Settings",
+    "notification_title": "Hosting Integration",
+    "status": {
+      "not_saved": "Not saved",
+      "saved": "Saved",
+      "saved_at": "Saved at {time}"
+    },
+    "success": {
+      "updated": "API token updated successfully",
+      "deleted": "API token deleted successfully"
+    },
+    "errors": {
+      "load_failed": "Failed to load API token",
+      "save_failed": "Failed to save API token",
+      "delete_failed": "Failed to delete API token",
+      "empty_token": "Token cannot be empty"
+    }
+  },
   "websites": {
     "title": "Websites",
     "subtitle": "Manage domains, SSL and PHP settings.",
@@ -72,10 +102,14 @@
     "discovered_refresh": "Refresh Discovery",
     "discovered_empty": "No sites waiting for import.",
     "owner_badge": "Owner: {owner}",
+    "path_label": "Path",
+    "docroot_label": "Docroot",
     "docroot_yes": "Docroot Yes",
     "docroot_no": "Docroot No",
     "index_yes": "Index Yes",
     "index_no": "Index No",
+    "status_suspended": "Suspended",
+    "status_active": "Active",
     "owner_placeholder": "owner",
     "import_action": "Import",
     "no_sites": "No sites found yet.",
@@ -85,6 +119,8 @@
     "previous": "Back",
     "next": "Next",
     "page_status": "Page {page} / {total}",
+    "suspend": "Suspend",
+    "unsuspend": "Unsuspend",
     "subdomain_title": "Subdomain Management",
     "subdomain_subtitle": "Create or delete subdomains per website.",
     "subdomain_add": "Add Subdomain",
@@ -142,6 +178,22 @@
     "confirm_subdomain_convert": "Convert {fqdn} into a full website?",
     "confirm_alias_delete": "Delete alias {alias}?",
     "confirm_db_link_detach": "Detach link {domain} - {db_name}?",
+    "logs": "Logs",
+    "engines": {
+      "mariadb": "MariaDB",
+      "postgresql": "PostgreSQL"
+    },
+    "placeholders": {
+      "domain": "example.com",
+      "admin_email": "admin@example.com",
+      "webmaster_email": "webmaster@example.com",
+      "subdomain": "blog",
+      "alias": "alias.example.com",
+      "rewrite_rules": "RewriteEngine On",
+      "vhost_config": "vhDomain example.com",
+      "cert_pem": "-----BEGIN CERTIFICATE-----",
+      "key_pem": "-----BEGIN PRIVATE KEY-----"
+    },
     "errors": {
       "site_list_failed": "Site list could not be loaded",
       "data_load_failed": "Data could not be loaded",
@@ -298,6 +350,12 @@
     "wizard_fill": "Wizard",
     "nameserver_1": "Nameserver 1",
     "nameserver_2": "Nameserver 2",
+    "placeholders": {
+      "zone_domain": "example.com",
+      "record_value": "192.168.1.1",
+      "nameserver_1": "ns1.example.com",
+      "nameserver_2": "ns2.example.com"
+    },
     "reset": "Reset",
     "confirm_delete_zone": "Are you sure you want to delete this zone?",
     "confirm_delete_record": "Delete this record?"
@@ -326,10 +384,17 @@
     "actions": "Actions",
     "compress": "Compress",
     "trash": "Move to Trash",
+    "chmod": "CHMOD",
+    "folder_badge": "DIR",
     "empty_dir": "Directory is empty",
     "drag_drop": "Drag and drop files here or click to browse",
     "compress_title": "Compress Files",
     "extract": "Extract",
+    "placeholders": {
+      "archive_name": "archive_name",
+      "file_name": "file_name.txt",
+      "folder_name": "folder_name"
+    },
     "messages": {
       "read_error": "Read error",
       "rename_success": "Renamed successfully",
@@ -516,6 +581,17 @@
     "admin_email": "Admin Email",
     "admin_user": "Admin Username",
     "admin_pass": "Admin Password",
+    "options": {
+      "wordpress": "WordPress",
+      "laravel": "Laravel"
+    },
+    "placeholders": {
+      "db_name": "wp_database",
+      "db_user": "wp_user",
+      "password": "********",
+      "admin_email": "admin@example.com",
+      "admin_user": "admin"
+    },
     "install": "Install",
     "installing": "Installing...",
     "success": "Installation completed successfully"
@@ -1308,6 +1384,7 @@
     "Security": "Security",
     "AppRuntime": "App Runtime",
     "WordPressManager": "WordPress Manager",
+    "PluginSDK": "Plugin SDK",
     "MinIO": "MinIO",
     "CronJobs": "Cron Jobs",
     "LogViewer": "Log Viewer",
@@ -1333,7 +1410,8 @@
     "MigrationWizard": "Migration Wizard",
     "MailTuning": "Mail Tuning",
     "OpsCenter": "Ops Center",
-    "AITools": "AI Tools"
+    "AITools": "AI Tools",
+    "ApiSettings": "Hosting Integration"
   },
   "terminal": {
     "title": "Web Terminal",
@@ -1542,6 +1620,11 @@
     "default_50mb": "Default: 50 MB",
     "client_connection_limit": "SMTP client connection limit",
     "client_connection_hint": "Concurrent connection count for the same client",
+    "placeholders": {
+      "message_size_limit": "10485760",
+      "mailbox_size_limit": "51200000",
+      "client_connection_limit": "50"
+    },
     "reset_defaults": "Defaults",
     "saving": "Saving...",
     "save_apply": "Save and Apply",
@@ -1558,6 +1641,16 @@
     "backup_file_label": "Backup file (.tar.gz / .tgz / .zip)",
     "source_panel": "Source panel",
     "source_auto": "Auto",
+    "source_options": {
+      "cpanel": "cPanel",
+      "cyberpanel": "CyberPanel",
+      "plesk": "Plesk",
+      "generic": "Generic"
+    },
+    "placeholders": {
+      "archive_path": "/var/lib/aurapanel/migrations/uploads/cpmove-account.tar.gz",
+      "target_owner": "aura"
+    },
     "uploading": "Uploading...",
     "upload_backup": "Upload Backup",
     "upload_success": "Backup file uploaded.",
@@ -1575,6 +1668,8 @@
     "emails": "Emails",
     "archive_size": "Archive Size",
     "precheck": "Pre-check",
+    "ready": "READY",
+    "blocked": "BLOCKED",
     "precheck_report": "Pre-check Report",
     "eta": "Estimated time: {value}",
     "eta_minutes": "{value} min",
@@ -1594,6 +1689,7 @@
     "target_owner": "Target owner",
     "job_id": "Job ID",
     "status": "Status:",
+    "separator": "|",
     "status_failed": "Could not fetch job status.",
     "live_log": "Live Log",
     "import_summary": "Import Summary",
@@ -1640,6 +1736,7 @@
     "firewall": {
       "block_all": "Block (All traffic)",
       "allow_all": "Allow (All traffic)",
+      "ip_cidr_placeholder": "IP/CIDR (e.g. 185.190.140.62 or 185.190.140.0/24)",
       "ip_cidr_hint": "This field is for IP/CIDR rules, not ports. Use Panel Port or service-based firewall screens for TCP/UDP port management.",
       "port_rules_title": "Port Rules (TCP/UDP)",
       "port_placeholder": "Port (e.g. 3306)",
@@ -1703,6 +1800,7 @@
       "desc": "Gateway-level request shaping for burst and layer-7 flood resilience.",
       "enabled": "Protection Enabled",
       "profile": "Profile",
+      "profile_label": "Profile: {profile}",
       "profile_standard": "Standard",
       "profile_strict": "Strict",
       "global_rps": "Global RPS",
@@ -1716,6 +1814,7 @@
     },
     "ssh_config": {
       "port_label": "SSH Port",
+      "port_placeholder": "22",
       "root_login_label": "Root Login (PermitRootLogin)",
       "root_yes": "Yes (Accessible)",
       "root_prohibit_password": "Prohibit Password (SSH Key only)",
@@ -1730,6 +1829,7 @@
     },
     "malware": {
       "title": "Malware Scanner",
+      "path_placeholder": "/home/site/public_html",
       "engine_auto": "Auto (ClamAV/Yara/Fallback)",
       "engine_clamav": "ClamAV",
       "engine_yara": "Yara",
@@ -1748,6 +1848,8 @@
       "quarantine_manager": "Quarantine Manager",
       "quarantine_empty": "No quarantine records found.",
       "quarantine_label": "Quarantine: {path}",
+      "original_label": "Original: {path}",
+      "job_finding_label": "Job: {job} - Finding: {finding}",
       "restored": "Restored",
       "restore": "Restore"
     },
@@ -2044,6 +2146,7 @@
       "security_failed": "Security level could not be updated.",
       "dev_mode_updated": "Development mode updated: {state}",
       "dev_mode_failed": "Development mode could not be updated.",
+      "minify_saved": "Minification settings saved.",
       "always_https_updated": "Always HTTPS updated: {state}",
       "zone_required": "Select a website zone first.",
       "analytics_loaded": "CloudFlare analytics loaded.",
@@ -2119,6 +2222,20 @@
       "memory": "RAM Limit",
       "cpu": "CPU Limit",
       "none": "None",
+      "restart_options": {
+        "always": "Always",
+        "unless_stopped": "Unless Stopped",
+        "on_failure": "On Failure"
+      },
+      "placeholders": {
+        "name": "my-app",
+        "image": "nginx:latest",
+        "ports": "80:80, 443:443",
+        "env": "MYSQL_ROOT_PASSWORD=secret",
+        "volumes": "/data:/var/lib/mysql",
+        "memory": "512m or 1g",
+        "cpu": "0.5 or 1.0"
+      },
       "button": "Create and Start Container"
     },
     "messages": {
@@ -2219,6 +2336,7 @@
     "ssl_active": "Active",
     "ssl_missing": "Missing",
     "owner": "Owner",
+    "php_runtime": "PHP Runtime",
     "package": "Package",
     "admin_email": "Admin Email",
     "save": "Save",
@@ -2236,6 +2354,16 @@
     "vhost_config": "VHost Config",
     "vhost_help": "Advanced raw vhost overrides for this website.",
     "custom_ssl": "Custom SSL",
+    "certificate": "Certificate",
+    "private_key": "Private Key",
+    "custom_ssl_hint": "Paste certificate and private key in PEM format.",
+    "filesystem_isolation": "Filesystem Isolation",
+    "public_html": "public_html",
+    "off": "Off",
+    "placeholders": {
+      "cert_pem": "-----BEGIN CERTIFICATE-----",
+      "key_pem": "-----BEGIN PRIVATE KEY-----"
+    },
     "logs_access": "Access",
     "logs_error": "Error",
     "no_logs": "No logs found.",
@@ -2340,7 +2468,9 @@
       "last_6_hours": "Last 6 hours",
       "last_24_hours": "Last 24 hours",
       "last_3_days": "Last 3 days",
-      "last_7_days": "Last 7 days"
+      "last_7_days": "Last 7 days",
+      "hit_title": "{bucket}: {hits} hits",
+      "hits_with_bandwidth": "{hits} hits - {bandwidth}"
     },
     "messages": {
       "load_failed": "Website data could not be loaded.",
@@ -2364,7 +2494,8 @@
       "db_tool_failed": "Database admin tool could not be opened.",
       "mailbox_required": "No mailbox found for this domain. Redirected to mailbox creation.",
       "webmail_prompt": "Select mailbox address for Webmail SSO:",
-      "webmail_sso_failed": "Webmail SSO could not be created."
+      "webmail_sso_failed": "Webmail SSO could not be created.",
+      "popup_blocked": "Popup blocked by browser. Please allow popups and try again."
     }
   },
   "plugin_sdk": {
@@ -2553,7 +2684,8 @@
     "templates": {
       "install": "Install",
       "empty": "No templates found.",
-      "default_icon": "App"
+      "default_icon": "App",
+      "default_ports": "Default ports"
     },
     "installed": {
       "title": "Installed Docker Applications",
@@ -2579,8 +2711,10 @@
     "modal": {
       "title_suffix": "Install",
       "app_name": "Application Name",
+      "app_name_placeholder": "my-{id}",
       "package": "Resource Package (Limits)",
       "extra_env": "Extra Environment Variables",
+      "extra_env_placeholder": "KEY=VALUE, KEY2=VALUE2",
       "extra_env_hint": "Comma separated. Values extend or override the template defaults.",
       "cancel": "Cancel",
       "install": "Install and Start",

@@ -80,8 +80,8 @@
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.app_type') }}</label>
           <select v-model="cms.app_type" class="aura-input">
-            <option value="wordpress">WordPress</option>
-            <option value="laravel">Laravel</option>
+            <option value="wordpress">{{ t('cms_installer.options.wordpress') }}</option>
+            <option value="laravel">{{ t('cms_installer.options.laravel') }}</option>
           </select>
         </div>
         <div>
@@ -96,27 +96,27 @@
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.db_name') }}</label>
-          <input v-model="cms.db_name" class="aura-input" placeholder="wp_database" />
+          <input v-model="cms.db_name" class="aura-input" :placeholder="t('cms_installer.placeholders.db_name')" />
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.db_user') }}</label>
-          <input v-model="cms.db_user" class="aura-input" placeholder="wp_user" />
+          <input v-model="cms.db_user" class="aura-input" :placeholder="t('cms_installer.placeholders.db_user')" />
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.db_pass') }}</label>
-          <input v-model="cms.db_pass" type="password" class="aura-input" placeholder="********" />
+          <input v-model="cms.db_pass" type="password" class="aura-input" :placeholder="t('cms_installer.placeholders.password')" />
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.admin_email') }}</label>
-          <input v-model="cms.admin_email" type="email" class="aura-input" placeholder="admin@example.com" />
+          <input v-model="cms.admin_email" type="email" class="aura-input" :placeholder="t('cms_installer.placeholders.admin_email')" />
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.admin_user') }}</label>
-          <input v-model="cms.admin_user" class="aura-input" placeholder="admin" />
+          <input v-model="cms.admin_user" class="aura-input" :placeholder="t('cms_installer.placeholders.admin_user')" />
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.admin_pass') }}</label>
-          <input v-model="cms.admin_pass" type="password" class="aura-input" placeholder="********" />
+          <input v-model="cms.admin_pass" type="password" class="aura-input" :placeholder="t('cms_installer.placeholders.password')" />
         </div>
       </div>
 
@@ -142,7 +142,7 @@
         <div v-for="app in apps" :key="app.app_name" class="bg-panel-dark border border-panel-border rounded-lg p-3 flex justify-between">
           <div>
             <p class="text-white">{{ app.app_name }}</p>
-            <p class="text-xs text-gray-400">{{ app.runtime }} · {{ app.dir }}</p>
+            <p class="text-xs text-gray-400">{{ app.runtime }} - {{ app.dir }}</p>
           </div>
           <span :class="app.status === 'running' ? 'text-green-400' : 'text-yellow-400'">{{ app.status }}</span>
         </div>

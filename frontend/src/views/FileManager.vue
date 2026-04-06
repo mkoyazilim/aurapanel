@@ -55,7 +55,7 @@
             </td>
             <td class="px-4 py-2.5">
               <button @click="item.is_dir ? enterDir(item.name) : editFile(item)" class="flex items-center gap-2 text-white hover:text-orange-400 transition font-mono text-xs">
-                <span>{{ item.is_dir ? 'DIR' : fileIcon(item.name) }}</span>
+                <span>{{ item.is_dir ? t('filemanager.folder_badge') : fileIcon(item.name) }}</span>
                 {{ item.name }}
               </button>
             </td>
@@ -66,7 +66,7 @@
               <div class="flex justify-end gap-1">
                 <button v-if="isArchive(item.name)" @click="extractItem(item)" class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded text-xs hover:bg-purple-600/40 transition" :title="t('filemanager.extract')">{{ t('filemanager.extract') }}</button>
                 <button v-if="!item.is_dir" @click="editFile(item)" class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded text-xs hover:bg-blue-600/40 transition">{{ t('filemanager.edit') }}</button>
-                <button @click="editPermissions(item)" class="px-2 py-1 bg-slate-600/30 text-slate-200 rounded text-xs hover:bg-slate-600/50 transition">CHMOD</button>
+                <button @click="editPermissions(item)" class="px-2 py-1 bg-slate-600/30 text-slate-200 rounded text-xs hover:bg-slate-600/50 transition">{{ t('filemanager.chmod') }}</button>
                 <button @click="renameItem(item)" class="px-2 py-1 bg-yellow-600/20 text-yellow-400 rounded text-xs hover:bg-yellow-600/40 transition">{{ t('filemanager.rename') }}</button>
                 <button @click="trashSingleItem(item)" class="px-2 py-1 bg-red-600/20 text-red-400 rounded text-xs hover:bg-red-600/40 transition">{{ t('filemanager.trash') }}</button>
                 <button @click="deleteSingleItem(item)" class="px-2 py-1 bg-red-700/30 text-red-300 rounded text-xs hover:bg-red-700/50 transition">{{ t('filemanager.delete') }}</button>
@@ -122,7 +122,7 @@
     <div v-if="showCompressModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showCompressModal = false">
       <div class="bg-panel-card border border-panel-border rounded-2xl w-full max-w-sm p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-white mb-4">{{ t('filemanager.compress_title') }}</h3>
-        <input v-model="compressName" type="text" placeholder="archive_name" class="aura-input mb-4">
+        <input v-model="compressName" type="text" :placeholder="t('filemanager.placeholders.archive_name')" class="aura-input mb-4">
         <select v-model="compressFormat" class="aura-input mb-4">
           <option value="zip">.zip</option>
           <option value="tar.gz">.tar.gz</option>
@@ -138,7 +138,7 @@
     <div v-if="showNewModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showNewModal = false">
       <div class="bg-panel-card border border-panel-border rounded-2xl w-full max-w-sm p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-white mb-4">{{ t('filemanager.new_file') }}</h3>
-        <input v-model="newFileName" type="text" placeholder="file_name.txt" class="aura-input">
+        <input v-model="newFileName" type="text" :placeholder="t('filemanager.placeholders.file_name')" class="aura-input">
         <div class="flex gap-3 mt-4">
           <button @click="createFile" class="flex-1 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg text-sm">{{ t('common.create') }}</button>
           <button @click="showNewModal = false" class="px-4 py-2 bg-panel-hover text-gray-300 rounded-lg text-sm">{{ t('common.cancel') }}</button>
@@ -150,7 +150,7 @@
     <div v-if="showNewFolderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showNewFolderModal = false">
       <div class="bg-panel-card border border-panel-border rounded-2xl w-full max-w-sm p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-white mb-4">{{ t('filemanager.new_folder') }}</h3>
-        <input v-model="newFolderName" type="text" placeholder="folder_name" class="aura-input">
+        <input v-model="newFolderName" type="text" :placeholder="t('filemanager.placeholders.folder_name')" class="aura-input">
         <div class="flex gap-3 mt-4">
           <button @click="createFolder" class="flex-1 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg text-sm">{{ t('common.create') }}</button>
           <button @click="showNewFolderModal = false" class="px-4 py-2 bg-panel-hover text-gray-300 rounded-lg text-sm">{{ t('common.cancel') }}</button>

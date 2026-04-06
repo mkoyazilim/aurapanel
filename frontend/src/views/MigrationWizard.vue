@@ -36,10 +36,10 @@
           <label class="block text-sm text-gray-400">{{ t('migration_wizard.source_panel') }}</label>
           <select v-model="sourceType" class="aura-input w-full">
             <option value="auto">{{ t('migration_wizard.source_auto') }}</option>
-            <option value="cpanel">cPanel</option>
-            <option value="cyberpanel">CyberPanel</option>
-            <option value="plesk">Plesk</option>
-            <option value="generic">Generic</option>
+            <option value="cpanel">{{ t('migration_wizard.source_options.cpanel') }}</option>
+            <option value="cyberpanel">{{ t('migration_wizard.source_options.cyberpanel') }}</option>
+            <option value="plesk">{{ t('migration_wizard.source_options.plesk') }}</option>
+            <option value="generic">{{ t('migration_wizard.source_options.generic') }}</option>
           </select>
         </div>
       </div>
@@ -62,7 +62,7 @@
         <input
           v-model="archivePath"
           class="aura-input w-full font-mono text-xs"
-          placeholder="/var/lib/aurapanel/migrations/uploads/cpmove-account.tar.gz"
+          :placeholder="t('migration_wizard.placeholders.archive_path')"
         />
       </div>
     </div>
@@ -100,7 +100,7 @@
           <div class="rounded-lg border border-panel-border bg-panel-dark p-3">
             <p class="text-xs text-gray-400">{{ t('migration_wizard.precheck') }}</p>
             <p class="text-sm mt-1" :class="isPrecheckReady ? 'text-green-400' : 'text-red-400'">
-              {{ isPrecheckReady ? 'READY' : 'BLOCKED' }}
+              {{ isPrecheckReady ? t('migration_wizard.ready') : t('migration_wizard.blocked') }}
             </p>
           </div>
         </div>
@@ -187,7 +187,7 @@
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('migration_wizard.target_owner') }}</label>
-          <input v-model="targetOwner" class="aura-input w-full" placeholder="aura" />
+          <input v-model="targetOwner" class="aura-input w-full" :placeholder="t('migration_wizard.placeholders.target_owner')" />
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('migration_wizard.job_id') }}</label>
@@ -199,7 +199,7 @@
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <span class="text-gray-400">{{ t('migration_wizard.status') }}</span>
           <span :class="statusClass(job.status)">{{ job.status }}</span>
-          <span class="text-gray-500">|</span>
+          <span class="text-gray-500">{{ t('migration_wizard.separator') }}</span>
           <span class="text-gray-300">%{{ job.progress }}</span>
           <button class="btn-secondary ml-auto" @click="fetchJobStatus">{{ t('common.refresh') }}</button>
         </div>

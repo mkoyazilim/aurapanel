@@ -23,7 +23,7 @@
       <div class="space-y-2">
         <div v-for="job in jobs" :key="job.id" class="bg-panel-dark border border-panel-border rounded-lg p-3 flex items-center justify-between">
           <div>
-            <p class="text-white">#{{ job.id }} · {{ job.user }}</p>
+            <p class="text-white">#{{ job.id }} - {{ job.user }}</p>
             <p class="text-xs text-gray-400">{{ job.schedule }} -> {{ job.command }}</p>
           </div>
           <button class="btn-danger px-3 py-1 text-xs" @click="deleteJob(job.id)">{{ t('cron_jobs.delete') }}</button>

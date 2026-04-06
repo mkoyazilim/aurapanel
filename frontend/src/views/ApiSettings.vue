@@ -2,9 +2,9 @@
   <div class="max-w-4xl mx-auto space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-white">Hosting Integration</h1>
+        <h1 class="text-2xl font-bold text-white">{{ t('api_settings.title') }}</h1>
         <p class="text-sm text-gray-400 mt-1">
-          Manage your AuraPanel API Token for integration with billing systems (WHMCS, AuraPanel Customer, etc.).
+          {{ t('api_settings.subtitle') }}
         </p>
       </div>
     </div>
@@ -14,19 +14,19 @@
         
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">
-            API Integration Token
+            {{ t('api_settings.integration_token') }}
           </label>
           <div class="flex items-center gap-3">
             <input
               v-model="token"
               :type="showToken ? 'text' : 'password'"
               class="aura-input flex-1"
-              placeholder="Enter your API token here..."
+              :placeholder="t('api_settings.token_placeholder')"
             />
             <button
               @click="showToken = !showToken"
               class="btn-secondary px-3 py-2 flex-shrink-0"
-              title="Toggle Visibility"
+              :title="t('api_settings.toggle_visibility')"
             >
               <Eye v-if="!showToken" class="w-4 h-4" />
               <EyeOff v-else class="w-4 h-4" />
@@ -34,20 +34,19 @@
             <button
               @click="generateToken"
               class="btn-secondary px-3 py-2 flex-shrink-0"
-              title="Generate New Token"
+              :title="t('api_settings.generate_new_token')"
             >
               <RefreshCw class="w-4 h-4" />
             </button>
           </div>
           <p class="text-xs text-gray-500 mt-2">
-            This token is used by the billing system to authenticate requests to the AuraPanel API.
-            Ensure you keep this token secure and update it in your billing system if changed.
+            {{ t('api_settings.token_help') }}
           </p>
         </div>
 
         <div class="rounded-lg border border-panel-border/70 bg-panel-bg/40 p-4">
           <div class="flex items-center justify-between mb-2">
-            <p class="text-sm font-medium text-gray-300">Saved Token</p>
+            <p class="text-sm font-medium text-gray-300">{{ t('api_settings.saved_token') }}</p>
             <p class="text-xs text-gray-500">{{ savedStatusText }}</p>
           </div>
 
@@ -61,7 +60,7 @@
             <button
               @click="showSavedToken = !showSavedToken"
               class="btn-secondary px-3 py-2 flex-shrink-0"
-              title="Show/Hide Saved Token"
+              :title="t('api_settings.show_hide_saved_token')"
             >
               <Eye v-if="!showSavedToken" class="w-4 h-4" />
               <EyeOff v-else class="w-4 h-4" />
@@ -70,7 +69,7 @@
               @click="deleteToken"
               :disabled="deleting"
               class="btn-secondary px-3 py-2 flex-shrink-0 text-red-300 hover:text-red-200 disabled:opacity-60"
-              title="Delete Saved Token"
+              :title="t('api_settings.delete_saved_token')"
             >
               <Loader2 v-if="deleting" class="w-4 h-4 animate-spin" />
               <Trash2 v-else class="w-4 h-4" />
@@ -78,7 +77,7 @@
           </div>
 
           <p v-else class="text-xs text-gray-500">
-            No token is saved yet.
+            {{ t('api_settings.no_saved_token') }}
           </p>
         </div>
 
@@ -90,7 +89,7 @@
           >
             <Loader2 v-if="saving" class="w-4 h-4 mr-2 animate-spin" />
             <Save v-else class="w-4 h-4 mr-2" />
-            <span>Save Settings</span>
+            <span>{{ t('api_settings.save_settings') }}</span>
           </button>
         </div>
 
@@ -101,10 +100,12 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNotificationStore } from '../stores/notifications'
 import api from '../services/api'
 import { Save, RefreshCw, Loader2, Eye, EyeOff, Trash2 } from 'lucide-vue-next'
 
+const { t } = useI18n({ useScope: 'global' })
 const notifications = useNotificationStore()
 const token = ref('')
 const showToken = ref(false)
@@ -117,7 +118,7 @@ const silentHeaders = { headers: { 'X-Aura-Silent-Error': '1' } }
 
 const notify = (type, message) => {
   notifications.add({
-    title: 'Hosting Integration',
+    title: t('api_settings.notification_title'),
     message,
     type,
     source: 'api-settings',
@@ -137,9 +138,9 @@ const savedTokenDisplay = computed(() => {
 })
 
 const savedStatusText = computed(() => {
-  if (!savedToken.value) return 'Not saved'
-  if (!lastSavedAt.value) return 'Saved'
-  return `Saved at ${new Date(lastSavedAt.value).toLocaleString()}`
+  if (!savedToken.value) return t('api_settings.status.not_saved')
+  if (!lastSavedAt.value) return t('api_settings.status.saved')
+  return t('api_settings.status.saved_at', { time: new Date(lastSavedAt.value).toLocaleString() })
 })
 
 const loadToken = async () => {
@@ -156,7 +157,7 @@ const loadToken = async () => {
       lastSavedAt.value = null
     }
   } catch (err) {
-    const message = err?.response?.data?.message || 'Failed to load API token'
+    const message = err?.response?.data?.message || t('api_settings.errors.load_failed')
     notify('error', message)
   }
 }
@@ -173,7 +174,7 @@ const generateToken = () => {
 
 const saveToken = async () => {
   if (!token.value) {
-    notify('warning', 'Token cannot be empty')
+    notify('warning', t('api_settings.errors.empty_token'))
     return
   }
   
@@ -183,9 +184,9 @@ const saveToken = async () => {
     savedToken.value = token.value
     showSavedToken.value = false
     lastSavedAt.value = Date.now()
-    notify('success', 'API token updated successfully')
+    notify('success', t('api_settings.success.updated'))
   } catch (err) {
-    const message = err?.response?.data?.message || 'Failed to save API token'
+    const message = err?.response?.data?.message || t('api_settings.errors.save_failed')
     notify('error', message)
   } finally {
     saving.value = false
@@ -201,9 +202,9 @@ const deleteToken = async () => {
     showToken.value = false
     showSavedToken.value = false
     lastSavedAt.value = null
-    notify('success', 'API token deleted successfully')
+    notify('success', t('api_settings.success.deleted'))
   } catch (err) {
-    const message = err?.response?.data?.message || 'Failed to delete API token'
+    const message = err?.response?.data?.message || t('api_settings.errors.delete_failed')
     notify('error', message)
   } finally {
     deleting.value = false

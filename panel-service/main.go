@@ -849,6 +849,7 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/security/2fa/verify",
 		"/api/v1/vhost/list",
 		"/api/v1/files",
+		"/api/v1/db/tools",
 	}
 	for _, prefix := range allowedWithoutDomain {
 		if servicePathMatchesPrefix(path, prefix) {
@@ -892,7 +893,6 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/status/update/apply",
 		"/api/v1/backup/destinations",
 		"/api/v1/backup/schedules",
-		"/api/v1/db/tools",
 		"/api/v1/db/mariadb/tuning",
 		"/api/v1/db/postgresql/tuning",
 		"/api/v1/mail/tuning",

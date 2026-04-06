@@ -253,8 +253,7 @@ const routes = [
       {
         path: 'api-settings',
         name: 'ApiSettings',
-        component: () => import('../views/ApiSettings.vue'),
-        meta: { title: 'Hosting Integration' }
+        component: () => import('../views/ApiSettings.vue')
       }
     ]
   }

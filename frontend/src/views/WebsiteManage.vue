@@ -490,12 +490,12 @@
 
               <label class="mt-4 block">
                 <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">{{ t('website_manage.certificate') }}</span>
-                <textarea v-model="customSsl.cert_pem" rows="6" class="aura-input w-full font-mono text-xs" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+                <textarea v-model="customSsl.cert_pem" rows="6" class="aura-input w-full font-mono text-xs" :placeholder="t('website_manage.placeholders.cert_pem')"></textarea>
               </label>
 
               <label class="mt-4 block">
                 <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">{{ t('website_manage.private_key') }}</span>
-                <textarea v-model="customSsl.key_pem" rows="6" class="aura-input w-full font-mono text-xs" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+                <textarea v-model="customSsl.key_pem" rows="6" class="aura-input w-full font-mono text-xs" :placeholder="t('website_manage.placeholders.key_pem')"></textarea>
               </label>
             </div>
           </div>

@@ -21,13 +21,13 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="rounded-xl border border-panel-border bg-panel-dark/40 p-4">
           <label class="block text-sm text-gray-400 mb-2">{{ t('mail_tuning.message_size_limit') }}</label>
-          <input v-model.trim="form.message_size_limit" type="text" class="aura-input w-full" placeholder="10485760" />
+          <input v-model.trim="form.message_size_limit" type="text" class="aura-input w-full" :placeholder="t('mail_tuning.placeholders.message_size_limit')" />
           <p class="mt-2 text-xs text-gray-500">{{ t('mail_tuning.default_10mb') }}</p>
         </div>
 
         <div class="rounded-xl border border-panel-border bg-panel-dark/40 p-4">
           <label class="block text-sm text-gray-400 mb-2">{{ t('mail_tuning.mailbox_size_limit') }}</label>
-          <input v-model.trim="form.mailbox_size_limit" type="text" class="aura-input w-full" placeholder="51200000" />
+          <input v-model.trim="form.mailbox_size_limit" type="text" class="aura-input w-full" :placeholder="t('mail_tuning.placeholders.mailbox_size_limit')" />
           <p class="mt-2 text-xs text-gray-500">{{ t('mail_tuning.default_50mb') }}</p>
         </div>
 
@@ -37,7 +37,7 @@
             v-model.trim="form.smtpd_client_connection_count_limit"
             type="text"
             class="aura-input w-full"
-            placeholder="50"
+            :placeholder="t('mail_tuning.placeholders.client_connection_limit')"
           />
           <p class="mt-2 text-xs text-gray-500">{{ t('mail_tuning.client_connection_hint') }}</p>
         </div>

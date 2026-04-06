@@ -70,7 +70,7 @@
             <tr v-for="item in plugins" :key="item.id" class="border-b border-panel-border/40">
               <td class="px-2 py-2">
                 <p class="font-semibold text-white">{{ item.name }}</p>
-                <p class="text-xs text-gray-500">{{ item.id }} · v{{ item.version }}</p>
+                <p class="text-xs text-gray-500">{{ item.id }} - v{{ item.version }}</p>
               </td>
               <td class="px-2 py-2 font-mono text-xs text-gray-300">{{ item.entrypoint }}</td>
               <td class="px-2 py-2 text-gray-300">{{ (item.hooks || []).join(', ') || '-' }}</td>
@@ -240,4 +240,3 @@ async function deletePlugin(item) {
 
 onMounted(loadAll)
 </script>
-

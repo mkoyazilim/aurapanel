@@ -425,7 +425,7 @@
                 <span>{{ t('routes.AITools') }}</span>
               </router-link>
               <router-link v-if="can('/api-settings')" to="/api-settings" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>Hosting Integration</span>
+                <span>{{ t('routes.ApiSettings') }}</span>
               </router-link>
             </div>
           </transition>
@@ -671,8 +671,21 @@ const releaseCheckLoading = ref(false)
 const headerUpdateStatus = ref({
   update_available: false,
   latest_version: '',
+  checked_at: '',
 })
 let releaseStatusInterval = null
+const headerUpdateStatusEventName = 'aurapanel:update-status'
+
+const normalizeUpdateAvailable = (value) => {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  return value === true || value === 1 || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+const normalizeHeaderUpdateStatus = (payload = {}) => ({
+  update_available: normalizeUpdateAvailable(payload.update_available),
+  latest_version: String(payload.latest_version || ''),
+  checked_at: String(payload.checked_at || ''),
+})
 
 const notifications = computed(() => notificationStore.orderedItems.slice(0, 50))
 const unreadCount = computed(() => notificationStore.unreadCount)
@@ -724,15 +737,16 @@ const routeTitleKeys = {
   'Docker Packages': 'routes.Docker Packages',
   CloudFlare: 'routes.CloudFlare',
   MigrationWizard: 'routes.MigrationWizard',
+  Migration: 'routes.MigrationWizard',
   OpsCenter: 'routes.OpsCenter',
 }
 
 const pageTitle = computed(() => {
-  const metaTitle = typeof route.meta?.title === 'string' ? route.meta.title : ''
-  if (metaTitle) return metaTitle
   const routeName = String(route.name || '')
   const key = routeTitleKeys[routeName]
-  return key ? t(key) : routeName
+  if (key) return t(key)
+  const metaTitle = typeof route.meta?.title === 'string' ? route.meta.title : ''
+  return metaTitle || routeName
 })
 const displayName = computed(() => {
   const user = authStore.user || {}
@@ -747,7 +761,7 @@ const avatarInitial = computed(() => {
 
 const can = (path) => canAccessPath(path, authStore.role, authStore.permissions)
 const canPanelUpdateAccess = computed(() => can('/panel-update'))
-const headerUpdateAvailable = computed(() => canPanelUpdateAccess.value && !!headerUpdateStatus.value.update_available)
+const headerUpdateAvailable = computed(() => canPanelUpdateAccess.value && normalizeUpdateAvailable(headerUpdateStatus.value.update_available))
 const canHostingGroup = computed(() =>
   ['/websites', '/dns', '/filemanager', '/migration', '/packages', '/users', '/reseller'].some((path) => can(path)),
 )
@@ -808,7 +822,7 @@ const commandItems = computed(() => [
   { label: t('layout.links.panel_port'), path: '/panel-control' },
   { label: t('panel_update.title'), path: '/panel-update' },
   { label: t('routes.AITools'), path: '/ai-tools' },
-  { label: 'Hosting Integration', path: '/api-settings' },
+  { label: t('routes.ApiSettings'), path: '/api-settings' },
   { label: t('routes.Docker Images'), path: '/docker/images' },
   { label: t('routes.Docker Containers'), path: '/docker/containers' },
   { label: t('routes.Docker App Store'), path: '/docker/apps' },
@@ -1032,22 +1046,38 @@ const fetchSidebarServerIp = async () => {
   }
 }
 
-const checkHeaderUpdateStatus = async ({ silent = false } = {}) => {
+const checkHeaderUpdateStatus = async ({ silent = false, force = true } = {}) => {
   if (!canPanelUpdateAccess.value) return
   if (!silent) releaseCheckLoading.value = true
   try {
-    const config = silent ? { headers: { 'X-Aura-Silent-Loading': '1' } } : undefined
+    const baseHeaders = silent ? { 'X-Aura-Silent-Loading': '1', 'X-Aura-Silent-Error': '1' } : {}
+    const config = {
+      params: {
+        _ts: Date.now(),
+        ...(force ? { force: 1 } : {}),
+      },
+      ...(Object.keys(baseHeaders).length ? { headers: baseHeaders } : {}),
+    }
     const res = await api.get('/status/update', config)
     if (res.data?.status === 'success' && res.data?.data) {
+      const next = normalizeHeaderUpdateStatus(res.data.data)
       headerUpdateStatus.value = {
         ...headerUpdateStatus.value,
-        ...res.data.data,
+        ...next,
       }
     }
   } catch (err) {
     // Header notice is best-effort; Panel Update page shows detailed errors.
   } finally {
     if (!silent) releaseCheckLoading.value = false
+  }
+}
+
+const onHeaderUpdateStatusEvent = (event) => {
+  const next = normalizeHeaderUpdateStatus(event?.detail || {})
+  headerUpdateStatus.value = {
+    ...headerUpdateStatus.value,
+    ...next,
   }
 }
 
@@ -1083,17 +1113,19 @@ watch(() => route.fullPath, () => {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener(headerUpdateStatusEventName, onHeaderUpdateStatusEvent)
   fetchSidebarServerIp()
   if (canPanelUpdateAccess.value) {
-    checkHeaderUpdateStatus({ silent: true })
+    checkHeaderUpdateStatus({ silent: true, force: true })
     releaseStatusInterval = window.setInterval(() => {
-      checkHeaderUpdateStatus({ silent: true })
+      checkHeaderUpdateStatus({ silent: true, force: true })
     }, 5 * 60 * 1000)
   }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener(headerUpdateStatusEventName, onHeaderUpdateStatusEvent)
   if (releaseStatusInterval) {
     window.clearInterval(releaseStatusInterval)
     releaseStatusInterval = null

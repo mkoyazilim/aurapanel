@@ -29,7 +29,7 @@
       <div v-for="template in templates" :key="template.id" class="group flex flex-col justify-between rounded-xl border border-panel-border bg-panel-card p-5 transition-all duration-200 hover:border-purple-500/50">
         <div>
           <div class="mb-3 flex items-start justify-between">
-            <span class="text-3xl">{{ template.icon || '📦' }}</span>
+            <span class="text-3xl">{{ template.icon || '[APP]' }}</span>
             <div class="flex flex-wrap justify-end gap-2">
               <span class="rounded bg-purple-500/15 px-2 py-0.5 text-xs font-medium text-purple-400">{{ template.category || t('docker_apps_screen.templates.default_icon') }}</span>
               <span v-if="template.provisioning" class="rounded bg-sky-500/15 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-sky-300">{{ template.provisioning }}</span>
@@ -39,7 +39,7 @@
           <p class="mb-4 line-clamp-2 text-sm leading-relaxed text-gray-400" :title="template.description">{{ template.description }}</p>
           <div class="mb-4 font-mono text-xs text-gray-500">{{ template.image }}</div>
           <div v-if="template.default_ports?.length" class="mb-4 text-xs text-gray-500">
-            Default ports: {{ template.default_ports.join(', ') }}
+            {{ t('docker_apps_screen.templates.default_ports') }}: {{ template.default_ports.join(', ') }}
           </div>
         </div>
         <button class="mt-2 w-full rounded-lg bg-purple-600/20 py-2 text-sm font-medium text-purple-400 transition-all duration-200 hover:bg-purple-600 hover:text-white" @click="openInstallModal(template)">
@@ -99,7 +99,7 @@
         {{ t('docker_apps_screen.packages.empty') }}
       </div>
       <div v-for="pkg in packages" :key="pkg.id" class="rounded-xl border border-panel-border bg-panel-card p-6 text-center transition hover:border-purple-500/40">
-        <div class="mb-3 text-4xl">{{ pkg.name.toLowerCase().includes('start') ? '🌱' : pkg.name.toLowerCase().includes('pro') ? '⚡' : '🏢' }}</div>
+        <div class="mb-3 text-4xl">{{ packageLabel(pkg.name) }}</div>
         <h3 class="mb-2 text-xl font-bold text-white">{{ pkg.name }}</h3>
         <div class="mb-5 space-y-2 text-sm text-gray-400">
           <div>{{ t('docker_apps_screen.packages.memory') }}: <span class="font-medium text-white">{{ pkg.memory_limit }}</span></div>
@@ -116,7 +116,7 @@
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('docker_apps_screen.modal.app_name') }}</label>
-            <input v-model="installForm.app_name" type="text" :placeholder="`my-${selectedTemplate?.id}`" class="aura-input" />
+            <input v-model="installForm.app_name" type="text" :placeholder="t('docker_apps_screen.modal.app_name_placeholder', { id: selectedTemplate?.id || 'app' })" class="aura-input" />
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('docker_apps_screen.modal.package') }}</label>
@@ -127,7 +127,7 @@
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-400">{{ t('docker_apps_screen.modal.extra_env') }}</label>
-            <input v-model="installForm.custom_env_str" type="text" placeholder="KEY=VALUE, KEY2=VALUE2" class="aura-input" />
+            <input v-model="installForm.custom_env_str" type="text" :placeholder="t('docker_apps_screen.modal.extra_env_placeholder')" class="aura-input" />
             <span class="mt-1 inline-block text-xs text-gray-500">{{ t('docker_apps_screen.modal.extra_env_hint') }}</span>
           </div>
         </div>
@@ -173,6 +173,13 @@ const showNotif = (message, type = 'success') => {
   setTimeout(() => {
     notification.value = null
   }, 3000)
+}
+
+const packageLabel = (name) => {
+  const lower = String(name || '').toLowerCase()
+  if (lower.includes('start')) return 'S'
+  if (lower.includes('pro')) return 'P'
+  return 'B'
 }
 
 const openInstallModal = template => {

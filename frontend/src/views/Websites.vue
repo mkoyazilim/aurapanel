@@ -89,8 +89,8 @@
           >
             <div class="space-y-1">
               <p class="text-white font-semibold">{{ item.domain }}</p>
-              <p class="text-xs text-gray-400">Path: {{ item.path }}</p>
-              <p class="text-xs text-gray-400">Docroot: {{ item.docroot }}</p>
+              <p class="text-xs text-gray-400">{{ t('websites.path_label') }}: {{ item.path }}</p>
+              <p class="text-xs text-gray-400">{{ t('websites.docroot_label') }}: {{ item.docroot }}</p>
               <div class="flex items-center gap-2 text-[11px]">
                 <span class="px-2 py-0.5 rounded border border-panel-border text-gray-300">{{ t('websites.owner_badge', { owner: item._owner || item.owner || item.user || '-' }) }}</span>
                 <span :class="item.has_docroot ? 'px-2 py-0.5 rounded border border-emerald-500/30 text-emerald-300' : 'px-2 py-0.5 rounded border border-yellow-500/30 text-yellow-300'">
@@ -142,7 +142,7 @@
                   :class="isSuspended(site)
                     ? 'px-2 py-0.5 rounded text-xs font-semibold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                     : 'px-2 py-0.5 rounded text-xs font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20'"
-                >{{ isSuspended(site) ? 'Suspend' : 'Active' }}</span>
+                >{{ isSuspended(site) ? t('websites.status_suspended') : t('websites.status_active') }}</span>
                 <span
                   v-if="site.ssl"
                   class="px-2 py-0.5 rounded text-xs font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20"
@@ -164,23 +164,23 @@
 
           <div class="flex items-center gap-2 w-full sm:w-auto">
             <button class="btn-secondary px-3 py-1.5 text-sm flex-1 sm:flex-none" @click="issueSSL(site)">
-              <ShieldCheck class="w-4 h-4 mr-1 inline" />SSL
+              <ShieldCheck class="w-4 h-4 mr-1 inline" />{{ t('websites.issue_ssl') }}
             </button>
             <button class="btn-secondary px-3 py-1.5 text-sm flex-1 sm:flex-none" @click="toggleSuspend(site)">
               <span class="inline-flex items-center gap-1">
                 <PauseCircle v-if="!isSuspended(site)" class="w-4 h-4" />
                 <PlayCircle v-else class="w-4 h-4" />
-                {{ isSuspended(site) ? 'Unsuspend' : 'Suspend' }}
+                {{ isSuspended(site) ? t('websites.unsuspend') : t('websites.suspend') }}
               </span>
             </button>
             <button class="btn-secondary px-3 py-1.5 text-sm flex-1 sm:flex-none" @click="openEditSiteModal(site)">
               <Pencil class="w-4 h-4 mr-1 inline" />{{ t('common.edit') }}
             </button>
             <button class="btn-secondary px-3 py-1.5 text-sm flex-1 sm:flex-none" @click="openManagePage(site)">
-              Manage
+              {{ t('websites.manage') }}
             </button>
             <button class="btn-secondary px-3 py-1.5 text-sm flex-1 sm:flex-none" @click="openSiteLogs(site, 'access')">
-              Logs
+              {{ t('websites.logs') }}
             </button>
             <button class="btn-danger px-2 py-1.5" :title="t('websites.delete_site')" @click="deleteSite(site)">
               <Trash2 class="w-4 h-4" />
@@ -327,7 +327,7 @@
         <div class="aura-card space-y-3">
           <h3 class="text-white font-semibold">{{ t('websites.domain_alias') }}</h3>
           <div class="flex gap-2">
-            <input v-model="aliasForm.alias" type="text" class="aura-input flex-1" placeholder="alias.example.com" />
+            <input v-model="aliasForm.alias" type="text" class="aura-input flex-1" :placeholder="t('websites.placeholders.alias')" />
             <button class="btn-primary" @click="addAlias">{{ t('common.add') }}</button>
           </div>
           <div class="space-y-2 max-h-48 overflow-auto">
@@ -354,7 +354,7 @@
 
         <div class="aura-card lg:col-span-2 space-y-3">
           <h3 class="text-white font-semibold">{{ t('websites.rewrite_rules') }}</h3>
-          <textarea v-model="advancedConfig.rewrite_rules" rows="8" class="aura-input w-full font-mono text-xs" placeholder="RewriteEngine On"></textarea>
+          <textarea v-model="advancedConfig.rewrite_rules" rows="8" class="aura-input w-full font-mono text-xs" :placeholder="t('websites.placeholders.rewrite_rules')"></textarea>
           <div>
             <button class="btn-primary" @click="saveRewrite">{{ t('websites.save_rewrite') }}</button>
           </div>
@@ -362,7 +362,7 @@
 
         <div class="aura-card lg:col-span-2 space-y-3">
           <h3 class="text-white font-semibold">{{ t('websites.vhost_config_editor') }}</h3>
-          <textarea v-model="advancedConfig.vhost_config" rows="12" class="aura-input w-full font-mono text-xs" placeholder="vhDomain example.com"></textarea>
+          <textarea v-model="advancedConfig.vhost_config" rows="12" class="aura-input w-full font-mono text-xs" :placeholder="t('websites.placeholders.vhost_config')"></textarea>
           <div>
             <button class="btn-primary" @click="saveVhostConfig">{{ t('websites.save_vhost_config') }}</button>
           </div>
@@ -370,8 +370,8 @@
 
         <div class="aura-card lg:col-span-2 space-y-3">
           <h3 class="text-white font-semibold">{{ t('websites.custom_ssl') }}</h3>
-          <textarea v-model="customSslForm.cert_pem" rows="8" class="aura-input w-full font-mono text-xs" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
-          <textarea v-model="customSslForm.key_pem" rows="8" class="aura-input w-full font-mono text-xs" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+          <textarea v-model="customSslForm.cert_pem" rows="8" class="aura-input w-full font-mono text-xs" :placeholder="t('websites.placeholders.cert_pem')"></textarea>
+          <textarea v-model="customSslForm.key_pem" rows="8" class="aura-input w-full font-mono text-xs" :placeholder="t('websites.placeholders.key_pem')"></textarea>
           <div>
             <button class="btn-primary" @click="saveCustomSsl">{{ t('websites.save_custom_ssl') }}</button>
           </div>
@@ -386,7 +386,7 @@
           <div class="space-y-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.domain') }}</label>
-              <input v-model="siteForm.domain" type="text" class="aura-input w-full" placeholder="example.com" />
+              <input v-model="siteForm.domain" type="text" class="aura-input w-full" :placeholder="t('websites.placeholders.domain')" />
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.owner') }}</label>
@@ -408,7 +408,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.admin_email') }}</label>
-              <input v-model="siteForm.email" type="email" class="aura-input w-full" placeholder="admin@example.com" />
+              <input v-model="siteForm.email" type="email" class="aura-input w-full" :placeholder="t('websites.placeholders.admin_email')" />
             </div>
             <label class="inline-flex items-center gap-2 text-sm text-gray-300">
               <input
@@ -447,7 +447,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.owner') }}</label>
-              <input v-model="editSiteForm.owner" type="text" class="aura-input w-full" placeholder="owner" />
+              <input v-model="editSiteForm.owner" type="text" class="aura-input w-full" :placeholder="t('websites.owner_placeholder')" />
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.php_version') }}</label>
@@ -463,7 +463,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.admin_email') }}</label>
-              <input v-model="editSiteForm.email" type="email" class="aura-input w-full" placeholder="webmaster@example.com" />
+              <input v-model="editSiteForm.email" type="email" class="aura-input w-full" :placeholder="t('websites.placeholders.webmaster_email')" />
             </div>
           </div>
           <div class="flex gap-3 mt-8">
@@ -511,7 +511,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.subdomain_label') }}</label>
-              <input v-model="subdomainForm.subdomain" type="text" class="aura-input w-full" placeholder="blog" />
+              <input v-model="subdomainForm.subdomain" type="text" class="aura-input w-full" :placeholder="t('websites.placeholders.subdomain')" />
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.php_version') }}</label>
@@ -546,8 +546,8 @@
             <div>
               <label class="block text-sm text-gray-400 mb-1">{{ t('websites.engine') }}</label>
               <select v-model="dbLinkForm.engine" class="aura-input w-full">
-                <option value="mariadb">MariaDB</option>
-                <option value="postgresql">PostgreSQL</option>
+                <option value="mariadb">{{ t('websites.engines.mariadb') }}</option>
+                <option value="postgresql">{{ t('websites.engines.postgresql') }}</option>
               </select>
             </div>
             <div>
@@ -789,7 +789,7 @@ function apiErrorMessage(err, fallback) {
 function formatUnix(ts) {
   if (!ts) return '-'
   try {
-    return new Date(ts * 1000).toLocaleString('tr-TR')
+    return new Date(ts * 1000).toLocaleString()
   } catch {
     return String(ts)
   }

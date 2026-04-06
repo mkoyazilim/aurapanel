@@ -113,7 +113,7 @@
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="font-medium text-white">{{ item.domain }}</p>
-                <p class="text-xs text-gray-400">{{ item.runtime }}/{{ item.provisioning }} · {{ item.bind_address }}:{{ item.port }}</p>
+                <p class="text-xs text-gray-400">{{ item.runtime }}/{{ item.provisioning }} - {{ item.bind_address }}:{{ item.port }}</p>
               </div>
               <div class="text-right text-xs text-gray-400">
                 <p>{{ item.unit }}</p>
