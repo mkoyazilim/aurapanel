@@ -1971,6 +1971,11 @@ AURAPANEL_DBTOOLS_ALLOWED_IPS=
 AURAPANEL_DBTOOLS_RATE_LIMIT_PER_MIN=120
 AURAPANEL_DBTOOLS_RUNTIME_ALLOWLIST_FILE=/etc/aurapanel/db-tools/runtime-allowlist.txt
 AURAPANEL_DBTOOLS_RELOAD_ON_ALLOWLIST_CHANGE=0
+AURAPANEL_STATE_BACKEND=mariadb
+AURAPANEL_STATE_DB_NAME=aurapanel
+AURAPANEL_STATE_DB_USER=root
+AURAPANEL_STATE_DB_PASSWORD=
+AURAPANEL_STATE_DB_SOCKET=/run/mysqld/mysqld.sock
 AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN=0
 AURAPANEL_PHPMYADMIN_BASE_URL=/phpmyadmin/index.php
 AURAPANEL_PGADMIN_BASE_URL=/pgadmin4/
@@ -2051,7 +2056,7 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_TARGET" "internal-minio"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_ENDPOINT" "http://127.0.0.1:9000"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_BUCKET" "aurapanel-backups"
-  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload panel_edge_single_domain pma_base pg_base ddos_enabled ddos_profile ddos_global_rps ddos_global_burst ddos_auth_rps ddos_auth_burst
+  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload panel_edge_single_domain pma_base pg_base ddos_enabled ddos_profile ddos_global_rps ddos_global_burst ddos_auth_rps ddos_auth_burst state_backend state_db_name state_db_user state_db_password state_db_socket
   dbtools_auth_user="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   dbtools_auth_pass="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
   dbtools_allowed_ips="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS")"
@@ -2067,6 +2072,11 @@ EOF
   ddos_global_burst="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_BURST")"
   ddos_auth_rps="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_RPS")"
   ddos_auth_burst="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_BURST")"
+  state_backend="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_BACKEND")"
+  state_db_name="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_NAME")"
+  state_db_user="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_USER")"
+  state_db_password="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_PASSWORD")"
+  state_db_socket="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_SOCKET")"
   [ -n "${dbtools_auth_user}" ] || dbtools_auth_user="dbtools"
   [ -n "${dbtools_rate}" ] || dbtools_rate="120"
   [ -n "${dbtools_runtime_file}" ] || dbtools_runtime_file="/etc/aurapanel/db-tools/runtime-allowlist.txt"
@@ -2080,6 +2090,10 @@ EOF
   [ -n "${ddos_global_burst}" ] || ddos_global_burst="240"
   [ -n "${ddos_auth_rps}" ] || ddos_auth_rps="20"
   [ -n "${ddos_auth_burst}" ] || ddos_auth_burst="40"
+  [ -n "${state_backend}" ] || state_backend="mariadb"
+  [ -n "${state_db_name}" ] || state_db_name="aurapanel"
+  [ -n "${state_db_user}" ] || state_db_user="root"
+  [ -n "${state_db_socket}" ] || state_db_socket="/run/mysqld/mysqld.sock"
 
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_UID" "5000"
@@ -2110,6 +2124,11 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_GLOBAL_BURST" "${ddos_global_burst}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_RPS" "${ddos_auth_rps}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DDOS_AUTH_BURST" "${ddos_auth_burst}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_BACKEND" "${state_backend}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_NAME" "${state_db_name}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_USER" "${state_db_user}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_PASSWORD" "${state_db_password}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_SOCKET" "${state_db_socket}"
 
   chmod 600 "${GATEWAY_ENV_FILE}" "${SERVICE_ENV_FILE}"
 }

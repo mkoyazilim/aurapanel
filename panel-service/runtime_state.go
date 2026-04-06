@@ -3,14 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"log"
 	"strings"
 )
-
-const defaultRuntimeStatePath = "/var/lib/aurapanel/panel-service-state.json"
 
 type persistedRuntimeState struct {
 	State   appState    `json:"state"`
@@ -22,31 +19,34 @@ type runtimeSnapshot struct {
 	Modules moduleState
 }
 
-func runtimeStatePath() string {
-	return envOr("AURAPANEL_STATE_FILE", defaultRuntimeStatePath)
-}
-
 func (s *service) loadRuntimeState() error {
-	path := runtimeStatePath()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	stores := runtimeStateStores()
+	var loadErrs []error
+	for index, store := range stores {
+		persisted, found, err := store.Load()
+		if err != nil {
+			loadErrs = append(loadErrs, fmt.Errorf("%s: %w", store.Name(), err))
+			continue
 		}
-		return err
-	}
-
-	var persisted persistedRuntimeState
-	if err := json.Unmarshal(raw, &persisted); err != nil {
-		return fmt.Errorf("decode runtime state: %w", err)
-	}
-
-	s.state = persisted.State
-	s.modules = persisted.Modules
-	if rehydrateSeedCredentials(&s.state) {
-		if err := s.saveRuntimeStateLocked(); err != nil {
-			return fmt.Errorf("persist migrated runtime state: %w", err)
+		if !found {
+			continue
 		}
+		s.state = persisted.State
+		s.modules = persisted.Modules
+		if index > 0 && len(stores) > 0 {
+			if err := stores[0].Save(persisted); err == nil {
+				log.Printf("runtime state migrated from %s to %s", store.Name(), stores[0].Name())
+			}
+		}
+		if rehydrateSeedCredentials(&s.state) {
+			if err := s.saveRuntimeStateLocked(); err != nil {
+				return fmt.Errorf("persist migrated runtime state: %w", err)
+			}
+		}
+		return nil
+	}
+	if len(loadErrs) > 0 {
+		return errors.Join(loadErrs...)
 	}
 	return nil
 }
@@ -58,23 +58,26 @@ func (s *service) saveRuntimeState() error {
 }
 
 func (s *service) saveRuntimeStateLocked() error {
-	path := runtimeStatePath()
 	payload := persistedRuntimeState{
 		State:   s.state,
 		Modules: s.modules,
 	}
-	raw, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode runtime state: %w", err)
+	stores := runtimeStateStores()
+	var persistErrs []error
+	for index, store := range stores {
+		if err := store.Save(payload); err != nil {
+			persistErrs = append(persistErrs, fmt.Errorf("%s: %w", store.Name(), err))
+			continue
+		}
+		if index > 0 && len(persistErrs) > 0 {
+			log.Printf("runtime state persist fallback used: %s", store.Name())
+		}
+		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+	if len(persistErrs) > 0 {
+		return errors.Join(persistErrs...)
 	}
-	tempPath := path + ".tmp"
-	if err := os.WriteFile(tempPath, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tempPath, path)
+	return nil
 }
 
 func (s *service) captureRuntimeSnapshotLocked() (runtimeSnapshot, error) {
