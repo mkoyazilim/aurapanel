@@ -143,6 +143,24 @@ const updateJob = ref({
 })
 
 let pollTimer = null
+const headerUpdateStatusEventName = 'aurapanel:update-status'
+
+function normalizeUpdateAvailable(value) {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  return value === true || value === 1 || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+function broadcastHeaderUpdateStatus(status) {
+  if (typeof window === 'undefined') return
+  if (!status || typeof status !== 'object') return
+  window.dispatchEvent(new CustomEvent(headerUpdateStatusEventName, {
+    detail: {
+      update_available: normalizeUpdateAvailable(status.update_available),
+      latest_version: String(status.latest_version || ''),
+      checked_at: String(status.checked_at || ''),
+    },
+  }))
+}
 
 function formatReleaseDate(value) {
   if (!value) return '-'
@@ -192,7 +210,9 @@ function applyStatusPayload(payload) {
   updateStatus.value = {
     ...updateStatus.value,
     ...(source || {}),
+    update_available: normalizeUpdateAvailable((source || {}).update_available ?? updateStatus.value.update_available),
   }
+  broadcastHeaderUpdateStatus(updateStatus.value)
 
   if (nextJob) {
     updateJob.value = {
@@ -240,7 +260,11 @@ async function loadUpdateStatus(options = {}) {
       _ts: Date.now(),
       ...(force ? { force: 1 } : {}),
     }
-    const res = await api.get('/status/update', { params })
+    const config = {
+      params,
+      ...(silent ? { headers: { 'X-Aura-Silent-Loading': '1', 'X-Aura-Silent-Error': '1' } } : {}),
+    }
+    const res = await api.get('/status/update', config)
     if (res.data?.status !== 'success') {
       throw new Error(res.data?.message || t('panel_update.messages.load_failed'))
     }

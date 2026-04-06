@@ -123,6 +123,7 @@ api.interceptors.response.use(response => {
   const status = Number(error?.response?.status || 0)
   const reqUrl = String(error?.config?.url || '')
   const silentError = String(error?.config?.headers?.[silentErrorHeader] || '').toLowerCase() === '1'
+  const silentLoading = String(error?.config?.headers?.[silentLoadingHeader] || '').toLowerCase() === '1'
   const isLoginRequest = reqUrl.includes('/auth/login')
 
   if (status === 401 && !isLoginRequest) {
@@ -137,7 +138,7 @@ api.interceptors.response.use(response => {
     return Promise.reject(error)
   }
 
-  if (!silentError) {
+  if (!silentError && !silentLoading) {
     const statusText = status > 0 ? `HTTP ${status}` : i18n.global.t('api_messages.network_error')
     notificationStore.add({
       title: i18n.global.t('api_messages.api_error_title', { status: statusText }),
