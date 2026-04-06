@@ -415,11 +415,11 @@ func newService() *service {
 	svc.ensureUserHierarchyLocked()
 	svc.reconcileUserRolePoliciesLocked()
 	svc.mu.Unlock()
+	svc.startOLSSyncWorker()
 	svc.bootstrapModules()
 	svc.initializeDBToolAccessRuntime()
 	svc.cleanupRuntimeTemporaryDBUsersOnStartup()
 	svc.startStatePersistenceWorker()
-	svc.startOLSSyncWorker()
 	svc.startHousekeepingWorker()
 	go func() {
 		if err := svc.selfHealOLSManagedConfig(); err != nil {
