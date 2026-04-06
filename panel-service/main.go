@@ -1219,6 +1219,10 @@ func (s *service) handleHealth(w http.ResponseWriter) {
 }
 
 func (s *service) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	force := isTruthyQueryValue(r.URL.Query().Get("force"))
 	status := s.getUpdateStatus(force)
 	job := s.getUpdateJobSnapshot()
@@ -1247,6 +1251,10 @@ func (s *service) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	principal, ok := principalFromContext(r.Context())
 	if !ok || principal.Role != "admin" {
 		writeError(w, http.StatusForbidden, "This endpoint is restricted to admin users.")

@@ -236,7 +236,10 @@ async function loadUpdateStatus(options = {}) {
   }
 
   try {
-    const params = force ? { force: 1 } : {}
+    const params = {
+      _ts: Date.now(),
+      ...(force ? { force: 1 } : {}),
+    }
     const res = await api.get('/status/update', { params })
     if (res.data?.status !== 'success') {
       throw new Error(res.data?.message || t('panel_update.messages.load_failed'))
