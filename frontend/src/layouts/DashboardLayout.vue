@@ -53,6 +53,12 @@
               <router-link v-if="can('/websites')" to="/websites" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('menu.websites') }}</span>
               </router-link>
+              <router-link v-if="can('/dns')" to="/dns" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>{{ t('menu.dns') }}</span>
+              </router-link>
+              <router-link v-if="can('/filemanager')" to="/filemanager" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>{{ t('layout.links.file_manager') }}</span>
+              </router-link>
               <router-link v-if="can('/migration')" to="/migration" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.MigrationWizard') }}</span>
               </router-link>
@@ -80,10 +86,6 @@
 
           <transition name="accordion">
             <div v-show="webAppsMenuOpen" class="ml-4 mt-1 space-y-0.5 border-l border-panel-border/50 pl-3">
-              <router-link v-if="can('/dns')" to="/dns" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('menu.dns') }}</span>
-              </router-link>
-
               <router-link v-if="can('/cloudflare')" to="/cloudflare" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.CloudFlare') }}</span>
               </router-link>
@@ -98,9 +100,6 @@
               </router-link>
               <router-link v-if="can('/php')" to="/php" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.PHP') }}</span>
-              </router-link>
-              <router-link v-if="can('/filemanager')" to="/filemanager" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('layout.links.file_manager') }}</span>
               </router-link>
               <router-link v-if="can('/terminal')" to="/terminal" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('layout.links.terminal') }}</span>
@@ -750,10 +749,10 @@ const can = (path) => canAccessPath(path, authStore.role, authStore.permissions)
 const canPanelUpdateAccess = computed(() => can('/panel-update'))
 const headerUpdateAvailable = computed(() => canPanelUpdateAccess.value && !!headerUpdateStatus.value.update_available)
 const canHostingGroup = computed(() =>
-  ['/websites', '/migration', '/packages', '/users', '/reseller'].some((path) => can(path)),
+  ['/websites', '/dns', '/filemanager', '/migration', '/packages', '/users', '/reseller'].some((path) => can(path)),
 )
 const canWebAppsGroup = computed(() =>
-  ['/dns', '/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/filemanager', '/terminal'].some((path) => can(path)),
+  ['/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/terminal'].some((path) => can(path)),
 )
 const canDataAccessGroup = computed(() =>
   ['/databases', '/emails', '/minio', '/ftp', '/sftp', '/backups', '/db-backup'].some((path) => can(path)),
@@ -827,9 +826,11 @@ const isSslRoute = computed(() => route.path.startsWith('/ssl'))
 const isFtpRoute = computed(() => route.path === '/sftp' || (route.path === '/ftp' && !isFtpTuningRoute.value))
 const isBackupsRoute = computed(() => route.path === '/backups' || route.path === '/db-backup')
 const isLogsRoute = computed(() => route.path === '/activity-log' || route.path === '/log-viewer')
-const isHostingRoute = computed(() => ['/websites', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)))
+const isHostingRoute = computed(() =>
+  ['/websites', '/dns', '/filemanager', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)),
+)
 const isWebAppsRoute = computed(() =>
-  ['/dns', '/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/filemanager', '/terminal'].some(prefix => route.path.startsWith(prefix))
+  ['/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/terminal'].some(prefix => route.path.startsWith(prefix))
     && !isPhpTuningRoute.value
 )
 const isDataAccessRoute = computed(() =>
