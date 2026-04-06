@@ -281,6 +281,26 @@ func TestNonAdminRoutePolicyAllowsFileRoutes(t *testing.T) {
 	}
 }
 
+func TestNonAdminRoutePolicyAllowsDBToolSSORouteWithoutDomain(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/db/tools/phpmyadmin/sso", strings.NewReader(`{"ttl_seconds":120}`))
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "user@example.com",
+		Role:     "user",
+		Username: "user",
+		Name:     "User",
+	}))
+	rec := httptest.NewRecorder()
+
+	if ok := svc.nonAdminRoutePolicy(rec, req); !ok {
+		t.Fatalf("expected policy to allow db tools sso route, got status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestNonAdminFilePathOwnershipCheck(t *testing.T) {
 	t.Setenv("AURAPANEL_ALLOWED_PATHS", "/home,/var/www,/usr/local/lsws,/etc/letsencrypt,/var/log,/opt/aurapanel")
 
