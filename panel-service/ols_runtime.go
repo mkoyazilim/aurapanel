@@ -173,17 +173,61 @@ func ensureOLSManagedFilesystem(item olsManagedSite) error {
 	if err := os.MkdirAll(olsManagedVhostDir(item.Site.Domain), 0o755); err != nil {
 		return err
 	}
-	if err := writeOLSHTAccess(item.Site.Domain, item.Config.RewriteRules); err != nil {
+	if err := seedOLSManagedDocrootFiles(item.Site.Domain, item.Config.RewriteRules); err != nil {
+		return err
+	}
+	return ensureOLSManagedOwnership(item.Site)
+}
+
+func seedOLSManagedDocrootFiles(domain, rules string) error {
+	docroot := domainDocroot(domain)
+	if err := os.MkdirAll(docroot, 0o755); err != nil {
+		return err
+	}
+	return seedOLSManagedDocrootContent(docroot, domain, rules)
+}
+
+func seedOLSManagedDocrootContent(docroot, domain, rules string) error {
+	// Runtime sync must never mutate live application files.
+	// Seed defaults only for truly empty docroots (freshly provisioned websites).
+	if !olsDocrootEffectivelyEmpty(docroot) {
+		return nil
+	}
+	if err := writeOLSHTAccessFile(filepath.Join(docroot, ".htaccess"), rules, false); err != nil {
 		return err
 	}
 	indexPath := filepath.Join(docroot, "index.html")
-	if !fileExists(indexPath) {
-		placeholder := fmt.Sprintf(`<!DOCTYPE html>
+	if fileExists(indexPath) || fileExists(filepath.Join(docroot, "index.php")) {
+		return nil
+	}
+	return os.WriteFile(indexPath, []byte(defaultOLSIndexPlaceholder(domain)), 0o644)
+}
+
+func olsDocrootEffectivelyEmpty(docroot string) bool {
+	entries, err := os.ReadDir(docroot)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if strings.TrimSpace(entry.Name()) == "" {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func defaultOLSIndexPlaceholder(domain string) string {
+	domain = normalizeDomain(domain)
+	if domain == "" {
+		domain = "site"
+	}
+	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - Başarıyla Kuruldu</title>
+    <title>%s - Basariyla Kuruldu</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; }
         .container { background-color: #1e293b; padding: 3rem; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5); border: 1px solid #334155; max-width: 600px; width: 90%%; }
@@ -199,21 +243,16 @@ func ensureOLSManagedFilesystem(item olsManagedSite) error {
 <body>
     <div class="container">
         <div class="badge">AuraPanel Web Server</div>
-        <h1>Web Siteniz Hazır!</h1>
-        <p><span class="domain">%s</span> alanı için hosting hesabınız ve web sunucunuz başarıyla oluşturuldu ve şu an aktif olarak çalışıyor.</p>
-        <p>AuraPanel üzerinden dosyalarınızı yükleyebilir, veritabanı oluşturabilir veya tek tıkla WordPress kurabilirsiniz.</p>
+        <h1>Web Siteniz Hazir!</h1>
+        <p><span class="domain">%s</span> alani icin hosting hesabin ve web sunucun basariyla olusturuldu ve su an aktif olarak calisiyor.</p>
+        <p>AuraPanel uzerinden dosyalarini yukleyebilir, veritabani olusturabilir veya tek tikla WordPress kurabilirsin.</p>
     </div>
     <div class="footer">
         Powered by <a href="https://aurapanel.com" target="_blank">AuraPanel</a> & OpenLiteSpeed
     </div>
 </body>
 </html>
-`, item.Site.Domain, item.Site.Domain)
-		if err := os.WriteFile(indexPath, []byte(placeholder), 0o644); err != nil {
-			return err
-		}
-	}
-	return ensureOLSManagedOwnership(item.Site)
+`, domain, domain)
 }
 
 func writeOLSHTAccess(domain, rules string) error {
@@ -222,6 +261,14 @@ func writeOLSHTAccess(domain, rules string) error {
 		return err
 	}
 	return writeOLSHTAccessFile(filepath.Join(docroot, ".htaccess"), rules, shouldOverwriteOLSHTAccess(rules))
+}
+
+func applyWebsiteRewriteRules(domain, rules string) error {
+	docroot := domainDocroot(domain)
+	if err := os.MkdirAll(docroot, 0o755); err != nil {
+		return err
+	}
+	return writeOLSHTAccessFile(filepath.Join(docroot, ".htaccess"), rules, true)
 }
 
 func shouldOverwriteOLSHTAccess(rules string) bool {

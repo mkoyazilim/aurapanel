@@ -6,6 +6,8 @@ BRANCH="${AURAPANEL_DEPLOY_BRANCH:-main}"
 PANEL_HEALTH_URL="${AURAPANEL_PANEL_HEALTH_URL:-http://127.0.0.1:8081/api/v1/health}"
 API_HEALTH_URL="${AURAPANEL_API_HEALTH_URL:-http://127.0.0.1:8090/api/health}"
 DEPLOY_SKIP_RESTART="${AURAPANEL_DEPLOY_SKIP_RESTART:-0}"
+HEALTH_RETRIES="${AURAPANEL_DEPLOY_HEALTH_RETRIES:-20}"
+HEALTH_SLEEP_SECONDS="${AURAPANEL_DEPLOY_HEALTH_SLEEP_SECONDS:-2}"
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -16,6 +18,34 @@ require_cmd() {
 
 log() {
   printf '[deploy] %s\n' "$*"
+}
+
+wait_for_service_active() {
+  local unit="$1"
+  local retries="$2"
+  local sleep_seconds="$3"
+  local i
+  for ((i=1; i<=retries; i++)); do
+    if systemctl is-active --quiet "${unit}"; then
+      return 0
+    fi
+    sleep "${sleep_seconds}"
+  done
+  return 1
+}
+
+wait_for_http_ok() {
+  local url="$1"
+  local retries="$2"
+  local sleep_seconds="$3"
+  local i
+  for ((i=1; i<=retries; i++)); do
+    if curl -fsS "${url}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${sleep_seconds}"
+  done
+  return 1
 }
 
 resolve_go_bin() {
@@ -76,12 +106,26 @@ else
   log "Restarting services"
   systemctl daemon-reload
   systemctl restart aurapanel-service aurapanel-api
-  systemctl is-active --quiet aurapanel-service
-  systemctl is-active --quiet aurapanel-api
+  wait_for_service_active aurapanel-service "${HEALTH_RETRIES}" "${HEALTH_SLEEP_SECONDS}" || {
+    echo "aurapanel-service did not become active in time" >&2
+    systemctl status --no-pager aurapanel-service >&2 || true
+    exit 1
+  }
+  wait_for_service_active aurapanel-api "${HEALTH_RETRIES}" "${HEALTH_SLEEP_SECONDS}" || {
+    echo "aurapanel-api did not become active in time" >&2
+    systemctl status --no-pager aurapanel-api >&2 || true
+    exit 1
+  }
 
   log "Running health checks"
-  curl -fsS "${PANEL_HEALTH_URL}" >/dev/null
-  curl -fsS "${API_HEALTH_URL}" >/dev/null
+  wait_for_http_ok "${PANEL_HEALTH_URL}" "${HEALTH_RETRIES}" "${HEALTH_SLEEP_SECONDS}" || {
+    echo "Panel health check failed after retries: ${PANEL_HEALTH_URL}" >&2
+    exit 1
+  }
+  wait_for_http_ok "${API_HEALTH_URL}" "${HEALTH_RETRIES}" "${HEALTH_SLEEP_SECONDS}" || {
+    echo "API health check failed after retries: ${API_HEALTH_URL}" >&2
+    exit 1
+  }
 fi
 
 log "Deployed commit: $(git rev-parse --short HEAD)"

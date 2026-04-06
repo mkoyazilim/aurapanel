@@ -206,6 +206,58 @@ func TestWriteOLSHTAccessFileDefaultsWhenRulesEmpty(t *testing.T) {
 	}
 }
 
+func TestSeedOLSManagedDocrootContentSeedsOnlyEmptyDocroot(t *testing.T) {
+	docroot := t.TempDir()
+
+	if err := seedOLSManagedDocrootContent(docroot, "example.com", "RewriteEngine On"); err != nil {
+		t.Fatalf("seedOLSManagedDocrootContent: %v", err)
+	}
+
+	htaccessPath := filepath.Join(docroot, ".htaccess")
+	htaccessRaw, err := os.ReadFile(htaccessPath)
+	if err != nil {
+		t.Fatalf("read .htaccess: %v", err)
+	}
+	if string(htaccessRaw) != "RewriteEngine On\n" {
+		t.Fatalf("unexpected .htaccess content: %q", string(htaccessRaw))
+	}
+
+	indexPath := filepath.Join(docroot, "index.html")
+	indexRaw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read index.html: %v", err)
+	}
+	if !strings.Contains(string(indexRaw), "example.com") {
+		t.Fatalf("expected placeholder domain in index.html, got %q", string(indexRaw))
+	}
+}
+
+func TestSeedOLSManagedDocrootContentSkipsNonEmptyDocroot(t *testing.T) {
+	docroot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(docroot, "index.php"), []byte("<?php echo 'ok';"), 0o644); err != nil {
+		t.Fatalf("seed index.php: %v", err)
+	}
+	originalHTAccess := "RewriteEngine On\nRewriteRule ^ index.php [L]\n"
+	if err := os.WriteFile(filepath.Join(docroot, ".htaccess"), []byte(originalHTAccess), 0o644); err != nil {
+		t.Fatalf("seed .htaccess: %v", err)
+	}
+
+	if err := seedOLSManagedDocrootContent(docroot, "example.com", "RewriteEngine On\nRewriteRule ^ app.php [L]"); err != nil {
+		t.Fatalf("seedOLSManagedDocrootContent: %v", err)
+	}
+
+	if fileExists(filepath.Join(docroot, "index.html")) {
+		t.Fatalf("index.html should not be created for non-empty docroot")
+	}
+	htaccessRaw, err := os.ReadFile(filepath.Join(docroot, ".htaccess"))
+	if err != nil {
+		t.Fatalf("read .htaccess: %v", err)
+	}
+	if string(htaccessRaw) != originalHTAccess {
+		t.Fatalf("existing .htaccess should stay untouched, got %q", string(htaccessRaw))
+	}
+}
+
 func TestShouldOverwriteOLSHTAccess(t *testing.T) {
 	if shouldOverwriteOLSHTAccess("") {
 		t.Fatalf("empty rules should not overwrite existing .htaccess")

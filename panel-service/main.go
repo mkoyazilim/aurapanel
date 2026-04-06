@@ -870,6 +870,7 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/status/processes",
 		"/api/v1/status/panel-port",
 		"/api/v1/status/panel-reverse-domain",
+		"/api/v1/status/web-stack",
 		"/api/v1/status/update/apply",
 		"/api/v1/backup/destinations",
 		"/api/v1/backup/schedules",
@@ -1141,6 +1142,10 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handlePanelReverseDomainGet(w)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/panel-reverse-domain":
 		s.handlePanelReverseDomainSet(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/web-stack":
+		s.handleWebStackGet(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/web-stack":
+		s.handleWebStackSet(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/security/status":
 		s.handleSecurityStatus(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudflare/status":

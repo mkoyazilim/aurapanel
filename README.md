@@ -17,6 +17,7 @@ AuraPanel is being built for 2026-grade infrastructure operations where platform
 - [Vision](#vision)
 - [Why AuraPanel](#why-aurapanel)
 - [Architecture](#architecture)
+- [Web Server Strategy](#web-server-strategy)
 - [Feature Surface](#feature-surface)
 - [Security Model](#security-model)
 - [Performance Model](#performance-model)
@@ -92,6 +93,24 @@ Browser
 - host-level automation and runtime orchestration
 - provisioning, tuning, hardening, backup, migration, and integration endpoints
 - deterministic command/config workflows across Linux environments
+
+## Web Server Strategy
+
+AuraPanel follows a clear web-stack policy:
+
+- `OpenLiteSpeed (primary)`: the canonical serving engine and the main integration target in panel workflows.
+- `Nginx (edge-compatible)`: supported as an optional reverse-proxy edge in front of OpenLiteSpeed for TLS termination, caching, and request shaping.
+- `Apache`: intentionally out of project scope.
+
+Apache mode is not included in AuraPanel roadmap because it does not align with the project's modern performance, operational consistency, and platform-direction standards.
+
+Default install mode is `ols-only`. To provision with edge mode on first install, set:
+
+```bash
+export AURAPANEL_WEB_STACK_MODE=nginx-edge
+```
+
+Then run the installer. You can switch modes later from `Panel Control -> Web Stack`.
 
 ## Feature Surface
 

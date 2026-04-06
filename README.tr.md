@@ -17,6 +17,7 @@ Temel üç ilke:
 - [Vizyon](#vizyon)
 - [Neden AuraPanel](#neden-aurapanel)
 - [Mimari](#mimari)
+- [Web Sunucu Stratejisi](#web-sunucu-stratejisi)
 - [Özellik Yüzeyi](#özellik-yüzeyi)
 - [Güvenlik Modeli](#güvenlik-modeli)
 - [Performans Modeli](#performans-modeli)
@@ -89,6 +90,24 @@ Tarayıcı
 `panel-service/`
 - host otomasyonu ve runtime orkestrasyonu
 - provisioning, tuning, hardening, backup ve migration uçları
+
+## Web Sunucu Stratejisi
+
+AuraPanel web katmanında net bir strateji uygular:
+
+- `OpenLiteSpeed (birincil)`: panel akışlarında ana ve resmi entegrasyon hedefidir.
+- `Nginx (edge uyumlu)`: OpenLiteSpeed'in önünde opsiyonel reverse proxy edge olarak TLS termination, cache ve istek şekillendirme için uyumludur.
+- `Apache`: proje kapsamı dışındadır.
+
+Apache modu, projenin modern performans, operasyonel tutarlılık ve platform yönü standartlarıyla uyumlu olmadığı için AuraPanel yol haritasına dahil edilmemiştir.
+
+Varsayilan kurulum modu `ols-only` modudur. Ilk kurulumda edge mod ile baslatmak icin:
+
+```bash
+export AURAPANEL_WEB_STACK_MODE=nginx-edge
+```
+
+degiskenini ayarlayip installer'i calistirin. Modu daha sonra `Panel Kontrol -> Web Stack` ekranindan da degistirebilirsiniz.
 
 ## Özellik Yüzeyi
 

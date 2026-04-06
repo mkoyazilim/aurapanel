@@ -631,13 +631,26 @@ func (s *service) handleWebsiteRewriteSet(w http.ResponseWriter, r *http.Request
 		return
 	}
 	cfg := s.state.AdvancedConfig[domain]
+	previousRules := cfg.RewriteRules
 	cfg.RewriteRules = resolvedRules
 	s.state.AdvancedConfig[domain] = cfg
+	if err := applyWebsiteRewriteRules(domain, resolvedRules); err != nil {
+		cfg.RewriteRules = previousRules
+		s.state.AdvancedConfig[domain] = cfg
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err := s.syncOLSVhostsLocked(); err != nil {
+		cfg.RewriteRules = previousRules
+		s.state.AdvancedConfig[domain] = cfg
+		_ = applyWebsiteRewriteRules(domain, previousRules)
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := s.saveRuntimeStateLocked(); err != nil {
+		cfg.RewriteRules = previousRules
+		s.state.AdvancedConfig[domain] = cfg
+		_ = applyWebsiteRewriteRules(domain, previousRules)
 		writeError(w, http.StatusInternalServerError, "rewrite update could not be persisted.")
 		return
 	}
