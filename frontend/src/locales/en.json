@@ -1167,11 +1167,8 @@
     "label": "Language",
     "select": "Select language",
     "options": {
-      "tr": "Turkce",
+      "tr": "Türkçe",
       "en": "English",
-      "de": "Deutsch",
-      "es": "Espanol",
-      "fr": "Francais",
       "id": "Bahasa Indonesia"
     }
   },

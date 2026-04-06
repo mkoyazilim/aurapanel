@@ -3,11 +3,8 @@
     "label": "Bahasa",
     "select": "Pilih bahasa",
     "options": {
-      "tr": "Turkce",
+      "tr": "Türkçe",
       "en": "English",
-      "de": "Deutsch",
-      "es": "Espanol",
-      "fr": "Francais",
       "id": "Bahasa Indonesia"
     }
   },
