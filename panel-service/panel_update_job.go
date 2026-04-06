@@ -67,8 +67,6 @@ func (s *service) runPanelUpdateJob() {
 	finishedAt := time.Now().UTC().Format(time.RFC3339)
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	next := s.updateJob
 	next.Running = false
 	next.FinishedAt = finishedAt
@@ -92,6 +90,7 @@ func (s *service) runPanelUpdateJob() {
 	s.updateJob = next
 	// Force a fresh git-based status read on next check.
 	s.update = updateStatusCache{}
+	s.mu.Unlock()
 
 	if err := s.saveRuntimeState(); err != nil {
 		log.Printf("panel update job state persist failed: %v", err)
