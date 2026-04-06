@@ -30,6 +30,15 @@
         >
           {{ t('panel_port.tabs.reverse_domain') }}
         </button>
+        <button
+          @click="setTab('web-stack')"
+          :class="[
+            'pb-3 text-sm font-medium transition',
+            activeTab === 'web-stack' ? 'text-emerald-300 border-b-2 border-emerald-400' : 'text-gray-400 hover:text-white'
+          ]"
+        >
+          {{ t('panel_port.tabs.web_stack') }}
+        </button>
       </nav>
     </div>
 
@@ -105,7 +114,7 @@
       </div>
     </div>
 
-    <div v-else class="space-y-6">
+    <div v-else-if="activeTab === 'reverse-domain'" class="space-y-6">
       <div class="bg-sky-500/10 border border-sky-500/30 rounded-xl p-4">
         <p class="text-sky-300 font-semibold text-sm">{{ t('panel_port.reverse.title') }}</p>
         <p class="text-sky-100/90 text-sm mt-1">{{ t('panel_port.reverse.subtitle') }}</p>
@@ -170,6 +179,92 @@
         {{ reverseError }}
       </div>
     </div>
+
+    <div v-else class="space-y-6">
+      <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+        <p class="text-emerald-300 font-semibold text-sm">{{ t('panel_port.web_stack.title') }}</p>
+        <p class="text-emerald-100/90 text-sm mt-1">{{ t('panel_port.web_stack.subtitle') }}</p>
+      </div>
+
+      <div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm space-y-1">
+        <p class="text-blue-300 font-semibold">{{ t('panel_port.web_stack.current_mode') }}</p>
+        <p class="text-blue-100">
+          {{ webStackModeLabel(webStackCurrentMode) }}
+        </p>
+        <p class="text-blue-100/80 text-xs">{{ t('panel_port.web_stack.status.nginx_active') }}: {{ webStackNginxActive ? t('panel_port.web_stack.yes') : t('panel_port.web_stack.no') }}</p>
+        <p class="text-blue-100/80 text-xs">{{ t('panel_port.web_stack.status.openlitespeed_active') }}: {{ webStackOpenLiteSpeedActive ? t('panel_port.web_stack.yes') : t('panel_port.web_stack.no') }}</p>
+      </div>
+
+      <div class="bg-panel-card border border-panel-border rounded-xl p-6 space-y-5">
+        <div>
+          <p class="block text-xs text-gray-400 uppercase tracking-wide mb-3">{{ t('panel_port.web_stack.desired_mode') }}</p>
+          <div class="space-y-3">
+            <label class="flex items-start gap-3 text-sm text-gray-300 p-3 rounded-lg border border-panel-border">
+              <input
+                v-model="webStackMode"
+                type="radio"
+                name="web-stack-mode"
+                value="ols-only"
+                class="accent-emerald-500 mt-1"
+              />
+              <span>
+                <span class="block text-white font-medium">{{ t('panel_port.web_stack.modes.ols_only.label') }}</span>
+                <span class="block text-gray-400 text-xs mt-1">{{ t('panel_port.web_stack.modes.ols_only.description') }}</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-3 text-sm text-gray-300 p-3 rounded-lg border border-panel-border">
+              <input
+                v-model="webStackMode"
+                type="radio"
+                name="web-stack-mode"
+                value="nginx-edge"
+                class="accent-emerald-500 mt-1"
+              />
+              <span>
+                <span class="block text-white font-medium">{{ t('panel_port.web_stack.modes.nginx_edge.label') }}</span>
+                <span class="block text-gray-400 text-xs mt-1">{{ t('panel_port.web_stack.modes.nginx_edge.description') }}</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2">
+          <button
+            @click="saveWebStackMode"
+            :disabled="webStackLoading || webStackSaving"
+            class="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium transition inline-flex items-center gap-2"
+          >
+            <Loader2 v-if="webStackSaving" class="w-4 h-4 animate-spin" />
+            <Save v-else class="w-4 h-4" />
+            <span>{{ webStackSaving ? t('panel_port.web_stack.saving') : t('panel_port.web_stack.save') }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="webStackMessage" class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-sm text-emerald-200">
+        {{ webStackMessage }}
+      </div>
+
+      <div v-if="webStackWarnings.length" class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-200">
+        <p class="font-semibold mb-2">{{ t('panel_port.web_stack.warnings') }}</p>
+        <ul class="space-y-1">
+          <li v-for="item in webStackWarnings" :key="item">- {{ item }}</li>
+        </ul>
+      </div>
+
+      <div v-if="webStackOutput" class="bg-panel-card border border-panel-border rounded-xl p-4">
+        <p class="font-semibold text-white text-sm mb-2">{{ t('panel_port.web_stack.last_output') }}</p>
+        <pre class="text-xs text-gray-300 whitespace-pre-wrap break-words">{{ webStackOutput }}</pre>
+      </div>
+
+      <div v-if="webStackScriptPath" class="bg-panel-card border border-panel-border rounded-xl p-4 text-xs text-gray-400">
+        {{ t('panel_port.web_stack.script_path') }}: <span class="font-mono">{{ webStackScriptPath }}</span>
+      </div>
+
+      <div v-if="webStackError" class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-200">
+        {{ webStackError }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -184,7 +279,11 @@ const { t } = useI18n({ useScope: 'global' })
 const route = useRoute()
 const router = useRouter()
 
-const normalizeTab = (value) => (value === 'reverse-domain' ? 'reverse-domain' : 'port')
+const normalizeTab = (value) => {
+  if (value === 'reverse-domain') return 'reverse-domain'
+  if (value === 'web-stack') return 'web-stack'
+  return 'port'
+}
 const activeTab = ref(normalizeTab(typeof route.query.tab === 'string' ? route.query.tab : ''))
 
 watch(
@@ -232,6 +331,19 @@ const reverseGatewayUpstream = ref('127.0.0.1:8090')
 const reverseMessage = ref('')
 const reverseError = ref('')
 const reverseWarnings = ref([])
+
+const webStackLoading = ref(false)
+const webStackSaving = ref(false)
+const webStackMode = ref('ols-only')
+const webStackCurrentMode = ref('ols-only')
+const webStackNginxActive = ref(false)
+const webStackOpenLiteSpeedActive = ref(false)
+const webStackSupportedModes = ref(['ols-only', 'nginx-edge'])
+const webStackScriptPath = ref('')
+const webStackMessage = ref('')
+const webStackError = ref('')
+const webStackWarnings = ref([])
+const webStackOutput = ref('')
 
 const newAccessUrl = computed(() => {
   if (typeof window === 'undefined') {
@@ -374,7 +486,78 @@ const saveReverseDomain = async () => {
   }
 }
 
+const webStackModeLabel = (mode) => {
+  return mode === 'nginx-edge'
+    ? t('panel_port.web_stack.modes.nginx_edge.label')
+    : t('panel_port.web_stack.modes.ols_only.label')
+}
+
+const loadWebStack = async () => {
+  webStackLoading.value = true
+  webStackError.value = ''
+  try {
+    const response = await api.get('/status/web-stack')
+    if (response.data?.status !== 'success') {
+      throw new Error(response.data?.message || t('panel_port.web_stack.messages.load_failed'))
+    }
+
+    const payload = response.data?.data || {}
+    const mode = String(payload.mode || 'ols-only')
+    webStackCurrentMode.value = mode
+    webStackMode.value = mode
+    webStackNginxActive.value = Boolean(payload.nginx_active)
+    webStackOpenLiteSpeedActive.value = Boolean(payload.openlitespeed_active)
+    webStackScriptPath.value = String(payload.script_path || '')
+    webStackSupportedModes.value = Array.isArray(payload.supported_modes) ? payload.supported_modes : ['ols-only', 'nginx-edge']
+  } catch (err) {
+    webStackError.value = err?.response?.data?.message || err?.message || t('panel_port.web_stack.messages.load_failed')
+  } finally {
+    webStackLoading.value = false
+  }
+}
+
+const saveWebStackMode = async () => {
+  webStackError.value = ''
+  webStackMessage.value = ''
+  webStackWarnings.value = []
+  webStackOutput.value = ''
+
+  if (!webStackSupportedModes.value.includes(webStackMode.value)) {
+    webStackError.value = t('panel_port.web_stack.messages.invalid_mode')
+    return
+  }
+
+  webStackSaving.value = true
+  try {
+    const response = await api.post('/status/web-stack', {
+      mode: webStackMode.value,
+    })
+    if (response.data?.status !== 'success') {
+      throw new Error(response.data?.message || t('panel_port.web_stack.messages.update_failed'))
+    }
+
+    const payload = response.data?.data || {}
+    webStackCurrentMode.value = String(payload.current_mode || webStackMode.value)
+    webStackMode.value = webStackCurrentMode.value
+    webStackNginxActive.value = Boolean(payload.nginx_active)
+    webStackOpenLiteSpeedActive.value = Boolean(payload.openlitespeed_active)
+    webStackScriptPath.value = String(payload.script_path || webStackScriptPath.value)
+    webStackWarnings.value = Array.isArray(payload.warnings) ? payload.warnings : []
+    webStackOutput.value = String(payload.execution_output || '')
+
+    if (payload.applied) {
+      webStackMessage.value = t('panel_port.web_stack.messages.updated', { mode: webStackModeLabel(webStackCurrentMode.value) })
+    } else {
+      webStackMessage.value = t('panel_port.web_stack.messages.unchanged', { mode: webStackModeLabel(webStackCurrentMode.value) })
+    }
+  } catch (err) {
+    webStackError.value = err?.response?.data?.message || err?.message || t('panel_port.web_stack.messages.update_failed')
+  } finally {
+    webStackSaving.value = false
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([loadPanelPort(), loadReverseDomain()])
+  await Promise.all([loadPanelPort(), loadReverseDomain(), loadWebStack()])
 })
 </script>

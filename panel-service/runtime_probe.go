@@ -143,6 +143,7 @@ func collectHostServices() []ServiceStatus {
 		{Name: "api-gateway", Desc: "AuraPanel API gateway", Units: []string{"aurapanel-api"}},
 		{Name: "panel-service", Desc: "AuraPanel panel service", Units: []string{"aurapanel-service"}},
 		{Name: "openlitespeed", Desc: "OpenLiteSpeed web server", Units: []string{"lshttpd", "openlitespeed", "lsws"}},
+		{Name: "nginx", Desc: "Nginx edge reverse proxy", Units: []string{"nginx"}},
 		{Name: "mariadb", Desc: "MariaDB database engine", Units: []string{"mariadb"}},
 		{Name: "postgresql", Desc: "PostgreSQL database engine", Units: []string{"postgresql"}},
 		{Name: "redis", Desc: "Redis in-memory data store", Units: []string{"redis-server", "redis"}},
@@ -401,6 +402,9 @@ func detectWebStack() []string {
 	stack := []string{}
 	if serviceActive("lshttpd", "openlitespeed", "lsws") {
 		stack = append(stack, "openlitespeed")
+	}
+	if serviceActive("nginx") {
+		stack = append(stack, "nginx")
 	}
 	if apacheBackendAvailable() {
 		stack = append(stack, "apache")

@@ -186,6 +186,7 @@ const baseEn = {
     tabs: {
       port: 'Port Settings',
       reverse_domain: 'Reverse Domain',
+      web_stack: 'Web Stack',
     },
     notice_title: 'Important Notice',
     notice_body: 'After changing the port, reconnect using the new URL. Keep firewall access enabled for the selected port.',
@@ -219,6 +220,40 @@ const baseEn = {
         update_failed: 'Reverse domain settings could not be updated.',
         updated: 'Reverse domain settings updated.',
         updated_synced: 'Reverse domain settings updated and OLS upstream synced.',
+      },
+    },
+    web_stack: {
+      title: 'Web stack mode settings.',
+      subtitle: 'Choose between direct OpenLiteSpeed mode and optional Nginx edge proxy mode.',
+      current_mode: 'Current web stack mode',
+      desired_mode: 'Target mode',
+      save: 'Apply Web Stack',
+      saving: 'Applying...',
+      warnings: 'Web Stack Warnings',
+      last_output: 'Last apply output',
+      script_path: 'Installer script path',
+      yes: 'Yes',
+      no: 'No',
+      status: {
+        nginx_active: 'Nginx active',
+        openlitespeed_active: 'OpenLiteSpeed active',
+      },
+      modes: {
+        ols_only: {
+          label: 'OpenLiteSpeed only',
+          description: 'OpenLiteSpeed serves directly on ports 80/443.',
+        },
+        nginx_edge: {
+          label: 'OpenLiteSpeed + Nginx edge',
+          description: 'Nginx fronts ports 80/443 and proxies traffic to OpenLiteSpeed backend.',
+        },
+      },
+      messages: {
+        load_failed: 'Web stack status could not be loaded.',
+        invalid_mode: 'Selected web stack mode is not valid.',
+        update_failed: 'Web stack mode could not be updated.',
+        updated: 'Web stack mode updated: {mode}.',
+        unchanged: 'Web stack mode is already active: {mode}.',
       },
     },
     messages: {
@@ -694,6 +729,7 @@ const baseTr = deepMerge(baseEn, {
     tabs: {
       port: 'Port Ayari',
       reverse_domain: 'Reverse Domain',
+      web_stack: 'Web Stack',
     },
     notice_title: 'Onemli Not',
     notice_body: 'Portu degistirdikten sonra yeni URL ile tekrar baglanin. Seçilen port için firewall erisiminin acik kaldigindan emin olun.',
@@ -727,6 +763,40 @@ const baseTr = deepMerge(baseEn, {
         update_failed: 'Reverse domain ayarlari guncellenemedi.',
         updated: 'Reverse domain ayarlari guncellendi.',
         updated_synced: 'Reverse domain ayarlari guncellendi ve OLS upstream senkronlandi.',
+      },
+    },
+    web_stack: {
+      title: 'Web stack mod ayarlari.',
+      subtitle: 'Dogrudan OpenLiteSpeed modu ile opsiyonel Nginx edge proxy modu arasinda secim yapin.',
+      current_mode: 'Mevcut web stack modu',
+      desired_mode: 'Hedef mod',
+      save: 'Web Stack Uygula',
+      saving: 'Uygulaniyor...',
+      warnings: 'Web Stack Uyarilari',
+      last_output: 'Son uygulama cikti logu',
+      script_path: 'Installer script yolu',
+      yes: 'Evet',
+      no: 'Hayir',
+      status: {
+        nginx_active: 'Nginx aktif',
+        openlitespeed_active: 'OpenLiteSpeed aktif',
+      },
+      modes: {
+        ols_only: {
+          label: 'Yalnizca OpenLiteSpeed',
+          description: 'OpenLiteSpeed 80/443 portlarinda dogrudan servis verir.',
+        },
+        nginx_edge: {
+          label: 'OpenLiteSpeed + Nginx edge',
+          description: 'Nginx 80/443 onunde calisir ve trafigi OpenLiteSpeed backendine proxyler.',
+        },
+      },
+      messages: {
+        load_failed: 'Web stack durumu alinamadi.',
+        invalid_mode: 'Secilen web stack modu gecersiz.',
+        update_failed: 'Web stack modu guncellenemedi.',
+        updated: 'Web stack modu guncellendi: {mode}.',
+        unchanged: 'Web stack modu zaten aktif: {mode}.',
       },
     },
     messages: {

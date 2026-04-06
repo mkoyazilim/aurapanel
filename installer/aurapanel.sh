@@ -722,6 +722,38 @@ gateway_port() {
   echo "${port}"
 }
 
+normalize_web_stack_mode() {
+  local raw
+  raw="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  case "${raw}" in
+    "nginx-edge"|"nginx_edge"|"nginxedge")
+      echo "nginx-edge"
+      ;;
+    "ols-only"|"ols_only"|"olsonly"|"")
+      echo "ols-only"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+web_stack_mode() {
+  local requested existing normalized
+  requested="$(normalize_web_stack_mode "${AURAPANEL_WEB_STACK_MODE:-}")"
+  if [ -n "${requested}" ]; then
+    echo "${requested}"
+    return
+  fi
+  existing="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_WEB_STACK_MODE")"
+  normalized="$(normalize_web_stack_mode "${existing}")"
+  if [ -n "${normalized}" ]; then
+    echo "${normalized}"
+    return
+  fi
+  echo "ols-only"
+}
+
 generate_safe_password() {
   local length="${1:-24}"
   local generated=""
@@ -1436,6 +1468,30 @@ ensure_docker_runtime() {
   systemctl start docker >/dev/null 2>&1 || true
 }
 
+ensure_nginx_for_edge_mode() {
+  local mode
+  mode="$(web_stack_mode)"
+  if [ "${mode}" != "nginx-edge" ]; then
+    return
+  fi
+
+  if command -v nginx >/dev/null 2>&1; then
+    ok "nginx already installed for edge mode."
+    return
+  fi
+
+  log "Installing nginx for optional nginx-edge web stack mode..."
+  if [ "${PKG_MGR}" = "apt" ]; then
+    install_packages nginx libnginx-mod-stream || install_packages nginx
+  elif [ "${PKG_MGR}" = "dnf" ]; then
+    install_packages nginx
+  else
+    install_packages nginx
+  fi
+
+  command -v nginx >/dev/null 2>&1 || fail "nginx installation failed for nginx-edge mode."
+}
+
 ensure_ols_public_listeners() {
   local ols_conf="/usr/local/lsws/conf/httpd_config.conf"
   local tls_key="/usr/local/lsws/admin/conf/webadmin.key"
@@ -1886,8 +1942,18 @@ write_service_env_defaults() {
   chmod 700 "${GATEWAY_ENV_DIR}"
   local shared_jwt_secret=""
   local shared_proxy_token=""
+  local web_stack_mode_value web_stack_edge_enabled web_stack_backend_addr
   local legacy_gateway_core_url_key="AURAPANEL_""CORE_URL"
   local legacy_service_bind_key="AURAPANEL_""CORE_BIND_ADDR"
+
+  web_stack_mode_value="$(web_stack_mode)"
+  if [ "${web_stack_mode_value}" = "nginx-edge" ]; then
+    web_stack_edge_enabled="1"
+    web_stack_backend_addr="127.0.0.1:8088"
+  else
+    web_stack_edge_enabled="0"
+    web_stack_backend_addr="*:80"
+  fi
 
   if [ ! -f "${GATEWAY_ENV_FILE}" ]; then
     local admin_pass jwt_secret proxy_token
@@ -1976,6 +2042,9 @@ AURAPANEL_STATE_DB_NAME=aurapanel
 AURAPANEL_STATE_DB_USER=root
 AURAPANEL_STATE_DB_PASSWORD=
 AURAPANEL_STATE_DB_SOCKET=/run/mysqld/mysqld.sock
+AURAPANEL_WEB_STACK_MODE=${web_stack_mode_value}
+AURAPANEL_NGINX_EDGE_ENABLED=${web_stack_edge_enabled}
+AURAPANEL_OLS_BACKEND_ADDR=${web_stack_backend_addr}
 AURAPANEL_PANEL_EDGE_SINGLE_DOMAIN=0
 AURAPANEL_PHPMYADMIN_BASE_URL=/phpmyadmin/index.php
 AURAPANEL_PGADMIN_BASE_URL=/pgadmin4/
@@ -2056,7 +2125,7 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_TARGET" "internal-minio"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_ENDPOINT" "http://127.0.0.1:9000"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_BACKUP_MINIO_BUCKET" "aurapanel-backups"
-  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload panel_edge_single_domain pma_base pg_base ddos_enabled ddos_profile ddos_global_rps ddos_global_burst ddos_auth_rps ddos_auth_burst state_backend state_db_name state_db_user state_db_password state_db_socket
+  local dbtools_auth_user dbtools_auth_pass dbtools_allowed_ips dbtools_rate dbtools_runtime_file dbtools_reload panel_edge_single_domain pma_base pg_base ddos_enabled ddos_profile ddos_global_rps ddos_global_burst ddos_auth_rps ddos_auth_burst state_backend state_db_name state_db_user state_db_password state_db_socket web_stack_mode_current nginx_edge_enabled ols_backend_addr
   dbtools_auth_user="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER")"
   dbtools_auth_pass="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS")"
   dbtools_allowed_ips="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS")"
@@ -2077,6 +2146,9 @@ EOF
   state_db_user="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_USER")"
   state_db_password="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_PASSWORD")"
   state_db_socket="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_SOCKET")"
+  web_stack_mode_current="$(normalize_web_stack_mode "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_WEB_STACK_MODE")")"
+  nginx_edge_enabled="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_NGINX_EDGE_ENABLED")"
+  ols_backend_addr="$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_OLS_BACKEND_ADDR")"
   [ -n "${dbtools_auth_user}" ] || dbtools_auth_user="dbtools"
   [ -n "${dbtools_rate}" ] || dbtools_rate="120"
   [ -n "${dbtools_runtime_file}" ] || dbtools_runtime_file="/etc/aurapanel/db-tools/runtime-allowlist.txt"
@@ -2094,6 +2166,14 @@ EOF
   [ -n "${state_db_name}" ] || state_db_name="aurapanel"
   [ -n "${state_db_user}" ] || state_db_user="root"
   [ -n "${state_db_socket}" ] || state_db_socket="/run/mysqld/mysqld.sock"
+  [ -n "${web_stack_mode_current}" ] || web_stack_mode_current="${web_stack_mode_value}"
+  if [ "${web_stack_mode_current}" = "nginx-edge" ]; then
+    [ -n "${nginx_edge_enabled}" ] || nginx_edge_enabled="1"
+    [ -n "${ols_backend_addr}" ] || ols_backend_addr="127.0.0.1:8088"
+  else
+    [ -n "${nginx_edge_enabled}" ] || nginx_edge_enabled="0"
+    [ -n "${ols_backend_addr}" ] || ols_backend_addr="*:80"
+  fi
 
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_BACKEND" "vmail"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_MAIL_VMAIL_UID" "5000"
@@ -2129,6 +2209,9 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_USER" "${state_db_user}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_PASSWORD" "${state_db_password}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STATE_DB_SOCKET" "${state_db_socket}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_WEB_STACK_MODE" "${web_stack_mode_current}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_NGINX_EDGE_ENABLED" "${nginx_edge_enabled}"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_OLS_BACKEND_ADDR" "${ols_backend_addr}"
 
   chmod 600 "${GATEWAY_ENV_FILE}" "${SERVICE_ENV_FILE}"
 }
@@ -2189,6 +2272,10 @@ EOF
 enable_stack_services() {
   local services=(mariadb postgresql redis-server redis docker fail2ban pdns pure-ftpd postfix dovecot aurapanel-htaccess-watcher)
   local unit=""
+
+  if command -v nginx >/dev/null 2>&1; then
+    services+=(nginx)
+  fi
 
   for svc in "${services[@]}"; do
     unit="${svc}.service"
@@ -2261,6 +2348,22 @@ sync_project() {
   fi
 }
 
+apply_web_stack_mode() {
+  local mode script_path
+  mode="$(web_stack_mode)"
+  script_path="${PROJECT_DIR}/installer/web-stack-mode.sh"
+
+  if [ ! -f "${script_path}" ]; then
+    fail "web stack mode script not found: ${script_path}"
+  fi
+
+  log "Applying web stack mode: ${mode}"
+  if ! bash "${script_path}" --mode "${mode}" --apply --auto-install-nginx; then
+    fail "web stack mode apply failed (${mode})."
+  fi
+  ok "Web stack mode active: ${mode}"
+}
+
 build_components() {
   log "Building Go panel service..."
   cd "${PROJECT_DIR}/panel-service"
@@ -2323,12 +2426,17 @@ EOF
 
 smoke_check() {
   log "Running post-install smoke checks..."
-  local panel_port panel_user panel_pass login_payload ols_user ols_pass ols_status
+  local panel_port panel_user panel_pass login_payload ols_user ols_pass ols_status stack_mode
   panel_port="$(gateway_port)"
+  stack_mode="$(normalize_web_stack_mode "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_WEB_STACK_MODE")")"
+  [ -n "${stack_mode}" ] || stack_mode="ols-only"
 
   systemctl is-active --quiet aurapanel-service || fail "aurapanel-service is not active"
   systemctl is-active --quiet aurapanel-api || fail "aurapanel-api is not active"
   systemctl is-active --quiet lshttpd || fail "lshttpd is not active"
+  if [ "${stack_mode}" = "nginx-edge" ]; then
+    systemctl is-active --quiet nginx || fail "nginx is not active in nginx-edge mode"
+  fi
   systemctl is-active --quiet minio || fail "minio is not active"
   if systemd_unit_exists "pure-ftpd.service"; then
     systemctl is-active --quiet pure-ftpd || fail "pure-ftpd is not active"
@@ -2398,6 +2506,10 @@ smoke_check() {
     fi
     if ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)443$'; then
       warn "Port 443 listener was not detected. Public HTTPS traffic may fail."
+    fi
+    if [ "${stack_mode}" = "nginx-edge" ]; then
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '127\.0\.0\.1:8088$' || warn "OLS backend listener 127.0.0.1:8088 was not detected in nginx-edge mode."
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '127\.0\.0\.1:8443$' || warn "OLS backend TLS listener 127.0.0.1:8443 was not detected in nginx-edge mode."
     fi
     if systemctl list-unit-files | grep -q '^postfix\.service'; then
       ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)587$' || fail "Postfix submission listener (587) was not detected"
@@ -2489,6 +2601,8 @@ main() {
 
   sync_project
   write_service_env_defaults
+  ensure_nginx_for_edge_mode
+  apply_web_stack_mode
   harden_ssh_systemd_unit
   ensure_firewall_manager_active
   configure_powerdns
