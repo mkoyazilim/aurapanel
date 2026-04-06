@@ -396,7 +396,7 @@ async function saveTuning() {
     await api.post('/mail/tuning', tuningForm.value)
     alert(t('email_manager.tuning_save_success'))
   } catch (err) {
-    alert('Hata: ' + (err.response?.data?.message || err.message))
+    alert(`${t('common.error')}: ${err.response?.data?.message || err.message}`)
   } finally {
     tuningSaving.value = false
   }
