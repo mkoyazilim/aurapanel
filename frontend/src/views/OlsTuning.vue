@@ -79,6 +79,29 @@ const form = ref({
   static_cache_max_age_secs: 3600,
 })
 
+function toIntOrFallback(value, fallback) {
+  const parsed = Number.parseInt(`${value ?? ''}`, 10)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function sanitizeOLSTuningConfig(input = {}) {
+  const base = form.value
+  return {
+    max_connections: toIntOrFallback(input.max_connections, base.max_connections),
+    max_ssl_connections: toIntOrFallback(input.max_ssl_connections, base.max_ssl_connections),
+    conn_timeout_secs: toIntOrFallback(input.conn_timeout_secs, base.conn_timeout_secs),
+    keep_alive_timeout_secs: toIntOrFallback(input.keep_alive_timeout_secs, base.keep_alive_timeout_secs),
+    max_keep_alive_requests: toIntOrFallback(input.max_keep_alive_requests, base.max_keep_alive_requests),
+    gzip_compression: Boolean(input.gzip_compression),
+    static_cache_enabled: Boolean(input.static_cache_enabled),
+    static_cache_max_age_secs: toIntOrFallback(input.static_cache_max_age_secs, base.static_cache_max_age_secs),
+  }
+}
+
+function buildOLSTuningPayload() {
+  return sanitizeOLSTuningConfig(form.value)
+}
+
 function apiErrorMessage(e, fallbackKey) {
   return e?.response?.data?.message || e?.message || t(fallbackKey)
 }
@@ -88,7 +111,7 @@ async function loadConfig() {
   success.value = ''
   try {
     const res = await api.get('/ols/tuning')
-    form.value = { ...form.value, ...(res.data?.data || {}) }
+    form.value = sanitizeOLSTuningConfig(res.data?.data || {})
   } catch (e) {
     error.value = apiErrorMessage(e, 'ols_tuning.messages.load_failed')
   }
@@ -98,7 +121,7 @@ async function saveConfig() {
   error.value = ''
   success.value = ''
   try {
-    await api.post('/ols/tuning', form.value)
+    await api.post('/ols/tuning', buildOLSTuningPayload())
     success.value = t('ols_tuning.messages.saved')
   } catch (e) {
     error.value = apiErrorMessage(e, 'ols_tuning.messages.save_failed')
@@ -109,7 +132,7 @@ async function applyConfig() {
   error.value = ''
   success.value = ''
   try {
-    const res = await api.post('/ols/tuning/apply', form.value)
+    const res = await api.post('/ols/tuning/apply', buildOLSTuningPayload())
     success.value = res.data?.message || t('ols_tuning.messages.applied')
   } catch (e) {
     error.value = apiErrorMessage(e, 'ols_tuning.messages.apply_failed')
