@@ -227,7 +227,7 @@ async function saveTuning() {
     success.value = t('ftp_manager.tuning.save_success')
     setTimeout(() => { success.value = '' }, 3000)
   } catch (err) {
-    error.value = 'Hata: ' + (err.response?.data?.message || err.message)
+    error.value = `${t('common.error')}: ${err.response?.data?.message || err.message}`
     setTimeout(() => { error.value = '' }, 3000)
   } finally {
     tuningSaving.value = false

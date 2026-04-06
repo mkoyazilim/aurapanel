@@ -63,7 +63,7 @@
     <div v-if="activeTab === 'containers'" class="overflow-hidden rounded-xl border border-panel-border bg-panel-card">
       <div class="flex items-center justify-between border-b border-panel-border p-4">
         <h2 class="text-lg font-semibold text-white">{{ t('docker_manager_screen.containers.title') }}</h2>
-        <button class="rounded-lg bg-panel-hover px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-600" @click="refreshContainers">
+        <button class="rounded-lg bg-panel-hover px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-60" :disabled="isRefreshingContainers" @click="refreshContainers()">
           {{ t('docker_manager_screen.containers.refresh') }}
         </button>
       </div>
@@ -117,8 +117,11 @@
       <div class="flex items-center justify-between border-b border-panel-border p-4">
         <h2 class="text-lg font-semibold text-white">{{ t('docker_manager_screen.images.title') }}</h2>
         <div class="flex gap-2">
+          <button class="rounded-lg bg-panel-hover px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-60" :disabled="isRefreshingImages" @click="refreshImages()">
+            {{ t('docker_manager_screen.containers.refresh') }}
+          </button>
           <input v-model="pullImageName" type="text" class="w-48 rounded-lg border border-panel-border bg-panel-hover px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" :placeholder="t('docker_manager_screen.images.pull_placeholder')" />
-          <button class="rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white transition hover:bg-blue-700" @click="pullImage">
+          <button class="rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" :disabled="isPullingImage" @click="pullImage">
             {{ t('docker_manager_screen.images.pull') }}
           </button>
         </div>
@@ -147,6 +150,9 @@
                   {{ t('docker_manager_screen.containers.remove') }}
                 </button>
               </td>
+            </tr>
+            <tr v-if="images.length === 0">
+              <td colspan="6" class="px-4 py-6 text-center text-gray-500">{{ t('docker_manager_screen.containers.empty') }}</td>
             </tr>
           </tbody>
         </table>
@@ -210,7 +216,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import api from '../services/api'
@@ -222,6 +228,10 @@ const containers = ref([])
 const images = ref([])
 const pullImageName = ref('')
 const notification = ref(null)
+const isRefreshingContainers = ref(false)
+const isRefreshingImages = ref(false)
+const isPullingImage = ref(false)
+let refreshInterval = null
 
 const newContainer = ref({
   name: '',
@@ -244,23 +254,39 @@ const showNotif = (message, type = 'success') => {
   }, 3000)
 }
 
-const refreshContainers = async () => {
+const refreshContainers = async ({ silent = false } = {}) => {
+  isRefreshingContainers.value = true
   try {
-    const { data } = await api.get('/docker/containers')
+    const { data } = await api.get('/docker/containers', {
+      params: { _ts: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    })
     containers.value = Array.isArray(data.data) ? data.data : []
   } catch (err) {
-    showNotif(err.response?.data?.error || t('docker_manager_screen.messages.containers_failed'), 'error')
+    if (!silent) {
+      showNotif(err.response?.data?.error || t('docker_manager_screen.messages.containers_failed'), 'error')
+    }
     containers.value = []
+  } finally {
+    isRefreshingContainers.value = false
   }
 }
 
-const refreshImages = async () => {
+const refreshImages = async ({ silent = false } = {}) => {
+  isRefreshingImages.value = true
   try {
-    const { data } = await api.get('/docker/images')
+    const { data } = await api.get('/docker/images', {
+      params: { _ts: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    })
     images.value = Array.isArray(data.data) ? data.data : []
   } catch (err) {
-    showNotif(err.response?.data?.error || t('docker_manager_screen.messages.images_failed'), 'error')
+    if (!silent) {
+      showNotif(err.response?.data?.error || t('docker_manager_screen.messages.images_failed'), 'error')
+    }
     images.value = []
+  } finally {
+    isRefreshingImages.value = false
   }
 }
 
@@ -286,14 +312,17 @@ const containerAction = async (id, action) => {
 
 const pullImage = async () => {
   if (!pullImageName.value) return
-  const [image, tag] = pullImageName.value.split(':')
+  const { image, tag } = splitImageReference(pullImageName.value)
+  isPullingImage.value = true
   try {
     await api.post('/docker/images/pull', { image, tag: tag || 'latest' })
     showNotif(t('docker_manager_screen.messages.image_pulled', { name: pullImageName.value }))
     pullImageName.value = ''
-    refreshImages()
+    await refreshImages()
   } catch (err) {
     showNotif(err.response?.data?.error || t('docker_manager_screen.messages.image_pull_failed'), 'error')
+  } finally {
+    isPullingImage.value = false
   }
 }
 
@@ -302,7 +331,7 @@ const removeImage = async id => {
   try {
     await api.post('/docker/images/remove', { id })
     showNotif(t('docker_manager_screen.messages.image_removed'))
-    refreshImages()
+    await refreshImages()
   } catch (err) {
     showNotif(err.response?.data?.error || t('docker_manager_screen.messages.image_remove_failed'), 'error')
   }
@@ -324,14 +353,66 @@ const createContainer = async () => {
     showNotif(t('docker_manager_screen.messages.container_created', { name: payload.name }))
     newContainer.value = { name: '', image: '', portsStr: '', envStr: '', volumesStr: '', restart_policy: '', memory_limit: '', cpu_limit: '' }
     activeTab.value = 'containers'
-    refreshContainers()
+    await refreshContainers()
   } catch (err) {
     showNotif(err.response?.data?.error || t('docker_manager_screen.messages.container_create_failed'), 'error')
   }
 }
 
+const splitImageReference = value => {
+  const input = String(value || '').trim()
+  if (!input) return { image: '', tag: 'latest' }
+  const digestIndex = input.indexOf('@')
+  if (digestIndex >= 0) {
+    return { image: input.slice(0, digestIndex), tag: input.slice(digestIndex + 1) || 'latest' }
+  }
+  const lastColon = input.lastIndexOf(':')
+  const lastSlash = input.lastIndexOf('/')
+  if (lastColon > lastSlash) {
+    return { image: input.slice(0, lastColon), tag: input.slice(lastColon + 1) || 'latest' }
+  }
+  return { image: input, tag: 'latest' }
+}
+
+const resetAutoRefresh = () => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
+  refreshInterval = setInterval(() => {
+    if (activeTab.value === 'containers') {
+      refreshContainers({ silent: true })
+      return
+    }
+    if (activeTab.value === 'images') {
+      refreshImages({ silent: true })
+    }
+  }, 15000)
+}
+
+watch(() => route.meta.dockerTab, tab => {
+  if (tab) {
+    activeTab.value = tab
+  }
+})
+
+watch(activeTab, tab => {
+  if (tab === 'containers') {
+    refreshContainers()
+  } else if (tab === 'images') {
+    refreshImages()
+  }
+})
+
 onMounted(() => {
   refreshContainers()
   refreshImages()
+  resetAutoRefresh()
+})
+
+onUnmounted(() => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  }
 })
 </script>

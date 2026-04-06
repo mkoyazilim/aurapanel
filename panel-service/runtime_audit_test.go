@@ -130,6 +130,67 @@ func TestHandleOLSTuningSetStagesWithoutApply(t *testing.T) {
 	}
 }
 
+func TestHandleOLSTuningSetAcceptsFlexiblePayloadTypes(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+
+	body := strings.NewReader(`{"max_connections":"24000","max_ssl_connections":"23000","conn_timeout_secs":"90","keep_alive_timeout_secs":"7","max_keep_alive_requests":"5500","gzip_compression":"true","static_cache_enabled":"0","static_cache_max_age_secs":"1800"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ols/tuning", body)
+	rec := httptest.NewRecorder()
+	svc.handleOLSTuningSet(rec, req, false)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if svc.modules.OLSConfig.MaxConnections != 24000 {
+		t.Fatalf("unexpected max_connections: %d", svc.modules.OLSConfig.MaxConnections)
+	}
+	if svc.modules.OLSConfig.StaticCacheEnabled {
+		t.Fatalf("expected static cache disabled after flexible payload parse")
+	}
+}
+
+func TestHandleOLSTuningSetPartialPayloadPreservesExistingValues(t *testing.T) {
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+	svc.modules.OLSConfig = OLSTuningConfig{
+		MaxConnections:       10000,
+		MaxSSLConnections:    9000,
+		ConnTimeoutSecs:      200,
+		KeepAliveTimeoutSecs: 4,
+		MaxKeepAliveRequests: 4000,
+		GzipCompression:      false,
+		StaticCacheEnabled:   true,
+		StaticCacheMaxAgeSec: 1200,
+	}
+
+	body := strings.NewReader(`{"max_connections":"28000"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ols/tuning", body)
+	rec := httptest.NewRecorder()
+	svc.handleOLSTuningSet(rec, req, false)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if svc.modules.OLSConfig.MaxConnections != 28000 {
+		t.Fatalf("max_connections was not updated: %d", svc.modules.OLSConfig.MaxConnections)
+	}
+	if svc.modules.OLSConfig.MaxSSLConnections != 9000 {
+		t.Fatalf("max_ssl_connections should stay unchanged, got %d", svc.modules.OLSConfig.MaxSSLConnections)
+	}
+	if svc.modules.OLSConfig.GzipCompression {
+		t.Fatalf("gzip_compression should stay unchanged=false")
+	}
+}
+
 func TestHandleCloudLinuxActionsReturnsCatalog(t *testing.T) {
 	svc := &service{
 		startedAt: seedTime(),

@@ -9,7 +9,7 @@
         <router-link to="/wordpress" class="btn-secondary">
           {{ t('app_runtime.wordpress_manager') }}
         </router-link>
-        <button class="btn-secondary" @click="loadApps">{{ t('app_runtime.refresh') }}</button>
+        <button class="btn-secondary" @click="refreshRuntimeData">{{ t('app_runtime.refresh') }}</button>
       </div>
     </div>
 
@@ -86,7 +86,13 @@
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.domain') }}</label>
-          <input v-model="cms.domain" class="aura-input" placeholder="example.com" />
+          <select v-model="cms.domain" class="aura-input" :disabled="cmsDomainsLoading || cmsDomains.length === 0">
+            <option value="" disabled>{{ cmsDomainsLoading ? t('common.loading') : t('websites.select_domain') }}</option>
+            <option v-for="domain in cmsDomains" :key="domain" :value="domain">{{ domain }}</option>
+          </select>
+          <p v-if="!cmsDomainsLoading && cmsDomains.length === 0" class="mt-1 text-xs text-yellow-300">
+            {{ t('websites.no_sites') }}
+          </p>
         </div>
         <div>
           <label class="block text-sm text-gray-400 mb-1">{{ t('cms_installer.db_name') }}</label>
@@ -157,6 +163,8 @@ const activeTab = ref('nodejs')
 const apps = ref([])
 const node = ref({ dir: '', app_name: '', start_script: 'npm start' })
 const python = ref({ dir: '', app_name: '', wsgi_module: 'app:app', port: 8001 })
+const cmsDomains = ref([])
+const cmsDomainsLoading = ref(false)
 const cms = ref({
   app_type: 'wordpress',
   domain: '',
@@ -174,6 +182,51 @@ const cmsMessageType = ref('success')
 async function loadApps() {
   const res = await api.get('/apps/runtime/list')
   apps.value = res.data.data || []
+}
+
+function normalizeDomain(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+async function loadCmsDomains() {
+  cmsDomainsLoading.value = true
+  try {
+    const collected = []
+    let page = 1
+    let totalPages = 1
+    const perPage = 200
+
+    do {
+      const res = await api.get('/vhost/list', {
+        params: {
+          page,
+          per_page: perPage,
+        },
+      })
+      const items = Array.isArray(res.data?.data) ? res.data.data : []
+      for (const item of items) {
+        const domain = normalizeDomain(item?.domain)
+        if (domain) {
+          collected.push(domain)
+        }
+      }
+      totalPages = Math.max(1, Number(res.data?.pagination?.total_pages || 1))
+      page += 1
+    } while (page <= totalPages)
+
+    const unique = [...new Set(collected)].sort((a, b) => a.localeCompare(b))
+    cmsDomains.value = unique
+
+    const selected = normalizeDomain(cms.value.domain)
+    if (!selected || !unique.includes(selected)) {
+      cms.value.domain = unique[0] || ''
+    }
+  } catch {
+    cmsDomains.value = []
+    cms.value.domain = ''
+  } finally {
+    cmsDomainsLoading.value = false
+  }
 }
 
 async function nodeInstallDeps() {
@@ -200,6 +253,11 @@ async function pythonStart() {
 }
 
 async function installCms() {
+  if (!normalizeDomain(cms.value.domain)) {
+    cmsMessageType.value = 'error'
+    cmsMessage.value = t('websites.select_domain')
+    return
+  }
   cmsInstalling.value = true
   cmsMessage.value = ''
   try {
@@ -214,5 +272,9 @@ async function installCms() {
   }
 }
 
-onMounted(loadApps)
+async function refreshRuntimeData() {
+  await Promise.allSettled([loadApps(), loadCmsDomains()])
+}
+
+onMounted(refreshRuntimeData)
 </script>

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -55,6 +56,21 @@ func securityStatusCacheTTL() time.Duration {
 		value = 30
 	}
 	return time.Duration(value) * time.Second
+}
+
+func olsSyncDebounce() time.Duration {
+	raw := strings.TrimSpace(envOr("AURAPANEL_OLS_SYNC_DEBOUNCE_MS", "120"))
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		value = 120
+	}
+	if value < 0 {
+		value = 0
+	}
+	if value > 2000 {
+		value = 2000
+	}
+	return time.Duration(value) * time.Millisecond
 }
 
 func syncStatePersistEnabled() bool {
@@ -121,6 +137,59 @@ func (s *service) startStatePersistenceWorker() {
 	}()
 }
 
+func (s *service) startOLSSyncWorker() {
+	if s.olsSyncQueue == nil {
+		return
+	}
+	debounce := s.olsSyncDebounce
+	if debounce < 0 {
+		debounce = 0
+	}
+	go func() {
+		pending := make([]olsSyncRequest, 0, 8)
+		for {
+			first := <-s.olsSyncQueue
+			latest := first
+			pending = append(pending[:0], first)
+			if debounce > 0 {
+				timer := time.NewTimer(debounce)
+			collectLoop:
+				for {
+					select {
+					case req := <-s.olsSyncQueue:
+						latest = req
+						pending = append(pending, req)
+					case <-timer.C:
+						break collectLoop
+					}
+				}
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+			}
+		drainLoop:
+			for {
+				select {
+				case req := <-s.olsSyncQueue:
+					latest = req
+					pending = append(pending, req)
+				default:
+					break drainLoop
+				}
+			}
+
+			err := syncOLSRuntimeState(latest.sites, latest.advanced, latest.aliases)
+			for _, req := range pending {
+				req.done <- err
+				close(req.done)
+			}
+		}
+	}()
+}
+
 func (s *service) startHousekeepingWorker() {
 	interval := s.housekeepingEvery
 	if interval <= 0 {
@@ -139,6 +208,7 @@ func (s *service) runHousekeeping(now time.Time) {
 	cleanupServiceLoginAttempts(now)
 
 	expiredTempUsers := []dbToolTempUser{}
+	activeTempUsers := map[string]dbToolTempUser{}
 	s.mu.Lock()
 	removedWebmailTokens := 0
 	for token, item := range s.modules.WebmailTokens {
@@ -178,12 +248,22 @@ func (s *service) runHousekeeping(now time.Time) {
 		if item.ExpiresAt.Before(now) {
 			delete(s.dbToolTempUsers, key)
 			expiredTempUsers = append(expiredTempUsers, item)
+			continue
 		}
+		activeTempUsers[key] = item
 	}
 
 	s.cleanupExpiredDBToolAccessLocked(now)
 	allowlistChanged, err := s.writeDBToolAllowlistFileLocked(now)
 	s.mu.Unlock()
+
+	orphanTempUsers, orphanErr := runtimeOrphanTemporaryDBUsers(activeTempUsers)
+	if orphanErr != nil {
+		log.Printf("housekeeping orphan temp db user scan warning: %v", orphanErr)
+	}
+	if len(orphanTempUsers) > 0 {
+		expiredTempUsers = append(expiredTempUsers, orphanTempUsers...)
+	}
 
 	for _, item := range dedupeDBToolTempUsers(expiredTempUsers) {
 		if strings.TrimSpace(item.Engine) == "" || strings.TrimSpace(item.Username) == "" {
@@ -223,6 +303,70 @@ func dedupeDBToolTempUsers(items []dbToolTempUser) []dbToolTempUser {
 		result = append(result, item)
 	}
 	return result
+}
+
+func filterRuntimeOrphanTemporaryDBUsers(discovered []dbToolTempUser, tracked map[string]dbToolTempUser) []dbToolTempUser {
+	if len(discovered) == 0 {
+		return nil
+	}
+	result := make([]dbToolTempUser, 0, len(discovered))
+	for _, item := range discovered {
+		key := dbToolTempUserKey(item.Engine, item.Username)
+		if key == "" {
+			continue
+		}
+		if tracked != nil {
+			if _, ok := tracked[key]; ok {
+				continue
+			}
+		}
+		result = append(result, item)
+	}
+	return dedupeDBToolTempUsers(result)
+}
+
+func runtimeOrphanTemporaryDBUsers(tracked map[string]dbToolTempUser) ([]dbToolTempUser, error) {
+	engines := []string{"mariadb", "postgresql"}
+	orphan := []dbToolTempUser{}
+	errs := []string{}
+	for _, engine := range engines {
+		users, err := runtimeTemporaryDBUsers(engine)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", engine, err))
+			continue
+		}
+		orphan = append(orphan, filterRuntimeOrphanTemporaryDBUsers(users, tracked)...)
+	}
+	orphan = dedupeDBToolTempUsers(orphan)
+	if len(errs) > 0 {
+		return orphan, fmt.Errorf(strings.Join(errs, "; "))
+	}
+	return orphan, nil
+}
+
+func (s *service) cleanupRuntimeTemporaryDBUsersOnStartup() {
+	orphanTempUsers, err := runtimeOrphanTemporaryDBUsers(nil)
+	if err != nil {
+		log.Printf("startup temp db user scan warning: %v", err)
+	}
+	if len(orphanTempUsers) == 0 {
+		return
+	}
+
+	removed := 0
+	for _, item := range orphanTempUsers {
+		if strings.TrimSpace(item.Engine) == "" || strings.TrimSpace(item.Username) == "" {
+			continue
+		}
+		if dropErr := dropRuntimeTemporaryDBUser(item.Engine, item.Username); dropErr != nil {
+			log.Printf("startup temp db user cleanup failed (%s/%s): %v", item.Engine, item.Username, dropErr)
+			continue
+		}
+		removed++
+	}
+	if removed > 0 {
+		log.Printf("startup temp db user cleanup removed %d stale runtime users", removed)
+	}
 }
 
 func cleanupServiceLoginAttempts(now time.Time) {

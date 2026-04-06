@@ -4,6 +4,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
+)
+
+const (
+	dockerListTimeout   = 45 * time.Second
+	dockerActionTimeout = 90 * time.Second
+	dockerPullTimeout   = 15 * time.Minute
 )
 
 func containerRuntimeCommand() (string, error) {
@@ -15,12 +22,28 @@ func containerRuntimeCommand() (string, error) {
 	return "", fmt.Errorf("docker or podman not found")
 }
 
+func containerRuntimeOutputTrimmed(timeout time.Duration, command string, args ...string) (string, error) {
+	output, err := runCommandCombinedOutputWithTimeout(timeout, command, args...)
+	trimmed := strings.TrimSpace(string(output))
+	if err != nil {
+		if trimmed != "" {
+			return "", fmt.Errorf("%s", trimmed)
+		}
+		return "", err
+	}
+	return trimmed, nil
+}
+
 func runtimeDockerContainers() ([]DockerContainer, error) {
 	command, err := containerRuntimeCommand()
 	if err != nil {
 		return nil, err
 	}
-	output, err := commandOutputTrimmed(command, "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}")
+	output, err := containerRuntimeOutputTrimmed(dockerListTimeout, command, "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}")
+	if err != nil {
+		// Older runtime templates can miss RunningFor; retry with a smaller compatible format.
+		output, err = containerRuntimeOutputTrimmed(dockerListTimeout, command, "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}")
+	}
 	if err != nil && strings.TrimSpace(err.Error()) == "" {
 		return []DockerContainer{}, nil
 	}
@@ -29,9 +52,17 @@ func runtimeDockerContainers() ([]DockerContainer, error) {
 	}
 	containers := []DockerContainer{}
 	for _, line := range strings.Split(output, "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) < 6 {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 5 {
+			continue
+		}
+		created := ""
+		if len(fields) > 5 {
+			created = fields[5]
 		}
 		containers = append(containers, DockerContainer{
 			ID:      fields[0],
@@ -39,7 +70,7 @@ func runtimeDockerContainers() ([]DockerContainer, error) {
 			Image:   fields[2],
 			Status:  fields[3],
 			Ports:   fields[4],
-			Created: fields[5],
+			Created: created,
 		})
 	}
 	return containers, nil
@@ -50,7 +81,11 @@ func runtimeDockerImages() ([]DockerImage, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, err := commandOutputTrimmed(command, "images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}")
+	output, err := containerRuntimeOutputTrimmed(dockerListTimeout, command, "images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}")
+	if err != nil {
+		// Fallback for runtimes that do not expose CreatedSince in templates.
+		output, err = containerRuntimeOutputTrimmed(dockerListTimeout, command, "images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}")
+	}
 	if err != nil && strings.TrimSpace(err.Error()) == "" {
 		return []DockerImage{}, nil
 	}
@@ -59,16 +94,24 @@ func runtimeDockerImages() ([]DockerImage, error) {
 	}
 	images := []DockerImage{}
 	for _, line := range strings.Split(output, "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) < 5 {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 4 {
+			continue
+		}
+		created := ""
+		if len(fields) > 4 {
+			created = fields[4]
 		}
 		images = append(images, DockerImage{
 			ID:         fields[0],
 			Repository: fields[1],
 			Tag:        fields[2],
 			Size:       fields[3],
-			Created:    fields[4],
+			Created:    created,
 		})
 	}
 	return images, nil
@@ -83,7 +126,7 @@ func createRuntimeDockerContainer(name, image string, ports []string, restartPol
 	if name == "" {
 		return fmt.Errorf("container name is required")
 	}
-	if _, err := commandOutputTrimmed(command, "pull", image); err != nil {
+	if _, err := containerRuntimeOutputTrimmed(dockerPullTimeout, command, "pull", image); err != nil {
 		return err
 	}
 	args := []string{"run", "-d", "--name", name}
@@ -115,7 +158,7 @@ func createRuntimeDockerContainer(name, image string, ports []string, restartPol
 		}
 	}
 	args = append(args, image)
-	_, err = commandOutputTrimmed(command, args...)
+	_, err = containerRuntimeOutputTrimmed(dockerActionTimeout, command, args...)
 	return err
 }
 
@@ -130,9 +173,9 @@ func applyRuntimeDockerContainerAction(id, action string) error {
 	}
 	switch action {
 	case "start", "stop", "restart":
-		_, err = commandOutputTrimmed(command, action, id)
+		_, err = containerRuntimeOutputTrimmed(dockerActionTimeout, command, action, id)
 	case "remove":
-		_, err = commandOutputTrimmed(command, "rm", "-f", id)
+		_, err = containerRuntimeOutputTrimmed(dockerActionTimeout, command, "rm", "-f", id)
 	default:
 		return fmt.Errorf("unsupported container action")
 	}
@@ -149,7 +192,7 @@ func pullRuntimeDockerImage(image, tag string) error {
 	if image == "" {
 		return fmt.Errorf("image is required")
 	}
-	_, err = commandOutputTrimmed(command, "pull", image+":"+tag)
+	_, err = containerRuntimeOutputTrimmed(dockerPullTimeout, command, "pull", image+":"+tag)
 	return err
 }
 
@@ -162,6 +205,6 @@ func removeRuntimeDockerImage(id string) error {
 	if id == "" {
 		return fmt.Errorf("image id is required")
 	}
-	_, err = commandOutputTrimmed(command, "rmi", "-f", id)
+	_, err = containerRuntimeOutputTrimmed(dockerActionTimeout, command, "rmi", "-f", id)
 	return err
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="relative">
+  <div v-if="hasMultipleLocales" class="relative">
     <button
       class="flex items-center gap-2 rounded-lg border border-panel-border bg-panel-card/80 px-3 py-2 text-sm text-gray-300 transition hover:border-brand-500/30 hover:text-white"
       @click="open = !open"
@@ -40,6 +40,7 @@ import { setAppLocale, supportedLocales } from '../i18n'
 const { locale, t } = useI18n({ useScope: 'global' })
 const route = useRoute()
 const open = ref(false)
+const hasMultipleLocales = computed(() => supportedLocales.length > 1)
 
 const currentLabel = computed(() => t(`locale.options.${locale.value}`))
 

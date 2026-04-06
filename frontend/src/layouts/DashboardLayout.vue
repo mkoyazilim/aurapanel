@@ -53,6 +53,12 @@
               <router-link v-if="can('/websites')" to="/websites" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('menu.websites') }}</span>
               </router-link>
+              <router-link v-if="can('/dns')" to="/dns" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>{{ t('menu.dns') }}</span>
+              </router-link>
+              <router-link v-if="can('/filemanager')" to="/filemanager" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                <span>{{ t('layout.links.file_manager') }}</span>
+              </router-link>
               <router-link v-if="can('/migration')" to="/migration" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.MigrationWizard') }}</span>
               </router-link>
@@ -80,10 +86,6 @@
 
           <transition name="accordion">
             <div v-show="webAppsMenuOpen" class="ml-4 mt-1 space-y-0.5 border-l border-panel-border/50 pl-3">
-              <router-link v-if="can('/dns')" to="/dns" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('menu.dns') }}</span>
-              </router-link>
-
               <router-link v-if="can('/cloudflare')" to="/cloudflare" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.CloudFlare') }}</span>
               </router-link>
@@ -98,9 +100,6 @@
               </router-link>
               <router-link v-if="can('/php')" to="/php" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.PHP') }}</span>
-              </router-link>
-              <router-link v-if="can('/filemanager')" to="/filemanager" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('layout.links.file_manager') }}</span>
               </router-link>
               <router-link v-if="can('/terminal')" to="/terminal" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('layout.links.terminal') }}</span>
@@ -550,6 +549,15 @@
         </div>
       </header>
 
+      <div
+        v-if="globalRequestBusy"
+        class="fixed right-6 top-20 z-[90] inline-flex items-center gap-2 rounded-xl border border-brand-500/30 bg-panel-card/95 px-3 py-2 text-sm text-brand-200 shadow-2xl backdrop-blur-md"
+      >
+        <Loader2 class="h-4 w-4 animate-spin text-brand-400" />
+        <span>{{ globalRequestMessage }}</span>
+        <span v-if="globalRequestCount > 1" class="text-xs text-brand-300/80">({{ globalRequestCount }})</span>
+      </div>
+
       <!-- Page Content -->
       <div class="flex-1 overflow-auto p-8">
         <div class="max-w-7xl mx-auto">
@@ -595,6 +603,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationStore } from '../stores/notifications'
+import { useRequestStateStore } from '../stores/requestState'
 import { canAccessPath } from '../security/rbac'
 import api from '../services/api'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
@@ -629,7 +638,8 @@ import {
   BookOpen,
   DatabaseBackup,
   RefreshCw,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Loader2
 } from 'lucide-vue-next'
 
 const { t, locale } = useI18n({ useScope: 'global' })
@@ -637,6 +647,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
+const requestStateStore = useRequestStateStore()
 const toggleMenu = ref(false)
 const hostingMenuOpen = ref(false)
 const webAppsMenuOpen = ref(false)
@@ -665,6 +676,12 @@ let releaseStatusInterval = null
 
 const notifications = computed(() => notificationStore.orderedItems.slice(0, 50))
 const unreadCount = computed(() => notificationStore.unreadCount)
+const globalRequestBusy = computed(() => requestStateStore.isBusy)
+const globalRequestCount = computed(() => requestStateStore.pendingCount)
+const globalRequestMessage = computed(() => {
+  const key = requestStateStore.currentKey || 'processing'
+  return t(`request_state.${key}`)
+})
 
 const routeTitleKeys = {
   Dashboard: 'routes.Dashboard',
@@ -732,10 +749,10 @@ const can = (path) => canAccessPath(path, authStore.role, authStore.permissions)
 const canPanelUpdateAccess = computed(() => can('/panel-update'))
 const headerUpdateAvailable = computed(() => canPanelUpdateAccess.value && !!headerUpdateStatus.value.update_available)
 const canHostingGroup = computed(() =>
-  ['/websites', '/migration', '/packages', '/users', '/reseller'].some((path) => can(path)),
+  ['/websites', '/dns', '/filemanager', '/migration', '/packages', '/users', '/reseller'].some((path) => can(path)),
 )
 const canWebAppsGroup = computed(() =>
-  ['/dns', '/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/filemanager', '/terminal'].some((path) => can(path)),
+  ['/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/terminal'].some((path) => can(path)),
 )
 const canDataAccessGroup = computed(() =>
   ['/databases', '/emails', '/minio', '/ftp', '/sftp', '/backups', '/db-backup'].some((path) => can(path)),
@@ -809,9 +826,11 @@ const isSslRoute = computed(() => route.path.startsWith('/ssl'))
 const isFtpRoute = computed(() => route.path === '/sftp' || (route.path === '/ftp' && !isFtpTuningRoute.value))
 const isBackupsRoute = computed(() => route.path === '/backups' || route.path === '/db-backup')
 const isLogsRoute = computed(() => route.path === '/activity-log' || route.path === '/log-viewer')
-const isHostingRoute = computed(() => ['/websites', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)))
+const isHostingRoute = computed(() =>
+  ['/websites', '/dns', '/filemanager', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)),
+)
 const isWebAppsRoute = computed(() =>
-  ['/dns', '/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/filemanager', '/terminal'].some(prefix => route.path.startsWith(prefix))
+  ['/cloudflare', '/wordpress', '/plugins', '/app-runtime', '/php', '/terminal'].some(prefix => route.path.startsWith(prefix))
     && !isPhpTuningRoute.value
 )
 const isDataAccessRoute = computed(() =>
@@ -997,10 +1016,11 @@ const clearNotifications = () => {
 const fetchSidebarServerIp = async () => {
   sidebarIpLoading.value = true
   try {
-    const res = await api.get('/status/metrics')
+    const silentLoadingConfig = { headers: { 'X-Aura-Silent-Loading': '1' } }
+    const res = await api.get('/status/metrics', silentLoadingConfig)
     let rawIp = String(res.data?.data?.server_ip || '').trim()
     if (!rawIp) {
-      const sec = await api.get('/security/status')
+      const sec = await api.get('/security/status', silentLoadingConfig)
       rawIp = String(sec.data?.data?.server_ip || '').trim()
     }
     sidebarServerIp.value = rawIp
@@ -1016,7 +1036,8 @@ const checkHeaderUpdateStatus = async ({ silent = false } = {}) => {
   if (!canPanelUpdateAccess.value) return
   if (!silent) releaseCheckLoading.value = true
   try {
-    const res = await api.get('/status/update')
+    const config = silent ? { headers: { 'X-Aura-Silent-Loading': '1' } } : undefined
+    const res = await api.get('/status/update', config)
     if (res.data?.status === 'success' && res.data?.data) {
       headerUpdateStatus.value = {
         ...headerUpdateStatus.value,

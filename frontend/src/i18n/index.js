@@ -1,8 +1,11 @@
 import { createI18n } from 'vue-i18n'
-import { messages, supportedLocales, rtlLocales } from './messages'
+import en from '../locales/en.json'
+import id from '../locales/id.json'
 
 const STORAGE_KEY = 'aura_locale'
-const DEFAULT_LOCALE = 'tr'
+const DEFAULT_LOCALE = 'en'
+const supportedLocales = ['en', 'id']
+const rtlLocales = []
 
 const normalizeLocale = (value) => {
   const locale = String(value || '').trim().toLowerCase()
@@ -31,7 +34,10 @@ const i18n = createI18n({
   legacy: false,
   locale: initialLocale,
   fallbackLocale: 'en',
-  messages,
+  messages: {
+    en,
+    id,
+  },
 })
 
 applyDocumentLocale(initialLocale)

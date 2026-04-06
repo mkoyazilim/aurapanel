@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strings"
 	"time"
 )
@@ -16,6 +17,19 @@ type panelUpdateJobState struct {
 	TargetVersion   string   `json:"target_version,omitempty"`
 	Steps           []string `json:"steps,omitempty"`
 	Warnings        []string `json:"warnings,omitempty"`
+}
+
+func isPanelUpdateJobEmpty(job panelUpdateJobState) bool {
+	return !job.Running &&
+		strings.TrimSpace(job.StartedAt) == "" &&
+		strings.TrimSpace(job.FinishedAt) == "" &&
+		strings.TrimSpace(job.Message) == "" &&
+		strings.TrimSpace(job.Error) == "" &&
+		strings.TrimSpace(job.PreviousVersion) == "" &&
+		strings.TrimSpace(job.CurrentVersion) == "" &&
+		strings.TrimSpace(job.TargetVersion) == "" &&
+		len(job.Steps) == 0 &&
+		len(job.Warnings) == 0
 }
 
 func clonePanelUpdateJobState(src panelUpdateJobState) panelUpdateJobState {
@@ -53,8 +67,6 @@ func (s *service) runPanelUpdateJob() {
 	finishedAt := time.Now().UTC().Format(time.RFC3339)
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	next := s.updateJob
 	next.Running = false
 	next.FinishedAt = finishedAt
@@ -78,4 +90,9 @@ func (s *service) runPanelUpdateJob() {
 	s.updateJob = next
 	// Force a fresh git-based status read on next check.
 	s.update = updateStatusCache{}
+	s.mu.Unlock()
+
+	if err := s.saveRuntimeState(); err != nil {
+		log.Printf("panel update job state persist failed: %v", err)
+	}
 }

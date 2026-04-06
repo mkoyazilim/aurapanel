@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +22,10 @@ const (
 	olsManagedListenerEnd   = "    # AURAPANEL MAPS END"
 	olsReloadWaitTimeout    = 10 * time.Second
 	olsReloadPollInterval   = 250 * time.Millisecond
+	olsConfigLockDirPath    = "/tmp/aurapanel-ols-config.lock.d"
+	olsConfigLockTimeout    = 45 * time.Second
+	olsConfigLockRetry      = 200 * time.Millisecond
+	olsConfigLockStaleAfter = 15 * time.Minute
 )
 
 var olsSleep = time.Sleep
@@ -38,6 +43,44 @@ func (s *service) syncOLSVhostsLocked() error {
 		advanced[key] = value
 	}
 	aliases := append([]DomainAlias(nil), s.state.Aliases...)
+	if s.olsSyncQueue == nil {
+		return syncOLSRuntimeState(sites, advanced, aliases)
+	}
+	req := olsSyncRequest{
+		sites:    sites,
+		advanced: advanced,
+		aliases:  aliases,
+		done:     make(chan error, 1),
+	}
+	select {
+	case s.olsSyncQueue <- req:
+		return <-req.done
+	default:
+		// If queue is saturated, fall back to direct sync to keep control-plane operations responsive.
+		return syncOLSRuntimeState(sites, advanced, aliases)
+	}
+}
+
+func (s *service) selfHealOLSManagedConfig() error {
+	if !fileExists(olsHTTPDConfigPath) || !fileExists(olsLSWSControlPath) {
+		return nil
+	}
+	current, err := os.ReadFile(olsHTTPDConfigPath)
+	if err != nil {
+		return err
+	}
+	if olsManagedMarkersHealthy(string(current)) {
+		return nil
+	}
+	log.Printf("OpenLiteSpeed managed marker drift detected; reconciling managed blocks at startup.")
+	s.mu.RLock()
+	sites := append([]Website(nil), s.state.Websites...)
+	advanced := make(map[string]WebsiteAdvancedConfig, len(s.state.AdvancedConfig))
+	for key, value := range s.state.AdvancedConfig {
+		advanced[key] = value
+	}
+	aliases := append([]DomainAlias(nil), s.state.Aliases...)
+	s.mu.RUnlock()
 	return syncOLSRuntimeState(sites, advanced, aliases)
 }
 
@@ -45,55 +88,56 @@ func syncOLSRuntimeState(sites []Website, advanced map[string]WebsiteAdvancedCon
 	if !fileExists(olsHTTPDConfigPath) || !fileExists(olsLSWSControlPath) {
 		return fmt.Errorf("openlitespeed runtime is not installed on this host")
 	}
-
-	managedSites, err := buildOLSManagedSites(sites, advanced, aliases)
-	if err != nil {
-		return err
-	}
-
-	previousHTTPD, err := os.ReadFile(olsHTTPDConfigPath)
-	if err != nil {
-		return err
-	}
-	previousVhostFiles, err := backupOLSManagedVhostFiles()
-	if err != nil {
-		return err
-	}
-
-	desiredDirs := map[string]struct{}{}
-	for _, item := range managedSites {
-		if err := ensureOLSManagedFilesystem(item); err != nil {
+	return withOLSConfigLock(func() error {
+		managedSites, err := buildOLSManagedSites(sites, advanced, aliases)
+		if err != nil {
 			return err
 		}
-		vhostDir := olsManagedVhostDir(item.Site.Domain)
-		desiredDirs[vhostDir] = struct{}{}
-		vhostConfPath := filepath.Join(vhostDir, "vhconf.conf")
-		if err := os.WriteFile(vhostConfPath, []byte(renderOLSVhostConfig(item)), 0o600); err != nil {
+
+		previousHTTPD, err := os.ReadFile(olsHTTPDConfigPath)
+		if err != nil {
 			return err
 		}
-		if err := ensureOLSManagedVhostOwnership(item.Site.Domain); err != nil {
+		previousVhostFiles, err := backupOLSManagedVhostFiles()
+		if err != nil {
 			return err
 		}
-	}
 
-	renderedHTTPD, err := renderOLSHTTPDConfig(string(previousHTTPD), managedSites)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(olsHTTPDConfigPath, []byte(renderedHTTPD), 0o640); err != nil {
-		return err
-	}
+		desiredDirs := map[string]struct{}{}
+		for _, item := range managedSites {
+			if err := ensureOLSManagedFilesystem(item); err != nil {
+				return err
+			}
+			vhostDir := olsManagedVhostDir(item.Site.Domain)
+			desiredDirs[vhostDir] = struct{}{}
+			vhostConfPath := filepath.Join(vhostDir, "vhconf.conf")
+			if err := writeOLSFileAtomically(vhostConfPath, []byte(renderOLSVhostConfig(item)), 0o600); err != nil {
+				return err
+			}
+			if err := ensureOLSManagedVhostOwnership(item.Site.Domain); err != nil {
+				return err
+			}
+		}
 
-	// Always do a gracefull reload to apply new vhost configs immediately
-	if err := reloadOpenLiteSpeed(); err != nil {
-		// Rollback if reload fails due to syntax error
-		_ = os.WriteFile(olsHTTPDConfigPath, previousHTTPD, 0o640)
-		_ = restoreOLSManagedVhostFiles(previousVhostFiles)
-		_ = reloadOpenLiteSpeed()
-		return err
-	}
+		renderedHTTPD, err := renderOLSHTTPDConfig(string(previousHTTPD), managedSites)
+		if err != nil {
+			return err
+		}
+		if err := writeOLSFileAtomically(olsHTTPDConfigPath, []byte(renderedHTTPD), 0o640); err != nil {
+			return err
+		}
 
-	return cleanupStaleOLSVhostDirs(desiredDirs)
+		// Always do a gracefull reload to apply new vhost configs immediately
+		if err := reloadOpenLiteSpeed(); err != nil {
+			// Rollback if reload fails due to syntax error
+			_ = writeOLSFileAtomically(olsHTTPDConfigPath, previousHTTPD, 0o640)
+			_ = restoreOLSManagedVhostFiles(previousVhostFiles)
+			_ = reloadOpenLiteSpeed()
+			return err
+		}
+
+		return cleanupStaleOLSVhostDirs(desiredDirs)
+	})
 }
 
 func buildOLSManagedSites(sites []Website, advanced map[string]WebsiteAdvancedConfig, aliases []DomainAlias) ([]olsManagedSite, error) {
@@ -716,6 +760,40 @@ func replaceOLSListenerMaps(current, listenerName, replacement string) (string, 
 	return current[:start] + section + current[closeBrace+1:], nil
 }
 
+func olsManagedMarkersHealthy(content string) bool {
+	if strings.Count(content, olsManagedVhostsBegin) != 1 || strings.Count(content, olsManagedVhostsEnd) != 1 {
+		return false
+	}
+	if !olsListenerManagedMarkersHealthy(content, "Default", true) {
+		return false
+	}
+	if !olsListenerManagedMarkersHealthy(content, "AuraPanelSSL", false) {
+		return false
+	}
+	return true
+}
+
+func olsListenerManagedMarkersHealthy(content, listenerName string, required bool) bool {
+	token := "listener " + listenerName + "{"
+	start := strings.Index(content, token)
+	if start < 0 {
+		return !required
+	}
+	openBrace := strings.Index(content[start:], "{")
+	if openBrace < 0 {
+		return false
+	}
+	openBrace += start
+	closeBrace, err := findMatchingBrace(content, openBrace)
+	if err != nil {
+		return false
+	}
+	section := content[start : closeBrace+1]
+	beginCount := strings.Count(section, olsManagedListenerBegin)
+	endCount := strings.Count(section, olsManagedListenerEnd)
+	return beginCount == 1 && endCount == 1
+}
+
 func findMatchingBrace(content string, openIndex int) (int, error) {
 	depth := 0
 	for idx := openIndex; idx < len(content); idx++ {
@@ -832,7 +910,7 @@ func restoreOLSManagedVhostFiles(backups map[string][]byte) error {
 		if err := os.MkdirAll(vhostDir, 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(path, content, 0o600); err != nil {
+		if err := writeOLSFileAtomically(path, content, 0o600); err != nil {
 			return err
 		}
 		if err := ensureOLSManagedVhostDirOwnership(vhostDir); err != nil {
@@ -898,43 +976,98 @@ func applyOLSTuningConfig(cfg OLSTuningConfig) error {
 	if !fileExists(olsHTTPDConfigPath) {
 		return fmt.Errorf("openlitespeed config bulunamadi")
 	}
-	previous, err := os.ReadFile(olsHTTPDConfigPath)
-	if err != nil {
-		return err
-	}
-	content, err := replaceOLSBlockDirectives(string(previous), "tuning{", map[string]string{
-		"maxConnections":    strconv.Itoa(maxInt(cfg.MaxConnections, 1)),
-		"maxSSLConnections": strconv.Itoa(maxInt(cfg.MaxSSLConnections, 1)),
-		"connTimeout":       strconv.Itoa(maxInt(cfg.ConnTimeoutSecs, 1)),
-		"keepAliveTimeout":  strconv.Itoa(maxInt(cfg.KeepAliveTimeoutSecs, 1)),
-		"maxKeepAliveReq":   strconv.Itoa(maxInt(cfg.MaxKeepAliveRequests, 1)),
-		"enableGzipCompress": map[bool]string{
-			true:  "1",
-			false: "0",
-		}[cfg.GzipCompression],
+	return withOLSConfigLock(func() error {
+		previous, err := os.ReadFile(olsHTTPDConfigPath)
+		if err != nil {
+			return err
+		}
+		content, err := replaceOLSBlockDirectives(string(previous), "tuning{", map[string]string{
+			"maxConnections":    strconv.Itoa(maxInt(cfg.MaxConnections, 1)),
+			"maxSSLConnections": strconv.Itoa(maxInt(cfg.MaxSSLConnections, 1)),
+			"connTimeout":       strconv.Itoa(maxInt(cfg.ConnTimeoutSecs, 1)),
+			"keepAliveTimeout":  strconv.Itoa(maxInt(cfg.KeepAliveTimeoutSecs, 1)),
+			"maxKeepAliveReq":   strconv.Itoa(maxInt(cfg.MaxKeepAliveRequests, 1)),
+			"enableGzipCompress": map[bool]string{
+				true:  "1",
+				false: "0",
+			}[cfg.GzipCompression],
+		})
+		if err != nil {
+			return err
+		}
+		content, err = replaceOLSBlockDirectives(content, "module cache {", map[string]string{
+			"enableCache": map[bool]string{
+				true:  "1",
+				false: "0",
+			}[cfg.StaticCacheEnabled],
+			"expireInSeconds": strconv.Itoa(maxInt(cfg.StaticCacheMaxAgeSec, 0)),
+		})
+		if err != nil {
+			return err
+		}
+		if err := writeOLSFileAtomically(olsHTTPDConfigPath, []byte(content), 0o640); err != nil {
+			return err
+		}
+		if err := reloadOpenLiteSpeed(); err != nil {
+			_ = writeOLSFileAtomically(olsHTTPDConfigPath, previous, 0o640)
+			_ = reloadOpenLiteSpeed()
+			return err
+		}
+		return nil
 	})
-	if err != nil {
+}
+
+func writeOLSFileAtomically(path string, content []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	content, err = replaceOLSBlockDirectives(content, "module cache {", map[string]string{
-		"enableCache": map[bool]string{
-			true:  "1",
-			false: "0",
-		}[cfg.StaticCacheEnabled],
-		"expireInSeconds": strconv.Itoa(maxInt(cfg.StaticCacheMaxAgeSec, 0)),
-	})
-	if err != nil {
+	tmp := fmt.Sprintf("%s.tmp.%d", path, time.Now().UTC().UnixNano())
+	if err := os.WriteFile(tmp, content, perm); err != nil {
 		return err
 	}
-	if err := os.WriteFile(olsHTTPDConfigPath, []byte(content), 0o640); err != nil {
-		return err
-	}
-	if err := reloadOpenLiteSpeed(); err != nil {
-		_ = os.WriteFile(olsHTTPDConfigPath, previous, 0o640)
-		_ = reloadOpenLiteSpeed()
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
 	return nil
+}
+
+func withOLSConfigLock(run func() error) error {
+	release, err := acquireOLSConfigLock()
+	if err != nil {
+		return err
+	}
+	defer release()
+	return run()
+}
+
+func acquireOLSConfigLock() (func(), error) {
+	deadline := time.Now().Add(olsConfigLockTimeout)
+	for {
+		if err := os.Mkdir(olsConfigLockDirPath, 0o700); err == nil {
+			ownerFile := filepath.Join(olsConfigLockDirPath, "owner")
+			_ = os.WriteFile(ownerFile, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o600)
+			return func() {
+				_ = os.Remove(ownerFile)
+				_ = os.Remove(olsConfigLockDirPath)
+			}, nil
+		} else if !os.IsExist(err) {
+			return nil, err
+		}
+
+		if info, statErr := os.Stat(olsConfigLockDirPath); statErr == nil {
+			if time.Since(info.ModTime()) > olsConfigLockStaleAfter {
+				_ = os.RemoveAll(olsConfigLockDirPath)
+				continue
+			}
+		}
+
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("timed out while waiting for OpenLiteSpeed config lock")
+		}
+		time.Sleep(olsConfigLockRetry)
+	}
 }
 
 func extractOLSConfigBlock(content, token string) (string, error) {

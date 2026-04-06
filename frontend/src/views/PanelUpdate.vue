@@ -167,11 +167,25 @@ function startPolling() {
   }, 3000)
 }
 
+function isMeaningfulJob(job) {
+  if (!job || typeof job !== 'object') {
+    return false
+  }
+  if (job.running) return true
+  if (String(job.started_at || '').trim()) return true
+  if (String(job.finished_at || '').trim()) return true
+  if (String(job.message || '').trim()) return true
+  if (String(job.error || '').trim()) return true
+  if (Array.isArray(job.steps) && job.steps.length > 0) return true
+  if (Array.isArray(job.warnings) && job.warnings.length > 0) return true
+  return false
+}
+
 function applyStatusPayload(payload) {
   const source = payload?.status && typeof payload.status === 'object'
     ? payload.status
     : payload
-  const nextJob = payload?.job && typeof payload.job === 'object'
+  const nextJob = isMeaningfulJob(payload?.job)
     ? payload.job
     : null
 
@@ -222,7 +236,10 @@ async function loadUpdateStatus(options = {}) {
   }
 
   try {
-    const params = force ? { force: 1 } : {}
+    const params = {
+      _ts: Date.now(),
+      ...(force ? { force: 1 } : {}),
+    }
     const res = await api.get('/status/update', { params })
     if (res.data?.status !== 'success') {
       throw new Error(res.data?.message || t('panel_update.messages.load_failed'))

@@ -5,6 +5,9 @@ GATEWAY_ENV_FILE="/etc/aurapanel/aurapanel.env"
 SERVICE_ENV_FILE="/etc/aurapanel/aurapanel-service.env"
 OLS_HTTPD_CONF="/usr/local/lsws/conf/httpd_config.conf"
 OLS_CTRL="/usr/local/lsws/bin/lswsctrl"
+OLS_LOCK_DIR="/tmp/aurapanel-ols-config.lock.d"
+OLS_LOCK_TIMEOUT_SEC="45"
+OLS_LOCK_STALE_SEC="900"
 NGINX_CONF="/etc/nginx/nginx.conf"
 NGINX_EDGE_HTTP_CONF="/etc/nginx/conf.d/aurapanel_edge_http.conf"
 NGINX_EDGE_STREAM_DIR="/etc/nginx/stream-conf.d"
@@ -27,6 +30,42 @@ warn() {
 fail() {
   echo "[web-stack-mode][error] $*" >&2
   exit 1
+}
+
+acquire_ols_lock() {
+  local start now elapsed lock_mtime lock_age
+  start="$(date +%s)"
+  while true; do
+    if mkdir "${OLS_LOCK_DIR}" >/dev/null 2>&1; then
+      printf '%s\n' "$$" > "${OLS_LOCK_DIR}/owner" 2>/dev/null || true
+      return 0
+    fi
+
+    if [ -d "${OLS_LOCK_DIR}" ]; then
+      lock_mtime="$(stat -c %Y "${OLS_LOCK_DIR}" 2>/dev/null || echo 0)"
+      now="$(date +%s)"
+      lock_age="$(( now - lock_mtime ))"
+      if [ "${lock_mtime}" -gt 0 ] && [ "${lock_age}" -gt "${OLS_LOCK_STALE_SEC}" ]; then
+        warn "stale OLS lock detected; removing ${OLS_LOCK_DIR}."
+        rm -rf "${OLS_LOCK_DIR}" >/dev/null 2>&1 || true
+        sleep 1
+        continue
+      fi
+    fi
+
+    now="$(date +%s)"
+    elapsed="$(( now - start ))"
+    if [ "${elapsed}" -ge "${OLS_LOCK_TIMEOUT_SEC}" ]; then
+      fail "timed out while waiting for OpenLiteSpeed config lock (${OLS_LOCK_DIR})."
+    fi
+    sleep 1
+  done
+}
+
+release_ols_lock() {
+  if [ -d "${OLS_LOCK_DIR}" ]; then
+    rm -rf "${OLS_LOCK_DIR}" >/dev/null 2>&1 || true
+  fi
 }
 
 normalize_mode() {
@@ -362,6 +401,9 @@ apply_mode() {
     fi
   }
 
+  acquire_ols_lock
+  trap 'release_ols_lock' EXIT
+
   if [ "${mode}" = "nginx-edge" ]; then
     install_nginx_if_needed
     [ -f "${NGINX_CONF}" ] || fail "nginx config not found: ${NGINX_CONF}"
@@ -391,6 +433,8 @@ apply_mode() {
   fi
 
   persist_mode_env "${mode}"
+  release_ols_lock
+  trap - EXIT
   rm -f "${ols_backup}" "${nginx_backup}" "${edge_http_backup}" "${edge_stream_backup}" >/dev/null 2>&1 || true
 }
 

@@ -5,8 +5,8 @@
         <h1 class="text-2xl font-bold text-white">{{ t('terminal.title') }}</h1>
         <p class="text-gray-400 mt-1">{{ t('terminal.subtitle') }}</p>
       </div>
-      <button class="btn-primary" @click="connectTerminal" :disabled="connected">
-        {{ connected ? t('terminal.connected') : t('terminal.connect') }}
+      <button class="btn-primary" @click="connectTerminal({ manual: true })" :disabled="connected || connecting">
+        {{ connected ? t('terminal.connected') : connecting ? t('terminal.connecting') : t('terminal.connect') }}
       </button>
     </div>
     
@@ -27,11 +27,25 @@ const authStore = useAuthStore()
 
 const terminalContainer = ref(null)
 const connected = ref(false)
+const connecting = ref(false)
 let term = null
 let fitAddon = null
 let ws = null
 let resizeHandler = null
+let resizeObserver = null
 let dataDisposable = null
+let heartbeatTimer = null
+let reconnectTimer = null
+let reconnectAttempts = 0
+let shouldReconnect = false
+let disposed = false
+let connectGeneration = 0
+
+const terminalHeartbeatFrame = '__AURA_HEARTBEAT__'
+const terminalHeartbeatIntervalMs = 20_000
+const reconnectBaseDelayMs = 1_000
+const reconnectMaxDelayMs = 10_000
+const reconnectMaxAttempts = 8
 
 function buildTerminalUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -43,62 +57,180 @@ function buildTerminalUrl() {
   return `${protocol}//${host}/api/v1/terminal/ws?token=${encodeURIComponent(authStore.token || '')}`
 }
 
-function connectTerminal() {
-  if (connected.value) return;
+function clearHeartbeat() {
+  if (heartbeatTimer) {
+    window.clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
 
-  if (!term) {
-    term = new Terminal({
-      theme: {
-        background: '#000000',
-        foreground: '#ffffff',
-      },
-      cursorBlink: true
-    });
-    fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalContainer.value);
-    fitAddon.fit();
-    dataDisposable = term.onData(data => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
-    resizeHandler = () => {
-      if (fitAddon) fitAddon.fit();
-    };
-    window.addEventListener('resize', resizeHandler);
+function startHeartbeat() {
+  clearHeartbeat()
+  heartbeatTimer = window.setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(terminalHeartbeatFrame)
+    }
+  }, terminalHeartbeatIntervalMs)
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer) {
+    window.clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+}
+
+function scheduleReconnect() {
+  if (disposed || !shouldReconnect || connected.value || connecting.value) {
+    return
+  }
+  if (reconnectAttempts >= reconnectMaxAttempts) {
+    shouldReconnect = false
+    return
+  }
+  reconnectAttempts += 1
+  const delay = Math.min(reconnectBaseDelayMs * (2 ** (reconnectAttempts - 1)), reconnectMaxDelayMs)
+  clearReconnectTimer()
+  reconnectTimer = window.setTimeout(() => {
+    connectTerminal({ manual: false })
+  }, delay)
+}
+
+function closeSocket() {
+  if (!ws) return
+  const activeSocket = ws
+  ws = null
+  activeSocket.onopen = null
+  activeSocket.onmessage = null
+  activeSocket.onclose = null
+  activeSocket.onerror = null
+  if (activeSocket.readyState === WebSocket.CONNECTING || activeSocket.readyState === WebSocket.OPEN) {
+    activeSocket.close()
+  }
+}
+
+function ensureTerminal() {
+  if (term) return
+
+  term = new Terminal({
+    theme: {
+      background: '#000000',
+      foreground: '#ffffff',
+    },
+    cursorBlink: true,
+  })
+  fitAddon = new FitAddon()
+  term.loadAddon(fitAddon)
+  term.open(terminalContainer.value)
+  fitAddon.fit()
+
+  dataDisposable = term.onData((data) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(data)
+    }
+  })
+
+  resizeHandler = () => {
+    if (fitAddon) fitAddon.fit()
+  }
+  window.addEventListener('resize', resizeHandler)
+
+  if (typeof ResizeObserver !== 'undefined' && terminalContainer.value) {
+    resizeObserver = new ResizeObserver(() => {
+      if (fitAddon) fitAddon.fit()
+    })
+    resizeObserver.observe(terminalContainer.value)
+  }
+}
+
+function connectTerminal({ manual = false } = {}) {
+  if (connected.value || connecting.value || disposed) return
+
+  ensureTerminal()
+  clearReconnectTimer()
+
+  if (manual) {
+    shouldReconnect = true
+    reconnectAttempts = 0
   }
 
-  const wsUrl = buildTerminalUrl();
-  
-  term.writeln(t('terminal.connecting'));
-  
-  ws = new WebSocket(wsUrl);
+  connecting.value = true
+  term.writeln(t('terminal.connecting'))
+  const wsUrl = buildTerminalUrl()
+  const generation = ++connectGeneration
+  const socket = new WebSocket(wsUrl)
+  ws = socket
 
-  ws.onopen = () => {
-    connected.value = true;
-    term.writeln('\r\n' + t('terminal.connected_msg') + '\r\n');
-    term.focus();
-  };
+  socket.onopen = () => {
+    if (generation !== connectGeneration || disposed) {
+      socket.close()
+      return
+    }
+    connecting.value = false
+    connected.value = true
+    reconnectAttempts = 0
+    startHeartbeat()
+    term.writeln('\r\n' + t('terminal.connected_msg') + '\r\n')
+    term.focus()
+  }
 
-  ws.onmessage = (event) => {
-    term.write(event.data);
-  };
+  socket.onmessage = (event) => {
+    if (generation !== connectGeneration || disposed || !term) return
+    if (typeof event.data === 'string') {
+      term.write(event.data)
+      return
+    }
+    if (event.data instanceof Blob) {
+      event.data.text().then((text) => {
+        if (generation === connectGeneration && !disposed && term) {
+          term.write(text)
+        }
+      }).catch(() => {})
+    }
+  }
 
-  ws.onclose = () => {
-    connected.value = false;
-    term.writeln('\r\n' + t('terminal.disconnected') + '\r\n');
-  };
+  socket.onerror = () => {
+    if (generation !== connectGeneration || disposed) return
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.close()
+    }
+  }
+
+  socket.onclose = () => {
+    if (generation !== connectGeneration) return
+    clearHeartbeat()
+    ws = null
+    if (!disposed) {
+      term?.writeln('\r\n' + t('terminal.disconnected') + '\r\n')
+    }
+    connecting.value = false
+    connected.value = false
+    scheduleReconnect()
+  }
 }
 
 onMounted(() => {
   // optionally connect on mount
-});
+})
 
 onBeforeUnmount(() => {
-  if (ws) ws.close();
-  if (dataDisposable) dataDisposable.dispose();
-  if (resizeHandler) window.removeEventListener('resize', resizeHandler);
-  if (term) term.dispose();
-});
+  disposed = true
+  shouldReconnect = false
+  clearReconnectTimer()
+  clearHeartbeat()
+  closeSocket()
+  if (dataDisposable) dataDisposable.dispose()
+  if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+  if (term) {
+    term.dispose()
+    term = null
+  }
+  fitAddon = null
+  connecting.value = false
+  connected.value = false
+})
 </script>

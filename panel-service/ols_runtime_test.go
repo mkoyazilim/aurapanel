@@ -269,3 +269,48 @@ func TestShouldOverwriteOLSHTAccess(t *testing.T) {
 		t.Fatalf("custom rewrite rules should overwrite existing .htaccess")
 	}
 }
+
+func TestOLSManagedMarkersHealthy(t *testing.T) {
+	content := `listener Default{
+    map                      Example *
+    # AURAPANEL MAPS BEGIN
+    map                      AuraPanel_demo demo.example
+    # AURAPANEL MAPS END
+}
+listener AuraPanelSSL{
+    map                      Example *
+    # AURAPANEL MAPS BEGIN
+    map                      AuraPanel_demo demo.example
+    # AURAPANEL MAPS END
+}
+# AURAPANEL VHOSTS BEGIN
+virtualHost AuraPanel_demo{
+    vhRoot                   /home/demo.example/
+}
+# AURAPANEL VHOSTS END
+module cache {
+}`
+
+	if !olsManagedMarkersHealthy(content) {
+		t.Fatalf("expected markers to be healthy")
+	}
+}
+
+func TestOLSManagedMarkersHealthyDetectsDrift(t *testing.T) {
+	content := `listener Default{
+    map                      Example *
+    # AURAPANEL MAPS BEGIN
+    map                      AuraPanel_demo demo.example
+}
+# AURAPANEL VHOSTS BEGIN
+virtualHost AuraPanel_demo{
+    vhRoot                   /home/demo.example/
+}
+# AURAPANEL VHOSTS END
+module cache {
+}`
+
+	if olsManagedMarkersHealthy(content) {
+		t.Fatalf("expected marker drift to be detected")
+	}
+}

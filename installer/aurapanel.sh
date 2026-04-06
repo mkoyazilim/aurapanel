@@ -1060,12 +1060,111 @@ configure_pureftpd() {
 }
 
 configure_htaccess_watcher() {
+  local watcher_service="/etc/systemd/system/aurapanel-htaccess-watcher.service"
+  local watcher_script="/usr/local/bin/aurapanel-htaccess-watcher.sh"
+  local fallback_script="/usr/local/bin/aurapanel-htaccess-fallback.sh"
+  local fallback_cron="/etc/cron.d/aurapanel-htaccess-fallback"
+  local state_dir="/var/lib/aurapanel"
+
+  mkdir -p "${state_dir}" /usr/local/bin
+  touch "${state_dir}/htaccess.last_reload" >/dev/null 2>&1 || true
+
+  cat <<'EOF' > "${watcher_script}"
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir="/var/lib/aurapanel"
+stamp_file="${state_dir}/htaccess.last_reload"
+cooldown="${AURAPANEL_HTACCESS_RELOAD_COOLDOWN:-3}"
+
+case "${cooldown}" in
+  ''|*[!0-9]*)
+    cooldown=3
+    ;;
+esac
+
+mkdir -p "${state_dir}"
+touch "${stamp_file}" >/dev/null 2>&1 || true
+
+last_reload=0
+inotifywait -m -r -e close_write,create,delete,move --format "%w%f" /home | while read -r changed; do
+  case "${changed}" in
+    */.htaccess)
+      now="$(date +%s)"
+      if [ $(( now - last_reload )) -lt "${cooldown}" ]; then
+        continue
+      fi
+      if /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1; then
+        last_reload="${now}"
+        touch "${stamp_file}" >/dev/null 2>&1 || true
+      fi
+      ;;
+  esac
+done
+EOF
+  chmod 750 "${watcher_script}" >/dev/null 2>&1 || true
+
+  cat <<'EOF' > "${fallback_script}"
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir="/var/lib/aurapanel"
+stamp_file="${state_dir}/htaccess.last_reload"
+mkdir -p "${state_dir}"
+touch "${stamp_file}" >/dev/null 2>&1 || true
+
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet aurapanel-htaccess-watcher 2>/dev/null; then
+  exit 0
+fi
+
+latest_raw="$(find /home -type f -name '.htaccess' -printf '%T@\n' 2>/dev/null | sort -nr | head -n1 || true)"
+if [ -z "${latest_raw}" ]; then
+  exit 0
+fi
+
+latest_epoch="${latest_raw%%.*}"
+if [ -z "${latest_epoch}" ]; then
+  latest_epoch=0
+fi
+last_epoch="$(stat -c %Y "${stamp_file}" 2>/dev/null || echo 0)"
+
+if [ "${latest_epoch}" -le "${last_epoch}" ]; then
+  exit 0
+fi
+
+if /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1; then
+  touch "${stamp_file}" >/dev/null 2>&1 || true
+fi
+EOF
+  chmod 750 "${fallback_script}" >/dev/null 2>&1 || true
+
+  cat <<EOF > "${fallback_cron}"
+*/5 * * * * root ${fallback_script} >/dev/null 2>&1
+EOF
+  chmod 644 "${fallback_cron}" >/dev/null 2>&1 || true
+
+  install_optional_packages cron cronie
+  if systemd_unit_exists "cron.service"; then
+    systemctl enable cron >/dev/null 2>&1 || true
+    systemctl restart cron >/dev/null 2>&1 || true
+  elif systemd_unit_exists "crond.service"; then
+    systemctl enable crond >/dev/null 2>&1 || true
+    systemctl restart crond >/dev/null 2>&1 || true
+  else
+    warn "cron service not found. .htaccess fallback cron may not run."
+  fi
+
   if ! command -v inotifywait >/dev/null 2>&1; then
-    warn "inotifywait is missing. .htaccess watcher bootstrap skipped."
+    warn "inotifywait is missing. realtime .htaccess watcher skipped; cron fallback enabled."
+    systemctl disable aurapanel-htaccess-watcher >/dev/null 2>&1 || true
+    systemctl stop aurapanel-htaccess-watcher >/dev/null 2>&1 || true
+    rm -f "${watcher_service}" >/dev/null 2>&1 || true
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    ok ".htaccess cron fallback enabled."
     return 0
   fi
 
-  cat <<'EOF' > /etc/systemd/system/aurapanel-htaccess-watcher.service
+  cat <<EOF > "${watcher_service}"
 [Unit]
 Description=AuraPanel .htaccess watcher for OpenLiteSpeed
 After=lshttpd.service
@@ -1073,7 +1172,7 @@ Requires=lshttpd.service
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -lc 'inotifywait -m -r -e close_write,create,delete,move --format "%%w%%f" /home | while read -r changed; do case "$changed" in */.htaccess) /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1 || true ;; esac; done'
+ExecStart=${watcher_script}
 Restart=always
 RestartSec=2
 
@@ -1084,7 +1183,7 @@ EOF
   systemctl daemon-reload >/dev/null 2>&1 || true
   systemctl enable aurapanel-htaccess-watcher >/dev/null 2>&1 || true
   systemctl restart aurapanel-htaccess-watcher >/dev/null 2>&1 || true
-  ok ".htaccess watcher enabled."
+  ok ".htaccess watcher enabled (debounced) with cron fallback."
 }
 
 configure_roundcube() {

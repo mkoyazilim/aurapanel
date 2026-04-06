@@ -168,8 +168,20 @@ func main() {
 	mainRouter.Handle("/api/v1/db/tools/pgadmin/sso/consume", publicHandler)
 	mainRouter.Handle("/api/v1/reseller/sso/consume", publicHandler)
 
+	// Reseller integration endpoints (token-authenticated).
+	// Keep these explicit so panel-authenticated reseller module routes like
+	// /api/v1/reseller/quotas and /api/v1/reseller/whitelabel continue through
+	// normal protected auth instead of reseller-token auth.
+	mainRouter.Handle("/api/v1/reseller/account/create", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/account/suspend", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/account/unsuspend", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/account/terminate", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/account/password", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/account/package", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/packages", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/sso", resellerHandler)
+
 	// Protected
-	mainRouter.Handle("/api/v1/reseller/", resellerHandler)
 	mainRouter.Handle("/api/v1/auth/me", protectedHandler)
 	mainRouter.Handle("/api/system/", protectedHandler)
 	mainRouter.Handle("/api/websites", protectedHandler)

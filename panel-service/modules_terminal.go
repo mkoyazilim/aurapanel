@@ -8,6 +8,8 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+const terminalHeartbeatFrame = "__AURA_HEARTBEAT__"
+
 func (s *service) handleTerminalWSRoute(w http.ResponseWriter, r *http.Request) {
 	websocket.Handler(func(conn *websocket.Conn) {
 		defer conn.Close()
@@ -20,6 +22,9 @@ func (s *service) handleTerminalWSRoute(w http.ResponseWriter, r *http.Request) 
 			var chunk string
 			if err := websocket.Message.Receive(conn, &chunk); err != nil {
 				return
+			}
+			if chunk == terminalHeartbeatFrame {
+				continue
 			}
 			for _, ch := range chunk {
 				switch ch {

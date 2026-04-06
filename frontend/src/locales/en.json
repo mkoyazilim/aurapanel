@@ -1,13 +1,4 @@
 {
-  "terminal": {
-    "title": "Web Terminal",
-    "subtitle": "Access your server securely via browser",
-    "connect": "Connect",
-    "connected": "Connected",
-    "connecting": "Connecting to terminal...",
-    "connected_msg": "Terminal connected successfully.",
-    "disconnected": "Terminal disconnected."
-  },
   "menu": {
     "dashboard": "Dashboard",
     "websites": "Websites",
@@ -47,7 +38,9 @@
     "password": "Password",
     "no_data": "No records found",
     "close": "Close",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "refresh": "Refresh",
+    "confirm_action": "Confirm Action"
   },
   "websites": {
     "title": "Websites",
@@ -177,12 +170,9 @@
     "title": "User Management",
     "subtitle": "Manage all clients and resellers on the system",
     "add_new": "New User",
-    "edit_user": "Edit User",
     "username": "Username",
-    "display_name": "Display Name",
     "email": "Email",
     "password": "Password",
-    "change_password": "Change Password",
     "role": "Role",
     "role_user": "User",
     "role_reseller": "Reseller",
@@ -190,10 +180,14 @@
     "package": "Package",
     "sites": "Sites",
     "login_as": "Login As",
-    "active_account": "Account is active",
     "add_success": "User created",
     "delete_success": "User deleted",
     "add_modal_title": "Create New User",
+    "confirm_delete": "Are you sure you want to delete this user?",
+    "edit_user": "Edit User",
+    "display_name": "Display Name",
+    "change_password": "Change Password",
+    "active_account": "Account is active",
     "edit_modal_title": "Edit User",
     "save_changes": "Save Changes",
     "password_modal_title": "Change User Password",
@@ -226,8 +220,7 @@
     "role_editor_delete": "Delete",
     "role_editor_empty": "No role definitions yet.",
     "role_editor_name_required": "Role name is required.",
-    "role_editor_delete_confirm": "Are you sure you want to delete role \"{name}\"?",
-    "confirm_delete": "Are you sure you want to delete this user?"
+    "role_editor_delete_confirm": "Are you sure you want to delete role \"{name}\"?"
   },
   "packages": {
     "title": "Package Management",
@@ -246,11 +239,11 @@
     "type_hosting": "Hosting Plan",
     "type_reseller": "Reseller Plan",
     "unlimited": "Unlimited",
-    "unlimited_zero_placeholder": "0=Unlimited",
     "edit": "Edit Package",
     "add_success": "Package created",
     "delete_success": "Package deleted",
-    "update_success": "Package updated"
+    "update_success": "Package updated",
+    "unlimited_zero_placeholder": "0=Unlimited"
   },
   "databases": {
     "title": "Databases",
@@ -292,25 +285,29 @@
     "add_zone_success": "DNS Zone created",
     "add_record_success": "DNS record added",
     "manage_records": "Manage Records",
-    "default_ns": "Default NS"
+    "default_ns": "Default NS",
+    "dnssec": "DNSSEC",
+    "active": "Active",
+    "passive": "Passive",
+    "disable": "Disable",
+    "enable": "Enable",
+    "reconcile": "Reconcile",
+    "domain_label": "Zone (Domain)",
+    "record_name_placeholder": "subdomain or @",
+    "wizard_base_domain": "Wizard Base Domain",
+    "wizard_fill": "Wizard",
+    "nameserver_1": "Nameserver 1",
+    "nameserver_2": "Nameserver 2",
+    "reset": "Reset",
+    "confirm_delete_zone": "Are you sure you want to delete this zone?",
+    "confirm_delete_record": "Delete this record?"
   },
-  "file_manager": {
+  "filemanager": {
     "title": "File Manager",
     "subtitle": "Manage server files",
-    "compress": "Compress",
-    "trash": "Move to Trash",
-    "upload": "Upload",
     "new_file": "New File",
     "new_folder": "New Folder",
-    "name": "Name",
-    "size": "Size",
-    "permissions": "Permissions",
-    "modified": "Modified",
-    "actions": "Actions",
-    "extract": "Extract Here",
-    "empty_dir": "Folder is empty",
-    "drag_drop": "Drag and drop files here",
-    "compress_title": "Create Archive",
+    "upload": "Upload",
     "save": "Save",
     "rename": "Rename",
     "delete": "Delete",
@@ -322,8 +319,43 @@
     "delete_success": "Deleted",
     "upload_success": "Upload complete",
     "confirm_delete": "Are you sure you want to delete this?",
-    "compress_success": "Archive created successfully.",
-    "extract_success": "Archive extracted successfully."
+    "name": "Name",
+    "size": "Size",
+    "permissions": "Permissions",
+    "modified": "Modified",
+    "actions": "Actions",
+    "compress": "Compress",
+    "trash": "Move to Trash",
+    "empty_dir": "Directory is empty",
+    "drag_drop": "Drag and drop files here or click to browse",
+    "compress_title": "Compress Files",
+    "extract": "Extract",
+    "messages": {
+      "read_error": "Read error",
+      "rename_success": "Renamed successfully",
+      "rename_error": "Rename failed",
+      "trash_success": "Moved to trash",
+      "trash_error": "Failed to move to trash",
+      "trash_confirm": "Are you sure you want to move selected items to trash?",
+      "trash_partial_error": "Failed to move some items to trash",
+      "delete_permanent_confirm": "Permanently delete?",
+      "delete_permanent_success": "Item permanently deleted",
+      "delete_permanent_error": "Permanent delete failed",
+      "delete_selected_permanent_confirm": "Permanently delete selected items? This cannot be undone.",
+      "delete_selected_permanent_success": "Selected items permanently deleted",
+      "delete_selected_permanent_error": "Permanent delete failed for one or more items",
+      "compress_success": "Archive created",
+      "compress_error": "Archiving failed",
+      "extract_success": "Archive extracted",
+      "extract_error": "Extraction failed",
+      "create_file_success": "File created",
+      "create_file_error": "Failed to create file",
+      "create_folder_success": "Folder created",
+      "create_folder_error": "Failed to create folder",
+      "perm_invalid_example": "Invalid permission format. Example: 644",
+      "perm_updated": "Permissions updated",
+      "perm_update_failed": "Permission update failed"
+    }
   },
   "php": {
     "title": "PHP Management",
@@ -340,10 +372,40 @@
     "restart": "Restart",
     "install_success": "PHP installed",
     "remove_success": "PHP removed",
-    "save_ini_success": "php.ini saved"
+    "save_ini_success": "php.ini saved",
+    "supported": "Supported",
+    "domain": "Domain",
+    "current_php": "Current PHP",
+    "change_php": "Change",
+    "site_not_found": "No websites found",
+    "read_ini": "Read",
+    "messages": {
+      "load_failed": "PHP data could not be loaded.",
+      "installed": "PHP {version} installed.",
+      "install_failed": "PHP installation failed.",
+      "removed": "PHP {version} removed.",
+      "remove_failed": "PHP removal failed.",
+      "restarted": "PHP {version} restarted.",
+      "restart_failed": "PHP restart failed.",
+      "site_updated": "PHP updated for {domain}.",
+      "site_update_failed": "Website PHP assignment failed.",
+      "ini_read_failed": "php.ini could not be read.",
+      "ini_save_failed": "php.ini could not be saved.",
+      "extension_installed": "{name} installed.",
+      "extension_removed": "{name} removed."
+    },
+    "package_manager": "Package manager",
+    "extension_name": "Extension",
+    "package": "Package",
+    "status": "Status",
+    "action": "Action",
+    "baseline": "Baseline",
+    "extension_list_failed": "Extension list could not be loaded.",
+    "remove_confirm": "Are you sure you want to remove PHP {version}?"
   },
   "server_status": {
     "title": "Server Status",
+    "subtitle": "Server metrics, services and processes",
     "cpu": "CPU Usage",
     "ram": "RAM Usage",
     "disk": "Disk Usage",
@@ -355,9 +417,22 @@
     "stop": "Stop",
     "restart": "Restart",
     "running": "Running",
+    "starting": "Starting",
+    "failed": "Failed",
     "stopped": "Stopped",
     "kill_process": "Kill",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "user": "User",
+    "command": "Command",
+    "action": "Action",
+    "load_avg": "Load: {value}",
+    "messages": {
+      "service_done": "{name} {action} completed",
+      "service_failed": "Service action failed",
+      "process_killed": "PID {pid} terminated",
+      "process_failed": "Process termination failed",
+      "updated": "Data refreshed"
+    }
   },
   "cloudflare": {
     "title": "CloudFlare",
@@ -447,7 +522,861 @@
   },
   "app_runtime": {
     "title": "App Runtime",
-    "subtitle": "Node.js, Python and CMS application management"
+    "subtitle": "Node.js, Python and CMS application management",
+    "wordpress_manager": "WordPress Manager",
+    "refresh": "Refresh",
+    "running_apps": "Running Applications",
+    "empty": "No application records found.",
+    "tabs": {
+      "nodejs": "Node.js",
+      "python": "Python"
+    },
+    "node": {
+      "dir_placeholder": "Project directory",
+      "app_name_placeholder": "App name",
+      "start_script_placeholder": "npm start",
+      "install_deps": "Install Deps",
+      "start": "Start",
+      "stop": "Stop"
+    },
+    "python": {
+      "dir_placeholder": "Project directory",
+      "app_name_placeholder": "App name",
+      "wsgi_placeholder": "app:app",
+      "port_placeholder": "8001",
+      "create_venv": "Create venv",
+      "install_requirements": "Install req",
+      "start": "Start"
+    },
+    "cms": {
+      "help_prefix": "After installation, manage plugin, theme, backup and staging operations from the",
+      "help_suffix": "screen."
+    }
+  },
+  "dashboard": {
+    "na": "N/A",
+    "trend_week": "{sign}{trend}% this week",
+    "system_load_map": "System Load Map",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "uptime": "Uptime: {value}",
+    "load_avg": "Load avg: {value}",
+    "sre_log": "Autonomous SRE Log",
+    "empty_logs": "No security or service events found yet.",
+    "service_check": "service check",
+    "security_event": "security event",
+    "runtime_snapshot": "runtime snapshot",
+    "running_services": "{count} services are running",
+    "load_failed": "Dashboard data could not be loaded.",
+    "stats": {
+      "active_websites": "Active Websites",
+      "server_uptime": "Server Uptime",
+      "databases": "Databases",
+      "threats_blocked": "Threats Blocked"
+    }
+  },
+  "log_viewer": {
+    "title": "Log Viewer",
+    "subtitle": "Site-based access and error log stream.",
+    "refresh": "Refresh",
+    "domain_placeholder": "example.com",
+    "lines_placeholder": "50",
+    "fetch": "Fetch Logs",
+    "output": "Log Output"
+  },
+  "cron_jobs": {
+    "title": "Cron Jobs",
+    "subtitle": "Manage site-based scheduled tasks.",
+    "refresh": "Refresh",
+    "create_title": "New Cron Job",
+    "user_placeholder": "user",
+    "schedule_placeholder": "*/5 * * * *",
+    "command_placeholder": "php /home/site/artisan schedule:run",
+    "add": "Add",
+    "list_title": "Cron List",
+    "delete": "Delete",
+    "empty": "No cron jobs found."
+  },
+  "minio": {
+    "title": "MinIO Storage",
+    "subtitle": "Manage S3-compatible buckets and access credentials.",
+    "refresh": "Refresh",
+    "create_bucket": "Create Bucket",
+    "bucket_placeholder": "bucket-name",
+    "create": "Create",
+    "credentials": "User Credentials",
+    "user_placeholder": "user",
+    "generate": "Generate",
+    "access_key": "Access Key",
+    "secret_key": "Secret Key",
+    "bucket_list": "Bucket List",
+    "empty": "No buckets found.",
+    "aws_title": "AWS S3 Connection",
+    "aws_subtitle": "Configure external AWS S3 bucket access in the same page.",
+    "aws_region_placeholder": "Region (e.g. eu-central-1)",
+    "aws_bucket_placeholder": "Bucket name",
+    "aws_secret_placeholder": "Secret key (leave blank to keep existing)",
+    "aws_endpoint_placeholder": "Endpoint (optional, e.g. s3.eu-central-1.amazonaws.com)",
+    "aws_use_path_style": "Use path-style requests",
+    "aws_secret_kept": "Existing secret key is kept unless you enter a new one.",
+    "aws_save": "Save AWS Config",
+    "aws_test": "Test Connection",
+    "aws_saved": "AWS S3 configuration saved.",
+    "aws_save_failed": "AWS S3 configuration could not be saved.",
+    "aws_test_ok": "AWS S3 connection successful.",
+    "aws_test_failed": "AWS S3 connection failed."
+  },
+  "federated": {
+    "title": "Federated Nodes",
+    "subtitle": "Multi-server federation over WireGuard.",
+    "refresh": "Refresh",
+    "mode_status": "Mode: {mode} / Role: {role}",
+    "add_node": "Add Node",
+    "node_name_placeholder": "node-eu-1",
+    "ip_placeholder": "10.0.0.2/32",
+    "pubkey_placeholder": "wireguard public key",
+    "passive_notice": "This node is in passive mode; adding new peers is disabled by active-passive policy.",
+    "connected_nodes": "Connected Nodes",
+    "empty": "No nodes found.",
+    "roles": {
+      "primary": "primary",
+      "passive": "passive"
+    }
+  },
+  "ols_tuning": {
+    "title": "OLS Tuning",
+    "subtitle": "Manage OpenLiteSpeed global tuning parameters.",
+    "refresh": "Refresh",
+    "save": "Save",
+    "save_apply": "Save + Apply",
+    "fields": {
+      "max_connections": "Max Connections",
+      "max_ssl_connections": "Max SSL Connections",
+      "conn_timeout_secs": "Connection Timeout (sec)",
+      "keep_alive_timeout_secs": "KeepAlive Timeout (sec)",
+      "max_keep_alive_requests": "Max KeepAlive Requests",
+      "static_cache_max_age_secs": "Static Cache Max Age (sec)"
+    },
+    "flags": {
+      "gzip_compression": "Gzip Compression",
+      "static_cache_enabled": "Static Cache"
+    },
+    "messages": {
+      "load_failed": "OLS tuning data could not be loaded.",
+      "saved": "OLS tuning settings saved.",
+      "save_failed": "OLS tuning settings could not be saved.",
+      "applied": "OLS tuning applied.",
+      "apply_failed": "OLS tuning could not be applied."
+    }
+  },
+  "panel_port": {
+    "title": "Panel Control",
+    "subtitle": "Manage panel port and reverse domain settings.",
+    "tabs": {
+      "port": "Port Settings",
+      "reverse_domain": "Reverse Domain",
+      "web_stack": "Web Stack"
+    },
+    "notice_title": "Important Notice",
+    "notice_body": "After changing the port, reconnect using the new URL. Keep firewall access enabled for the selected port.",
+    "current_config": "Current Configuration",
+    "current_port": "Current panel port",
+    "new_port": "New Port Number",
+    "port_placeholder": "8090",
+    "valid_range": "Valid range: 1 - 65535. Common ports: 8090, 8443, 7080.",
+    "open_firewall": "Try to open firewall for the new panel port automatically",
+    "changing": "Changing...",
+    "change": "Change Port",
+    "reconnect_url": "Reconnect URL",
+    "warnings": "Warnings",
+    "firewall_actions": "Firewall Actions",
+    "reverse": {
+      "title": "Single-domain reverse gateway settings.",
+      "subtitle": "Configure reverse domain mode and keep OpenLiteSpeed upstream in sync with gateway port.",
+      "enabled": "Enable single-domain reverse mode",
+      "domain": "Reverse Domain",
+      "domain_placeholder": "panel.example.com",
+      "vhost_conf_path": "OLS Vhost Config Path",
+      "vhost_conf_placeholder": "/usr/local/lsws/conf/vhosts/Example/vhconf.conf",
+      "current_upstream": "Current gateway upstream",
+      "save": "Save Reverse Domain",
+      "saving": "Saving...",
+      "warnings": "Reverse Domain Warnings",
+      "messages": {
+        "load_failed": "Reverse domain settings could not be loaded.",
+        "domain_required": "Domain is required when reverse domain mode is enabled.",
+        "invalid_domain": "Please enter a valid domain name.",
+        "update_failed": "Reverse domain settings could not be updated.",
+        "updated": "Reverse domain settings updated.",
+        "updated_synced": "Reverse domain settings updated and OLS upstream synced."
+      }
+    },
+    "web_stack": {
+      "title": "Web stack mode settings.",
+      "subtitle": "Choose between direct OpenLiteSpeed mode and optional Nginx edge proxy mode.",
+      "current_mode": "Current web stack mode",
+      "desired_mode": "Target mode",
+      "save": "Apply Web Stack",
+      "saving": "Applying...",
+      "warnings": "Web Stack Warnings",
+      "last_output": "Last apply output",
+      "script_path": "Installer script path",
+      "yes": "Yes",
+      "no": "No",
+      "status": {
+        "nginx_active": "Nginx active",
+        "openlitespeed_active": "OpenLiteSpeed active"
+      },
+      "modes": {
+        "ols_only": {
+          "label": "OpenLiteSpeed only",
+          "description": "OpenLiteSpeed serves directly on ports 80/443."
+        },
+        "nginx_edge": {
+          "label": "OpenLiteSpeed + Nginx edge",
+          "description": "Nginx fronts ports 80/443 and proxies traffic to OpenLiteSpeed backend."
+        }
+      },
+      "messages": {
+        "load_failed": "Web stack status could not be loaded.",
+        "invalid_mode": "Selected web stack mode is not valid.",
+        "update_failed": "Web stack mode could not be updated.",
+        "updated": "Web stack mode updated: {mode}.",
+        "unchanged": "Web stack mode is already active: {mode}."
+      }
+    },
+    "messages": {
+      "load_failed": "Panel port information could not be loaded.",
+      "invalid_port": "Port must be in the 1-65535 range.",
+      "update_failed": "Panel port could not be updated.",
+      "restart_scheduled": "Gateway restart scheduled.",
+      "updated": "Panel port updated to {port}.{restartNote}",
+      "network_reconnect": "Connection was interrupted. The gateway may have restarted, reconnect on the new port: {url}"
+    }
+  },
+  "panel_update": {
+    "title": "Panel Update",
+    "subtitle": "Check release status and apply updates to this server.",
+    "channel": "Release Channel",
+    "check_now": "Check Now",
+    "checking": "Checking...",
+    "update_now": "Update",
+    "updating": "Updating...",
+    "current_version": "Current Version",
+    "latest_release": "Latest Release",
+    "source": "Source",
+    "not_checked": "Not checked yet",
+    "last_checked": "Last checked",
+    "up_to_date": "This server is currently running the configured panel version.",
+    "update_available": "A newer GitHub release is available for this panel.",
+    "view_release": "View GitHub release",
+    "warnings": "Update Warnings",
+    "steps": "Update Steps",
+    "badges": {
+      "update_available": "Update Available",
+      "up_to_date": "Up to Date"
+    },
+    "messages": {
+      "load_failed": "Update status could not be loaded.",
+      "apply_failed": "Panel update could not be applied.",
+      "started": "Panel update started in background.",
+      "in_progress": "Panel update is running in background...",
+      "in_progress_hint": "Do not close this page. Build and service restart may take a few minutes.",
+      "applied": "Panel update completed."
+    }
+  },
+  "database_manager": {
+    "title": "Database Manager",
+    "subtitle": "Provision, attach and secure MariaDB or PostgreSQL databases.",
+    "create_button": "Create Database",
+    "engines": {
+      "mariadb": "MariaDB",
+      "mariadb_mysql": "MariaDB / MySQL",
+      "postgresql": "PostgreSQL"
+    },
+    "stats": {
+      "databases": "Databases",
+      "users": "Users",
+      "engine": "Engine"
+    },
+    "sections": {
+      "databases": "{engine} Databases",
+      "users": "Database Users",
+      "remote_access": "Remote Access Rules"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "attach_to_site": "Attach to Website",
+      "delete": "Delete",
+      "password": "Password",
+      "remote_ip": "Remote IP",
+      "open_phpmyadmin": "Open phpMyAdmin",
+      "open_pgadmin": "Open pgAdmin"
+    },
+    "table": {
+      "database": "Database",
+      "size": "Size",
+      "tables": "Tables",
+      "engine": "Engine",
+      "action": "Action",
+      "empty_databases": "No databases found for this engine yet.",
+      "user": "User",
+      "host": "Host",
+      "empty_users": "No database users found for this engine yet.",
+      "remote": "Remote",
+      "auth": "Auth Method",
+      "empty_rules": "No remote access rules configured yet."
+    },
+    "modal": {
+      "title": "Create Database",
+      "website": "Website",
+      "standalone": "Standalone database",
+      "website_hint": "Choose an existing site or create a new site together with the database.",
+      "create_website": "Create website with database",
+      "new_site_placeholder": "example.com",
+      "owner_placeholder": "Site owner",
+      "package_placeholder": "Hosting package",
+      "email_placeholder": "admin{'@'}example.com",
+      "mail_domain": "Create mail domain",
+      "apache_backend": "Enable Apache backend",
+      "engine": "Engine",
+      "db_name": "Database Name",
+      "db_name_placeholder": "app_db",
+      "db_user": "Database User",
+      "db_user_placeholder": "app_user",
+      "preview_title": "Resolved Naming Preview",
+      "preview_db": "Database",
+      "preview_user": "User",
+      "password": "Password",
+      "password_placeholder": "********",
+      "create": "Create",
+      "cancel": "Cancel"
+    },
+    "prompts": {
+      "new_password": "Enter a new password for {user}",
+      "remote_ip": "Enter the remote IP/CIDR for {user}",
+      "remote_db": "Which database should be opened for remote access?",
+      "remote_password": "Enter the current MariaDB password for this user"
+    },
+    "notifications": {
+      "connection_verified": " Connection verified successfully.",
+      "connection_pending": " Connection saved, verification is still pending.",
+      "connection_auto_failed": " Connection mapping was created, but automatic verification failed.",
+      "created": "Database \"{name}\" created successfully.",
+      "create_failed": "Database could not be created.",
+      "deleted": "Database \"{name}\" deleted successfully.",
+      "delete_failed": "Database could not be deleted.",
+      "password_updated": "Password rotated for \"{user}\".",
+      "password_failed": "Password could not be updated.",
+      "remote_required": "MariaDB requires the current password to enable remote access.",
+      "remote_added": "Remote access granted for \"{user}\".",
+      "remote_failed": "Remote access rule could not be created.",
+      "tool_launch_failed": "Database tool launch link could not be generated."
+    },
+    "tuning": {
+      "tab_title": "Tuning & Config",
+      "mariadb_tab": "MariaDB Tuning",
+      "postgresql_tab": "PostgreSQL Tuning",
+      "max_connections": "Max Connections",
+      "innodb_buffer_pool_size": "InnoDB Buffer Pool Size",
+      "key_buffer_size": "Key Buffer Size",
+      "max_allowed_packet": "Max Allowed Packet",
+      "shared_buffers": "Shared Buffers",
+      "work_mem": "Work Mem",
+      "maintenance_work_mem": "Maintenance Work Mem",
+      "example": "Example: {value}",
+      "save_mariadb_success": "MariaDB tuning settings were saved and the service was restarted.",
+      "save_pg_success": "PostgreSQL tuning settings were saved and the service was restarted.",
+      "mariadb_title": "MariaDB Tuning",
+      "mariadb_desc": "Optimize database performance based on your server RAM and CPU.",
+      "pg_title": "PostgreSQL Tuning",
+      "pg_desc": "Configure PostgreSQL RAM consumption and connection limits.",
+      "max_conn_desc": "Maximum simultaneous client connections.",
+      "innodb_pool_desc": "RAM allocated for caching data and indexes. (50-70% of total RAM recommended)",
+      "key_buffer_desc": "Index cache size for MyISAM tables.",
+      "max_packet_desc": "Maximum size of a single query/packet.",
+      "shared_buffers_desc": "Shared memory allocated for PostgreSQL. (25% of total RAM recommended)",
+      "work_mem_desc": "RAM allocated per operation (SORT, HASH).",
+      "maintenance_work_mem_desc": "Maximum memory for maintenance operations like VACUUM and CREATE INDEX.",
+      "saving": "Saving & Restarting...",
+      "save_mariadb": "Save & Restart MariaDB",
+      "save_pg": "Save & Restart PostgreSQL"
+    }
+  },
+  "email_manager": {
+    "title": "Email Manager",
+    "subtitle": "Manage mailboxes, forwarding, routing and DKIM from a single surface.",
+    "add_mailbox": "Add Mailbox",
+    "tabs": {
+      "mailboxes": "Mailboxes",
+      "forwards": "Forwards",
+      "routing": "Routing",
+      "dkim": "DKIM",
+      "premium": "Premium"
+    },
+    "mailbox": {
+      "count": "Total mailboxes: {count}",
+      "refresh": "Refresh",
+      "empty": "No mailboxes created yet.",
+      "quota": "Used {used} MB / {quota} MB",
+      "password": "Password",
+      "webmail_sso": "Webmail SSO",
+      "delete": "Delete",
+      "modal_title": "Create Mailbox",
+      "address_placeholder": "user{'@'}example.com",
+      "password_placeholder": "Mailbox password",
+      "quota_placeholder": "Quota in MB",
+      "cancel": "Cancel",
+      "create": "Create"
+    },
+    "forwards": {
+      "title": "Forwarding Rules",
+      "domain_placeholder": "Select domain",
+      "source_placeholder": "Source mailbox or alias",
+      "target_placeholder": "Destination address",
+      "add": "Add Forward",
+      "refresh": "Refresh",
+      "catchall_title": "Catch-all Rule",
+      "catchall_placeholder": "Catch-all destination",
+      "enabled": "Enabled",
+      "save": "Save",
+      "table": {
+        "domain": "Domain",
+        "source": "Source",
+        "target": "Target",
+        "action": "Action",
+        "empty": "No forward rules defined yet."
+      }
+    },
+    "routing": {
+      "title": "Routing Rules",
+      "pattern_placeholder": "Recipient pattern",
+      "target_placeholder": "Target transport",
+      "priority_placeholder": "Priority",
+      "add": "Add Rule",
+      "table": {
+        "domain": "Domain",
+        "pattern": "Pattern",
+        "target": "Target",
+        "priority": "Priority",
+        "action": "Action",
+        "empty": "No routing rules configured yet."
+      }
+    },
+    "dkim": {
+      "title": "DKIM",
+      "fetch": "Fetch",
+      "rotate": "Rotate",
+      "selector": "Selector",
+      "txt": "TXT Record"
+    },
+    "messages": {
+      "mailbox_list_failed": "Mailboxes could not be loaded.",
+      "mailbox_create_failed": "Mailbox could not be created.",
+      "mailbox_delete_confirm": "Delete mailbox \"{address}\"?",
+      "mailbox_delete_failed": "Mailbox could not be deleted.",
+      "mailbox_password_prompt": "Enter a new password for \"{address}\"",
+      "mailbox_password_failed": "Mailbox password could not be updated.",
+      "forwards_failed": "Forward rules could not be loaded.",
+      "forward_create_failed": "Forward rule could not be created.",
+      "forward_delete_failed": "Forward rule could not be deleted.",
+      "catchall_failed": "Catch-all rule could not be saved.",
+      "routing_failed": "Routing rules could not be loaded.",
+      "routing_create_failed": "Routing rule could not be created.",
+      "routing_delete_failed": "Routing rule could not be deleted.",
+      "dkim_failed": "DKIM record could not be loaded.",
+      "dkim_rotate_failed": "DKIM key could not be rotated.",
+      "webmail_sso_failed": "Webmail SSO link could not be generated.",
+      "auth_load_failed": "Mail auth settings could not be loaded.",
+      "auth_bootstrap_failed": "SPF/DMARC bootstrap failed.",
+      "deliverability_failed": "Deliverability status could not be loaded.",
+      "webmail_ops_failed": "Webmail ops data could not be loaded.",
+      "webmail_revoke_required": "Provide token/address or select a domain."
+    },
+    "tuning_tab": "Tuning & Config",
+    "tuning": {
+      "message_size_limit": "Message Size Limit",
+      "mailbox_size_limit": "Mailbox Size Limit",
+      "max_client_connections": "Max Client Connections",
+      "title": "Mail Server (Postfix) Tuning",
+      "desc": "Manage your mail server connection limits and size constraints.",
+      "msg_size_desc": "Maximum size of an email including attachments in bytes. (e.g., 10MB = 10485760)",
+      "mbox_size_desc": "Default size limit for virtual mailboxes if panel limit is 0.",
+      "max_conn_desc": "Maximum simultaneous connections from a single IP. (Spam protection)",
+      "saving": "Saving & Restarting...",
+      "save": "Save & Restart Postfix"
+    },
+    "tuning_example_message_size": "Example: 10485760 (10MB)",
+    "tuning_example_mailbox_size": "Example: 51200000 (50MB)",
+    "tuning_example_client_limit": "Example: 50",
+    "policy_none": "None",
+    "policy_quarantine": "Quarantine",
+    "policy_reject": "Reject",
+    "dkim_label": "DKIM",
+    "spf_dmarc_label": "SPF/DMARC",
+    "tuning_save_success": "Postfix tuning settings were saved and service restarted.",
+    "premium": {
+      "auth": {
+        "title": "SPF / DMARC Bootstrap",
+        "subtitle": "Generate ready DNS records for sender policy.",
+        "rua": "RUA (mailto:...)",
+        "ruf": "RUF (mailto:..., optional)",
+        "bootstrap": "Bootstrap Auth"
+      },
+      "deliverability": {
+        "title": "Deliverability",
+        "score": "Score",
+        "mailboxes": "Mailboxes",
+        "catch_all": "Catch-all"
+      },
+      "webmail_ops": {
+        "title": "Webmail Ops",
+        "subtitle": "Admin-level token visibility and cleanup actions.",
+        "tokens_total": "Tokens Total",
+        "tokens_active": "Tokens Active",
+        "tokens_expired": "Tokens Expired",
+        "address_placeholder": "mailbox{'@'}example.com",
+        "token_placeholder": "raw token (optional)",
+        "revoke": "Revoke",
+        "cleanup_expired": "Cleanup Expired",
+        "active": "active",
+        "expired": "expired",
+        "empty": "No webmail tokens found.",
+        "table": {
+          "token": "Token",
+          "address": "Address",
+          "expires": "Expires",
+          "status": "Status"
+        }
+      }
+    }
+  },
+  "ftp_manager": {
+    "title": "FTP Manager",
+    "subtitle": "Provision FTP users per website and control their home directories.",
+    "add_user": "Add FTP User",
+    "domain_filter": "Domain Filter",
+    "all_domains": "All domains",
+    "refresh": "Refresh",
+    "table": {
+      "username": "Username",
+      "domain": "Domain",
+      "home": "Home Directory",
+      "created": "Created",
+      "action": "Action",
+      "empty": "No FTP users found."
+    },
+    "actions": {
+      "password": "Password",
+      "delete": "Delete",
+      "primary": "Primary"
+    },
+    "modal": {
+      "create_title": "Create FTP User",
+      "domain_optional": "Domain (optional)",
+      "not_selected": "Not selected",
+      "username": "Username",
+      "username_placeholder": "siteftp",
+      "password": "Password",
+      "home_directory": "Home Directory",
+      "home_directory_placeholder": "/home/domain/public_html",
+      "cancel": "Cancel",
+      "create": "Create",
+      "reset_title": "Reset FTP Password",
+      "user_label": "User",
+      "new_password_placeholder": "New password",
+      "update": "Update Password"
+    },
+    "messages": {
+      "list_failed": "FTP users could not be loaded.",
+      "required_create": "Username, password and home directory are required.",
+      "created": "FTP user created successfully.",
+      "create_failed": "FTP user could not be created.",
+      "required_reset": "User and new password are required.",
+      "password_updated": "FTP password updated successfully.",
+      "password_failed": "FTP password could not be updated.",
+      "delete_confirm": "Delete FTP user \"{username}\"?",
+      "deleted": "FTP user deleted successfully.",
+      "delete_failed": "FTP user could not be deleted."
+    },
+    "ftp_users_tab": "FTP Users",
+    "tuning_tab": "Tuning & Config",
+    "tuning": {
+      "passive_port_range": "Passive Port Range",
+      "example_passive_port_range": "Example: 30000 30049",
+      "max_clients_number": "Max Clients Number",
+      "example_max_clients": "Example: 50",
+      "tls": "TLS",
+      "save_success": "Pure-FTPd tuning settings were saved and the service was restarted.",
+      "title": "Pure-FTPd Tuning",
+      "desc": "Configure FTP server ports and connection limits.",
+      "passive_port_desc": "Passive port range to be opened in firewall.",
+      "max_clients_desc": "Maximum simultaneous FTP clients.",
+      "tls_0": "0 - Cleartext only",
+      "tls_1": "1 - Optional TLS",
+      "tls_2": "2 - Mandatory TLS (Recommended)",
+      "tls_desc": "Encryption requirement level.",
+      "saving": "Saving & Restarting...",
+      "save": "Save & Restart Pure-FTPd"
+    }
+  },
+  "sftp_manager": {
+    "title": "SFTP Manager",
+    "subtitle": "Manage isolated SFTP accounts for secure file access.",
+    "add_user": "Add SFTP User",
+    "refresh": "Refresh",
+    "table": {
+      "username": "Username",
+      "home": "Home Directory",
+      "created": "Created",
+      "action": "Action",
+      "empty": "No SFTP users found."
+    },
+    "actions": {
+      "password": "Password",
+      "delete": "Delete"
+    },
+    "modal": {
+      "create_title": "Create SFTP User",
+      "username": "Username",
+      "username_placeholder": "siteuser",
+      "password": "Password",
+      "home_directory": "Home Directory",
+      "home_directory_placeholder": "/home/siteuser",
+      "cancel": "Cancel",
+      "create": "Create",
+      "reset_title": "Reset SFTP Password",
+      "user_label": "User",
+      "new_password_placeholder": "New password",
+      "update": "Update Password"
+    },
+    "messages": {
+      "list_failed": "SFTP users could not be loaded.",
+      "required_create": "Username, password and home directory are required.",
+      "created": "SFTP user created successfully.",
+      "create_failed": "SFTP user could not be created.",
+      "required_reset": "User and new password are required.",
+      "password_updated": "SFTP password updated successfully.",
+      "password_failed": "SFTP password could not be updated.",
+      "delete_confirm": "Delete SFTP user \"{username}\"?",
+      "deleted": "SFTP user deleted successfully.",
+      "delete_failed": "SFTP user could not be deleted."
+    }
+  },
+  "locale": {
+    "label": "Language",
+    "select": "Select language",
+    "options": {
+      "tr": "Turkce",
+      "en": "English",
+      "de": "Deutsch",
+      "es": "Espanol",
+      "fr": "Francais",
+      "id": "Bahasa Indonesia"
+    }
+  },
+  "login": {
+    "title": "Sign In to AuraPanel",
+    "subtitle": "Use the administrator account created during installation.",
+    "email_label": "Administrator email",
+    "email_placeholder": "admin{'@'}server.com",
+    "password_label": "Administrator password",
+    "password_placeholder": "Enter your password",
+    "twofa_label": "Verification code",
+    "twofa_placeholder": "123456",
+    "remember_me": "Remember this device",
+    "submit": "Sign In",
+    "submitting": "Signing in...",
+    "error_default": "We could not complete the sign-in request.",
+    "hint": "OpenLiteSpeed WebAdmin credentials are separate from AuraPanel panel credentials.",
+    "footer_tagline": "Secure Hosting Control Plane",
+    "footer_credit": "Built by Mkoyazilim"
+  },
+  "auth_messages": {
+    "welcome_title": "Welcome",
+    "welcome_message": "Signed in as {email}",
+    "login_error": "Sign in failed. Please verify your credentials.",
+    "signed_out_title": "Signed Out",
+    "signed_out_message": "Your session was closed securely."
+  },
+  "api_messages": {
+    "unknown_error": "Unknown API error",
+    "session_expired": "Session expired",
+    "session_ended_title": "Session Ended",
+    "session_ended_message": "Your session expired. Please sign in again.",
+    "network_error": "Network Error",
+    "api_error_title": "API Error - {status}"
+  },
+  "request_state": {
+    "loading": "Loading...",
+    "processing": "Processing...",
+    "saving": "Saving...",
+    "updating": "Updating...",
+    "deleting": "Deleting...",
+    "adding": "Adding...",
+    "uploading": "Uploading..."
+  },
+  "layout": {
+    "toggle_all_open": "Open All",
+    "toggle_all_close": "Close All",
+    "toggle_all_label": "Menu Groups",
+    "groups": {
+      "hosting": "Hosting",
+      "web_apps": "Web & Apps",
+      "data_access": "Data & Access",
+      "security_logs": "Security & Logs",
+      "devops": "Developer",
+      "system": "System",
+      "ftp_sftp": "FTP / SFTP",
+      "backups": "Backups",
+      "logs": "Logs",
+      "tuning": "Tuning"
+    },
+    "links": {
+      "reseller_acl": "Reseller & ACL",
+      "ssl_manage": "SSL Management",
+      "ssl_hostname": "Hostname SSL",
+      "ssl_mail": "Mail Server SSL",
+      "wordpress_manager": "WordPress Manager",
+      "app_runtime": "App Runtime",
+      "file_manager": "File Manager",
+      "terminal": "Web Terminal",
+      "file_backups": "File Backups",
+      "overview": "Overview",
+      "firewall": "Firewall",
+      "ssh_keys": "SSH Settings",
+      "activity_log": "Activity Log",
+      "log_viewer": "Log Viewer",
+      "image_manager": "Image Management",
+      "container_manager": "Container Management",
+      "create_container": "Create Container",
+      "app_store": "App Store",
+      "installed_apps": "Installed Apps",
+      "docker_packages": "Docker Packages",
+      "cron_jobs": "Cron Jobs",
+      "panel_port": "Panel Control",
+      "ml_waf": "ML-WAF",
+      "ddos": "DDoS Guard",
+      "totp": "2FA (TOTP)",
+      "hardening": "Hardening",
+      "mariadb_tuning": "MariaDB Tuning",
+      "postgresql_tuning": "PostgreSQL Tuning",
+      "ftp_tuning": "FTP Tuning",
+      "php_config": "PHP Config",
+      "plugin_sdk": "Plugin SDK"
+    },
+    "labels": {
+      "manager": "Manager",
+      "apps": "Apps"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "unread": "{count} unread",
+      "mark_all_read": "Mark all as read",
+      "clear": "Clear",
+      "empty": "No notifications yet.",
+      "new": "NEW"
+    },
+    "user_menu": {
+      "secure_logout": "Secure Logout"
+    },
+    "footer": {
+      "zero_trust": "Zero-Trust Active",
+      "server_load": "Server Load"
+    },
+    "command_palette": {
+      "placeholder": "Quick jump with Ctrl+K... (example: dns, security, logs)"
+    },
+    "update_notice": {
+      "check": "Version Check",
+      "checking": "Checking...",
+      "new_version": "New Version Available"
+    }
+  },
+  "notifications": {
+    "default_title": "Notification"
+  },
+  "routes": {
+    "Dashboard": "Dashboard",
+    "Websites": "Websites",
+    "WebsiteManage": "Website Manager",
+    "Packages": "Packages",
+    "Users": "Users",
+    "Databases": "Databases",
+    "Emails": "Emails",
+    "FTP": "FTP",
+    "SFTP": "SFTP",
+    "DNS": "DNS",
+    "SSL": "SSL",
+    "Security": "Security",
+    "AppRuntime": "App Runtime",
+    "WordPressManager": "WordPress Manager",
+    "MinIO": "MinIO",
+    "CronJobs": "Cron Jobs",
+    "LogViewer": "Log Viewer",
+    "Federated": "Federated",
+    "FileManager": "File Manager",
+    "Terminal": "Web Terminal",
+    "PHP": "PHP Management",
+    "ServerStatus": "Server Status",
+    "PanelPort": "Panel Control",
+    "Backups": "Backups",
+    "OlsTuning": "OLS Tuning",
+    "Reseller": "Reseller & ACL",
+    "ActivityLog": "Activity Log",
+    "DbBackup": "DB Backup",
+    "Docker Images": "Docker Images",
+    "Docker Containers": "Docker Containers",
+    "Docker Create": "Create Container",
+    "Docker App Store": "Docker App Store",
+    "Docker Installed Apps": "Installed Docker Apps",
+    "Docker Packages": "Docker Packages",
+    "CloudFlare": "CloudFlare",
+    "CloudLinux": "CloudLinux",
+    "MigrationWizard": "Migration Wizard",
+    "MailTuning": "Mail Tuning",
+    "OpsCenter": "Ops Center",
+    "AITools": "AI Tools"
+  },
+  "terminal": {
+    "title": "Web Terminal",
+    "subtitle": "Access your server securely via browser",
+    "connect": "Connect",
+    "connected": "Connected",
+    "connecting": "Connecting to terminal...",
+    "connected_msg": "Terminal connected successfully.",
+    "disconnected": "Terminal disconnected."
+  },
+  "file_manager": {
+    "title": "File Manager",
+    "subtitle": "Manage server files",
+    "compress": "Compress",
+    "trash": "Move to Trash",
+    "upload": "Upload",
+    "new_file": "New File",
+    "new_folder": "New Folder",
+    "name": "Name",
+    "size": "Size",
+    "permissions": "Permissions",
+    "modified": "Modified",
+    "actions": "Actions",
+    "extract": "Extract Here",
+    "empty_dir": "Folder is empty",
+    "drag_drop": "Drag and drop files here",
+    "compress_title": "Create Archive",
+    "save": "Save",
+    "rename": "Rename",
+    "delete": "Delete",
+    "download": "Download",
+    "edit": "Edit",
+    "file_name": "File Name",
+    "folder_name": "Folder Name",
+    "save_success": "File saved",
+    "delete_success": "Deleted",
+    "upload_success": "Upload complete",
+    "confirm_delete": "Are you sure you want to delete this?",
+    "compress_success": "Archive created successfully.",
+    "extract_success": "Archive extracted successfully."
   },
   "cloudlinux": {
     "title": "CloudLinux",
@@ -681,70 +1610,6 @@
     "import_queued": "Import queued.",
     "import_failed": "Import could not be started."
   },
-  "layout": {
-    "groups": {
-      "tuning": "Tuning"
-    },
-    "links": {
-      "mariadb_tuning": "MariaDB Tuning",
-      "postgresql_tuning": "PostgreSQL Tuning",
-      "ftp_tuning": "FTP Tuning",
-      "php_config": "PHP Config"
-    }
-  },
-  "database_manager": {
-    "tuning": {
-      "tab_title": "Tuning & Config",
-      "mariadb_tab": "MariaDB Tuning",
-      "postgresql_tab": "PostgreSQL Tuning",
-      "max_connections": "Max Connections",
-      "innodb_buffer_pool_size": "InnoDB Buffer Pool Size",
-      "key_buffer_size": "Key Buffer Size",
-      "max_allowed_packet": "Max Allowed Packet",
-      "shared_buffers": "Shared Buffers",
-      "work_mem": "Work Mem",
-      "maintenance_work_mem": "Maintenance Work Mem",
-      "example": "Example: {value}",
-      "save_mariadb_success": "MariaDB tuning settings were saved and the service was restarted.",
-      "save_pg_success": "PostgreSQL tuning settings were saved and the service was restarted."
-    }
-  },
-  "email_manager": {
-    "tuning_tab": "Tuning & Config",
-    "tuning": {
-      "message_size_limit": "Message Size Limit",
-      "mailbox_size_limit": "Mailbox Size Limit",
-      "max_client_connections": "Max Client Connections"
-    },
-    "tuning_example_message_size": "Example: 10485760 (10MB)",
-    "tuning_example_mailbox_size": "Example: 51200000 (50MB)",
-    "tuning_example_client_limit": "Example: 50",
-    "policy_none": "None",
-    "policy_quarantine": "Quarantine",
-    "policy_reject": "Reject",
-    "dkim_label": "DKIM",
-    "spf_dmarc_label": "SPF/DMARC",
-    "tuning_save_success": "Postfix tuning settings were saved and service restarted."
-  },
-  "ftp_manager": {
-    "ftp_users_tab": "FTP Users",
-    "tuning_tab": "Tuning & Config",
-    "tuning": {
-      "passive_port_range": "Passive Port Range",
-      "example_passive_port_range": "Example: 30000 30049",
-      "max_clients_number": "Max Clients Number",
-      "example_max_clients": "Example: 50",
-      "tls": "TLS",
-      "save_success": "Pure-FTPd tuning settings were saved and the service was restarted."
-    }
-  },
-  "filemanager": {
-    "messages": {
-      "perm_invalid_example": "Invalid permission format. Example: 644",
-      "perm_updated": "Permissions updated",
-      "perm_update_failed": "Permission update failed"
-    }
-  },
   "security_center": {
     "status_label": "Status:",
     "passive_or_unknown": "Passive / Not detected",
@@ -753,7 +1618,15 @@
     "open_ports_label": "Open ports: {ports}",
     "tabs": {
       "fail2ban": "Fail2Ban",
-      "malware": "Malware Scanner"
+      "malware": "Malware Scanner",
+      "overview": "Overview",
+      "firewall": "Firewall",
+      "waf": "ML-WAF",
+      "ddos": "DDoS",
+      "twofa": "2FA",
+      "ssh_settings": "SSH Settings",
+      "hardening": "Hardening",
+      "kernel": "Live Patching"
     },
     "cards": {
       "ebpf": "eBPF Monitoring",
@@ -788,22 +1661,61 @@
       "delete_failed": "Firewall rule could not be deleted.",
       "invalid_port": "Invalid port. Must be in range 1-65535.",
       "add_port_failed": "Firewall port rule could not be added.",
-      "delete_port_failed": "Firewall port rule could not be deleted."
+      "delete_port_failed": "Firewall port rule could not be deleted.",
+      "title": "Firewall (nftables)",
+      "ip": "IP Address",
+      "reason": "Reason",
+      "action": "Action",
+      "add_rule": "Add Rule",
+      "no_rules": "No rules found.",
+      "allow": "Allow",
+      "block": "Block",
+      "delete": "Delete"
     },
     "waf": {
       "manage_title": "ModSecurity & ML-WAF Management",
       "global_status": "Global WAF Status",
       "global_desc": "Enables or disables ModSecurity rule engine for all websites on the server.",
       "open": "WAF Enabled",
-      "close": "Disable"
+      "close": "Disable",
+      "title": "ML-WAF Test",
+      "path": "Path",
+      "query": "Query String",
+      "user_agent": "User-Agent",
+      "ip": "IP",
+      "body": "Request Body",
+      "analyze": "Analyze Request",
+      "allowed": "Allowed",
+      "score": "Score",
+      "reason": "Reason"
     },
     "fail2ban": {
       "unban_placeholder": "Example: 192.168.1.1",
-      "unban_confirm": "Are you sure you want to remove block for {ip}?"
+      "unban_confirm": "Are you sure you want to remove block for {ip}?",
+      "title": "Fail2Ban Manager",
+      "desc": "Detect and block bruteforce and unauthorized access attempts.",
+      "status_label": "Service Status",
+      "logs_title": "Fail2Ban Logs / Status Output",
+      "unban_title": "Unban IP Address",
+      "unban_btn": "Unban IP"
     },
     "ddos": {
       "load_failed": "DDoS settings could not be loaded.",
-      "save_failed": "DDoS settings could not be updated."
+      "save_failed": "DDoS settings could not be updated.",
+      "title": "DDoS Guard",
+      "desc": "Gateway-level request shaping for burst and layer-7 flood resilience.",
+      "enabled": "Protection Enabled",
+      "profile": "Profile",
+      "profile_standard": "Standard",
+      "profile_strict": "Strict",
+      "global_rps": "Global RPS",
+      "global_burst": "Global Burst",
+      "auth_rps": "Auth RPS",
+      "auth_burst": "Auth Burst",
+      "apply": "Apply DDoS Profile",
+      "compatibility": "Compatibility Analysis",
+      "recommendations": "Recommendations",
+      "note": "This control updates gateway request limits only and does not modify firewall or Fail2Ban rules."
     },
     "ssh_config": {
       "port_label": "SSH Port",
@@ -812,7 +1724,12 @@
       "root_prohibit_password": "Prohibit Password (SSH Key only)",
       "root_no": "No (Fully Disabled)",
       "load_failed": "SSH settings could not be read",
-      "save_success": "SSH settings saved successfully and service restarted."
+      "save_success": "SSH settings saved successfully and service restarted.",
+      "title": "SSH Configuration",
+      "desc": "Manage SSH port and Root login access.",
+      "port_desc": "Default is 22. Make sure you open the new port in your firewall first.",
+      "root_desc": "Disabling root login enhances security.",
+      "save": "Save & Restart SSH"
     },
     "malware": {
       "title": "Malware Scanner",
@@ -836,12 +1753,1187 @@
       "quarantine_label": "Quarantine: {path}",
       "restored": "Restored",
       "restore": "Restore"
+    },
+    "title": "Security Center",
+    "subtitle": "Manage zero-trust security features by plan and policy.",
+    "refresh": "Refresh",
+    "ssh_settings": {
+      "title": "SSH Settings",
+      "add_user": "Add SSH User",
+      "sftp_note": "SFTP users are SSH users. Create users from SFTP Manager."
+    },
+    "overview": {
+      "active": "Active",
+      "passive": "Passive",
+      "partial": "Partial"
+    },
+    "twofa": {
+      "title": "2FA (TOTP)",
+      "account_name": "Account Name",
+      "setup": "Setup 2FA",
+      "secret": "Secret",
+      "token": "Enter OTP Token",
+      "verify": "Verify",
+      "verified": "Token verified",
+      "invalid": "Token invalid",
+      "qr_alt": "2FA QR"
+    },
+    "ssh": {
+      "title": "SSH Key Manager",
+      "user": "User",
+      "title_label": "Title",
+      "public_key": "Public Key",
+      "add_key": "Add Key",
+      "list": "List Keys",
+      "delete": "Delete"
+    },
+    "hardening": {
+      "title": "One-Click Hardening",
+      "stack": "Stack",
+      "domain": "Domain",
+      "apply": "Apply Hardening",
+      "rules_for": "Applied rules for {domain}:",
+      "stacks": {
+        "wordpress": "WordPress",
+        "laravel": "Laravel",
+        "generic": "Generic"
+      }
+    },
+    "kernel": {
+      "title": "Kernel Security",
+      "immutable_status": "Immutable Status",
+      "ebpf_events": "eBPF Events",
+      "live_patch_target": "Target",
+      "live_patch": "Live Patch"
     }
   },
-  "routes": {
-    "CloudLinux": "CloudLinux",
-    "MigrationWizard": "Migration Wizard",
-    "MailTuning": "Mail Tuning",
-    "OpsCenter": "Ops Center"
+  "backup_center": {
+    "title": "Backup Center",
+    "subtitle": "Manage destinations, snapshots, restore jobs and schedules.",
+    "refresh": "Refresh",
+    "run_title": "Run Backup",
+    "restore_title": "Restore",
+    "destinations_title": "Destinations",
+    "schedules_title": "Schedules",
+    "snapshots_title": "Snapshots",
+    "select_domain": "Select domain",
+    "select_destination": "Select destination",
+    "destination_short": "Destination",
+    "backup_path_placeholder": "/var/backups/aurapanel/sites",
+    "snapshot_placeholder": "snapshot id",
+    "incremental_backup": "Full backup mode is always enabled.",
+    "incremental": "Full backup mode is always enabled.",
+    "dry_run": "Dry-run (preflight only)",
+    "run_backup": "Start Backup",
+    "load_snapshots": "Load Snapshots",
+    "restore_backup": "Start Restore",
+    "save_destination": "Save Destination",
+    "reset_destination": "Reset",
+    "save_schedule": "Save Schedule",
+    "reset_schedule": "Reset",
+    "enabled": "Enabled",
+    "empty": {
+      "destinations": "No destinations configured.",
+      "schedules": "No schedules configured.",
+      "snapshots": "No snapshots found."
+    },
+    "table": {
+      "name": "Name",
+      "repository": "Repository",
+      "state": "State",
+      "action": "Action",
+      "domain": "Domain",
+      "cron": "Cron",
+      "path": "Path",
+      "destination": "Destination",
+      "id": "ID",
+      "time": "Time",
+      "hostname": "Hostname",
+      "mode": "Mode",
+      "size": "Size",
+      "tags": "Tags"
+    },
+    "mode": {
+      "full": "Full",
+      "incremental": "Full"
+    },
+    "status": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "form": {
+      "destination_name": "Destination name",
+      "destination_repo": "Remote repository",
+      "destination_password": "Restic password",
+      "retention_keep": "Retention (keep snapshots)",
+      "cron_placeholder": "0 3 * * *"
+    },
+    "messages": {
+      "destination_required": "Destination is required.",
+      "destination_not_selected": "Destination not selected",
+      "load_failed": "Backup data could not be loaded.",
+      "destination_saved": "Destination saved: {name}",
+      "destination_save_failed": "Destination could not be saved.",
+      "destination_delete_confirm": "Delete this destination?",
+      "destination_deleted": "Destination deleted.",
+      "destination_delete_failed": "Destination could not be deleted.",
+      "schedule_saved": "Schedule saved: {cron}",
+      "schedule_save_failed": "Schedule could not be saved.",
+      "schedule_delete_confirm": "Delete this schedule?",
+      "schedule_deleted": "Schedule deleted.",
+      "schedule_delete_failed": "Schedule could not be deleted.",
+      "backup_started": "Backup started.",
+      "backup_failed": "Backup failed.",
+      "snapshots_failed": "Snapshot list could not be loaded.",
+      "restore_started": "Restore completed.",
+      "restore_failed": "Restore failed.",
+      "restore_destination_required": "Select a destination.",
+      "drill_domain_required": "Select a domain for restore drill.",
+      "drill_done": "Restore drill completed.",
+      "drill_failed": "Restore drill failed."
+    },
+    "sla": {
+      "title": "SLA & Backup Health",
+      "subtitle": "RPO compliance and restore drill freshness by domain.",
+      "total_domains": "Total Domains",
+      "coverage": "Healthy Coverage",
+      "backup_healthy": "RPO Healthy",
+      "drill_healthy": "Drill Healthy",
+      "latest_age": "Latest Age",
+      "last_drill": "Last Drill",
+      "score": "Score",
+      "status": "Status",
+      "empty": "No SLA records found."
+    },
+    "drill": {
+      "title": "Restore Drill",
+      "subtitle": "Run restore preflight drills and keep readiness history.",
+      "target_domain": "Target domain (optional)",
+      "run": "Run Drill",
+      "load_history": "Load History",
+      "empty": "No restore drill history yet."
+    }
+  },
+  "cloudflare_manager": {
+    "title": "CloudFlare Management",
+    "subtitle": "Manage DNS, SSL, cache and security settings.",
+    "connect_title": "CloudFlare API Connection",
+    "email": "Email",
+    "api_key": "API Key (Global)",
+    "connect": "Connect",
+    "connecting": "Connecting...",
+    "refresh": "Refresh",
+    "server_status": {
+      "title": "Server Authentication",
+      "ready": "Server credentials are configured. Source: {source}. Email: {email}",
+      "missing": "No server-side CloudFlare credentials are configured yet.",
+      "configured": "Configured",
+      "not_configured": "Missing",
+      "auto_sync_on": "Auto-sync on",
+      "auto_sync_off": "Auto-sync off",
+      "server_auth_active": "Server-managed CloudFlare authentication is active. You can connect without entering browser-side credentials.",
+      "save_action": "Save To Server",
+      "saving": "Saving..."
+    },
+    "tabs": {
+      "zones": "Zones",
+      "dns": "DNS Records",
+      "ssl": "SSL/TLS",
+      "cache": "Cache",
+      "security": "Security",
+      "analytics": "Analytics"
+    },
+    "scope": {
+      "select_zone": "Select Website Zone",
+      "all_actions_apply": "All DNS/SSL/Cache/Security/Analytics actions apply only to the selected zone."
+    },
+    "zones": {
+      "title": "Zone List",
+      "empty": "No zones found.",
+      "domain": "Domain",
+      "status": "Status",
+      "plan": "Plan",
+      "nameservers": "Name Servers",
+      "action": "Action",
+      "manage_dns": "Manage DNS"
+    },
+    "dns": {
+      "zone_label": "Zone",
+      "not_selected": "Not selected",
+      "add_record": "Add Record",
+      "type": "Type",
+      "name": "Name",
+      "value": "Value",
+      "ttl": "TTL",
+      "proxy": "Proxy",
+      "action": "Action",
+      "empty": "No DNS records found. Select a zone first.",
+      "auto": "Auto",
+      "proxy_on": "Proxy",
+      "proxy_off": "DNS Only",
+      "delete_confirm": "Delete this DNS record?",
+      "modal_title": "Add DNS Record",
+      "proxied": "Proxied (CF Proxy)",
+      "ttl_auto": "Auto",
+      "ttl_5m": "5 min",
+      "ttl_1h": "1 hour",
+      "ttl_1d": "1 day"
+    },
+    "ssl": {
+      "mode_title": "SSL/TLS Mode",
+      "always_https": "Always HTTPS",
+      "minify": "Minify",
+      "save": "Save",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "modes": {
+        "off": {
+          "label": "Off",
+          "desc": "No SSL, HTTP only"
+        },
+        "flexible": {
+          "label": "Flexible",
+          "desc": "HTTP between CloudFlare and origin"
+        },
+        "full": {
+          "label": "Full",
+          "desc": "HTTPS between CloudFlare and origin"
+        },
+        "strict": {
+          "label": "Full (Strict)",
+          "desc": "Requires a valid origin certificate"
+        }
+      }
+    },
+    "cache": {
+      "purge_all_title": "Purge Entire Cache",
+      "purge_all_desc": "Clear all cached resources for the selected zone.",
+      "purge_all": "Purge Everything",
+      "purge_urls_title": "Purge Specific URLs",
+      "purge_urls_placeholder": "https://example.com/css/style.css",
+      "purge_urls": "Purge Selected URLs"
+    },
+    "security": {
+      "level_title": "Security Level",
+      "attack_title": "I'm Under Attack Mode",
+      "attack_desc": "Enable when the site is actively under DDoS pressure.",
+      "attack_button": "Under Attack Mode",
+      "dev_title": "Development Mode",
+      "dev_desc": "Disables cache for 3 hours.",
+      "levels": {
+        "off": "Off",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "under_attack": "Under Attack"
+      }
+    },
+    "messages": {
+      "credentials_required": "Email and API key are required.",
+      "connected": "Connected. {count} zones found.",
+      "connect_failed": "CloudFlare connection failed.",
+      "dns_failed": "DNS records could not be loaded.",
+      "dns_added": "{type} record added.",
+      "dns_add_failed": "DNS record could not be added.",
+      "dns_deleted": "DNS record deleted.",
+      "dns_delete_failed": "DNS record could not be deleted.",
+      "ssl_updated": "SSL mode updated: {mode}",
+      "ssl_update_failed": "SSL mode could not be updated.",
+      "cache_purged": "Entire cache purged.",
+      "cache_url_required": "Add at least one URL.",
+      "cache_urls_purged": "{count} URL cache entries purged.",
+      "cache_failed": "Cache could not be purged.",
+      "security_updated": "Security level updated.",
+      "security_failed": "Security level could not be updated.",
+      "dev_mode_updated": "Development mode updated: {state}",
+      "dev_mode_failed": "Development mode could not be updated.",
+      "always_https_updated": "Always HTTPS updated: {state}",
+      "zone_required": "Select a website zone first.",
+      "analytics_loaded": "CloudFlare analytics loaded.",
+      "analytics_failed": "Analytics request failed.",
+      "server_auth_saved": "CloudFlare credentials were saved to server env and auto-sync was enabled.",
+      "server_auth_failed": "CloudFlare server credentials could not be saved."
+    },
+    "placeholders": {
+      "email": "user@example.com",
+      "api_key": "****************",
+      "dns_name": "@, www, mail",
+      "dns_value": "93.184.216.34"
+    },
+    "analytics": {
+      "loading": "Loading...",
+      "load": "Load Analytics",
+      "requests": "Requests",
+      "page_views": "Page Views",
+      "bandwidth": "Bandwidth",
+      "raw_response": "Raw Analytics Response"
+    }
+  },
+  "docker_manager_screen": {
+    "title": "Docker Manager",
+    "subtitle": "Manage your Docker containers and images.",
+    "stats": {
+      "running": "Running Containers",
+      "stopped": "Stopped Containers",
+      "images": "Total Images"
+    },
+    "tabs": {
+      "containers": "Containers",
+      "images": "Images",
+      "create": "New Container"
+    },
+    "containers": {
+      "title": "Container List",
+      "refresh": "Refresh",
+      "name": "Name",
+      "image": "Image",
+      "status": "Status",
+      "ports": "Ports",
+      "created": "Created",
+      "actions": "Actions",
+      "empty": "No containers found.",
+      "running": "Running",
+      "stopped": "Stopped",
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "remove": "Remove"
+    },
+    "images": {
+      "title": "Docker Images",
+      "repository": "Repository",
+      "tag": "Tag",
+      "id": "ID",
+      "size": "Size",
+      "created": "Created",
+      "action": "Action",
+      "pull_placeholder": "nginx:latest",
+      "pull": "Pull",
+      "empty_ports": "-"
+    },
+    "create": {
+      "title": "Create New Container",
+      "name": "Container Name",
+      "image": "Image",
+      "ports": "Port Mapping (comma separated)",
+      "env": "Environment Variables (KEY=VAL)",
+      "volumes": "Volume Mapping",
+      "restart_policy": "Restart Policy",
+      "memory": "RAM Limit",
+      "cpu": "CPU Limit",
+      "none": "None",
+      "button": "Create and Start Container"
+    },
+    "messages": {
+      "containers_failed": "Containers could not be loaded.",
+      "images_failed": "Images could not be loaded.",
+      "container_action_success": "Container action completed: {action}",
+      "container_action_failed": "Container action failed: {action}",
+      "image_pulled": "Image pulled: {name}",
+      "image_pull_failed": "Image could not be pulled.",
+      "image_remove_confirm": "Delete this image?",
+      "image_removed": "Image deleted.",
+      "image_remove_failed": "Image could not be deleted.",
+      "container_created": "Container \"{name}\" created.",
+      "container_create_failed": "Container could not be created."
+    }
+  },
+  "ops_center": {
+    "title": "Ops Center",
+    "subtitle": "SRE, GitOps, Redis isolation and health checks.",
+    "health": {
+      "title": "Health",
+      "status": "Status",
+      "version": "Version",
+      "uptime": "Uptime"
+    },
+    "prediction": {
+      "title": "SRE Prediction",
+      "analyze": "Analyze",
+      "empty": "No prediction loaded yet."
+    },
+    "query": {
+      "title": "SRE Log Query",
+      "placeholder": "e.g. 404 errors in nginx logs",
+      "run": "Run Query",
+      "answer": "Answer",
+      "confidence": "Confidence",
+      "sources": "Sources"
+    },
+    "optimizations": {
+      "title": "SRE Optimization Suggestions",
+      "generate": "Generate",
+      "empty": "No suggestions loaded yet."
+    },
+    "gitops": {
+      "title": "GitOps Deploy",
+      "domain_placeholder": "Domain (example.com)",
+      "branch_placeholder": "Branch (main)",
+      "repo_placeholder": "Repository URL",
+      "deploy_path_placeholder": "/home/user/public_html/example.com",
+      "webhook_placeholder": "Webhook secret",
+      "deploy": "Deploy"
+    },
+    "redis": {
+      "title": "Redis Isolation",
+      "desc": "Host Redis isolation provisions a dedicated systemd service per domain. Docker Redis remains a separate container runtime choice.",
+      "domain_placeholder": "Domain (example.com)",
+      "max_memory_placeholder": "Max memory (MB)",
+      "create": "Create Isolated Redis",
+      "instances_title": "Host Redis Instances",
+      "empty": "No host Redis isolations created yet."
+    },
+    "messages": {
+      "health_failed": "Health check failed.",
+      "prediction_failed": "SRE prediction failed.",
+      "query_required": "Please enter a query.",
+      "query_failed": "SRE log query failed.",
+      "optimizations_failed": "SRE optimization failed.",
+      "gitops_required": "All GitOps fields are required.",
+      "gitops_started": "GitOps deployment started.",
+      "gitops_failed": "GitOps deploy failed.",
+      "redis_domain_required": "Domain is required for Redis setup.",
+      "redis_created": "Host Redis instance created.",
+      "redis_failed": "Redis setup failed.",
+      "redis_load_failed": "Failed to load Redis isolations."
+    }
+  },
+  "website_manage": {
+    "title": "Website Manage",
+    "launcher_subtitle": "Category-based tool buttons, just like a hosting panel launcher.",
+    "launcher_items": "tools",
+    "subtitle": "Operate PHP, SSL, aliases and web server directives from a single control surface.",
+    "hero_badge": "Hosting Control Surface",
+    "hero_body": "A structured cockpit for runtime, security and traffic diagnostics.",
+    "jump_to": "Jump to",
+    "live_snapshot": "Live snapshot",
+    "quick_actions": "Quick actions",
+    "quick_action_save": "Apply website profile",
+    "quick_action_ssl": "Issue or renew certificate",
+    "quick_action_suspend": "Pause website access",
+    "quick_action_unsuspend": "Bring website online",
+    "quick_action_refresh": "Reload config and insights",
+    "back": "Back",
+    "refresh": "Refresh",
+    "status": "Status",
+    "ssl": "SSL",
+    "suspended": "Suspended",
+    "active": "Active",
+    "ssl_active": "Active",
+    "ssl_missing": "Missing",
+    "owner": "Owner",
+    "package": "Package",
+    "admin_email": "Admin Email",
+    "save": "Save",
+    "suspend": "Suspend",
+    "unsuspend": "Unsuspend",
+    "issue_ssl": "Issue SSL",
+    "ssl_launch_text": "Request or renew a standard certificate for this website.",
+    "alias_title": "Alias",
+    "alias_placeholder": "alias.example.com",
+    "add_alias": "Add",
+    "open_basedir": "OpenBasedir",
+    "enabled": "Enabled",
+    "rewrite": "Rewrite",
+    "rewrite_help": "Manage rewrite rules without digging through server files.",
+    "vhost_config": "VHost Config",
+    "vhost_help": "Advanced raw vhost overrides for this website.",
+    "custom_ssl": "Custom SSL",
+    "logs_access": "Access",
+    "logs_error": "Error",
+    "no_logs": "No logs found.",
+    "categories": {
+      "profile": "Profile",
+      "domain": "Domain",
+      "security": "Security",
+      "server": "Web Server",
+      "observability": "Insights"
+    },
+    "summary": {
+      "owner": "Owner",
+      "package": "Package",
+      "php": "PHP Runtime",
+      "aliases": "Aliases"
+    },
+    "sections": {
+      "profile_title": "Website profile",
+      "profile_body": "Core ownership, package and PHP assignment.",
+      "domain_title": "Domain network",
+      "domain_body": "Manage aliases and entry points for this website.",
+      "backup_title": "Backup",
+      "backup_body": "Create and upload backups for the currently opened website.",
+      "security_title": "Security and SSL",
+      "security_body": "Filesystem isolation and certificate controls.",
+      "server_title": "Web server directives",
+      "server_body": "Rewrite rules and raw vhost overrides.",
+      "observability_title": "Traffic and logs",
+      "observability_body": "Inspect traffic trends and recent request logs."
+    },
+    "launcher": {
+      "site_title": "Website Tools",
+      "site_body": "Frequently used website actions.",
+      "access_title": "Access Tools",
+      "access_body": "FTP, SFTP and file operations for this website.",
+      "database_title": "Database Tools",
+      "database_body": "Manage engines, users and admin panels.",
+      "mail_title": "Mail Tools",
+      "mail_body": "Mailbox operations and webmail access.",
+      "security_title": "Security Tools",
+      "security_body": "SSL and filesystem isolation controls.",
+      "server_title": "Server Tools",
+      "server_body": "Runtime and web server level actions.",
+      "profile_desc": "Owner, package and PHP settings.",
+      "alias_desc": "Add or remove alias domains.",
+      "traffic_desc": "Open traffic and visitor analytics.",
+      "logs_desc": "Inspect access and error logs.",
+      "backup_desc": "Open quick backup operations for this website.",
+      "backup_upload_desc": "Upload .zip/.tar.gz backup archive for this website.",
+      "ftp_desc": "Create, update or remove FTP accounts.",
+      "ftp_create": "Add FTP User",
+      "ftp_create_desc": "Open FTP account create form with domain preselected.",
+      "sftp_desc": "Manage SFTP users and passwords.",
+      "file_manager_desc": "Open file manager for this website.",
+      "site_root_desc": "Jump directly to site document root.",
+      "database_desc": "List databases, users and remote access rules.",
+      "database_create": "Create Database",
+      "database_create_desc": "Open create database form with domain preselected.",
+      "phpmyadmin_desc": "Open phpMyAdmin with one-click SSO.",
+      "pgadmin_desc": "Open pgAdmin with one-click SSO.",
+      "mailbox_desc": "Manage mailboxes and quotas for this domain.",
+      "mailbox_create": "Create Mailbox",
+      "mailbox_create_desc": "Open mailbox create form for this website.",
+      "webmail_sso": "Webmail SSO",
+      "webmail_sso_desc": "Login to webmail without password prompt.",
+      "mail_routing": "Mail Routing",
+      "mail_routing_desc": "Manage forward and routing rules.",
+      "ssl_desc": "Issue or renew SSL quickly.",
+      "open_basedir_desc": "Toggle PHP directory isolation.",
+      "custom_ssl_desc": "Paste custom PEM certificate files.",
+      "rewrite_desc": "Edit rewrite rules.",
+      "vhost_desc": "Open raw vhost configuration."
+    },
+    "backup": {
+      "title": "Backup",
+      "create": "Create Backup",
+      "creating": "Creating...",
+      "upload": "Upload Backup",
+      "uploading": "Uploading...",
+      "restore": "Restore",
+      "snapshots": "Snapshots",
+      "snapshots_short": "snaps",
+      "empty": "No backup snapshots found for this website.",
+      "path": "Backup Path",
+      "path_placeholder": "/var/backups/aurapanel/sites",
+      "upload_hint": "Supported: .tar.gz, .tgz, .tar, .zip"
+    },
+    "insights": {
+      "traffic": "Traffic",
+      "logs": "Logs",
+      "range": "Range",
+      "source": "Source",
+      "total_hits": "Total hits",
+      "unique_visitors": "Unique visitors",
+      "bandwidth": "Bandwidth",
+      "hourly_traffic": "Hourly traffic",
+      "top_urls": "Top URLs",
+      "no_traffic": "No traffic found for the selected range.",
+      "no_data": "No data.",
+      "loading": "Loading...",
+      "latest_12_hours": "Showing latest 12 hours",
+      "last_6_hours": "Last 6 hours",
+      "last_24_hours": "Last 24 hours",
+      "last_3_days": "Last 3 days",
+      "last_7_days": "Last 7 days"
+    },
+    "messages": {
+      "load_failed": "Website data could not be loaded.",
+      "save_failed": "Website could not be saved.",
+      "status_failed": "Website status could not be updated.",
+      "ssl_failed": "SSL operation failed.",
+      "alias_add_failed": "Alias could not be added.",
+      "alias_delete_failed": "Alias could not be deleted.",
+      "open_basedir_failed": "OpenBasedir could not be saved.",
+      "rewrite_failed": "Rewrite rules could not be saved.",
+      "vhost_failed": "VHost config could not be saved.",
+      "custom_ssl_failed": "Custom SSL could not be saved.",
+      "backup_created": "Website backup created.",
+      "backup_create_failed": "Website backup could not be created.",
+      "backup_uploaded": "Backup archive uploaded.",
+      "backup_upload_failed": "Backup archive could not be uploaded.",
+      "backup_file_required": "Please choose a backup file.",
+      "backup_restore_confirm": "Restore snapshot {id} for this website?",
+      "backup_restored": "Website backup restored.",
+      "backup_restore_failed": "Website backup could not be restored.",
+      "db_tool_failed": "Database admin tool could not be opened.",
+      "mailbox_required": "No mailbox found for this domain. Redirected to mailbox creation.",
+      "webmail_prompt": "Select mailbox address for Webmail SSO:",
+      "webmail_sso_failed": "Webmail SSO could not be created."
+    }
+  },
+  "plugin_sdk": {
+    "title": "Plugin SDK Holder",
+    "subtitle": "Manage panel plugin manifests and lifecycle toggles.",
+    "refresh": "Refresh",
+    "form": {
+      "title": "Plugin Manifest",
+      "id": "Plugin id (unique)",
+      "name": "Plugin name",
+      "version": "Version",
+      "author": "Author",
+      "entrypoint": "Entrypoint (binary/script)",
+      "description": "Description",
+      "hooks": "Hooks (comma separated)",
+      "permissions": "Permissions (comma separated)",
+      "config_schema": "Config schema JSON (optional)",
+      "enabled": "Enabled",
+      "save": "Save Plugin",
+      "reset": "Reset"
+    },
+    "sdk_info": {
+      "title": "SDK Contract",
+      "version": "Manifest Version",
+      "required_fields": "Required Fields",
+      "supported_hooks": "Supported Hooks"
+    },
+    "list": {
+      "title": "Registered Plugins",
+      "name": "Plugin",
+      "entrypoint": "Entrypoint",
+      "hooks": "Hooks",
+      "status": "Status",
+      "action": "Action",
+      "enable": "Enable",
+      "disable": "Disable",
+      "empty": "No plugins registered."
+    },
+    "messages": {
+      "load_failed": "Plugin data could not be loaded.",
+      "saved": "Plugin saved.",
+      "save_failed": "Plugin could not be saved.",
+      "toggled": "Plugin state updated.",
+      "toggle_failed": "Plugin state could not be changed.",
+      "delete_confirm": "Delete plugin \"{name}\"?",
+      "deleted": "Plugin deleted.",
+      "delete_failed": "Plugin could not be deleted."
+    }
+  },
+  "wordpress_manager": {
+    "title": "WordPress Manager",
+    "subtitle": "Scan installed WordPress sites, manage plugins and themes, create backups and staging environments.",
+    "cms_installation": "CMS Install",
+    "refresh": "Refresh",
+    "scan": "Scan",
+    "sites_title": "WordPress Sites",
+    "records_found": "{count} records found",
+    "toolkit": "WP Toolkit",
+    "loading_sites": "Loading sites...",
+    "empty_title": "No WordPress installation found",
+    "empty_body": "You can install WordPress from CMS Install or scan the host filesystem again.",
+    "go_install": "Go to Install",
+    "rescan": "Scan Again",
+    "select_site": "Select a WordPress site",
+    "select_site_body": "Plugin, theme, backup and staging tools load automatically after a site is selected.",
+    "stats": {
+      "owner": "Owner",
+      "plugins": "Plugins",
+      "theme": "Theme",
+      "database": "Database",
+      "site_url": "Site URL",
+      "admin_email": "Admin Email",
+      "docroot": "Docroot",
+      "not_found": "No record found",
+      "status": "Status",
+      "db_name": "Database",
+      "db_user": "DB User",
+      "db_host": "DB Host"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "plugins": "Plugins",
+      "themes": "Themes",
+      "backups": "Backups",
+      "staging": "Staging"
+    },
+    "overview": {
+      "summary": "Site Summary",
+      "next_steps": "Next Steps",
+      "step_plugins": "Test plugin and theme changes in staging before promoting them to production.",
+      "step_backups": "Take a backup before destructive actions. The backups tab already scopes to this site.",
+      "step_install": "Use CMS Install inside App Runtime when you need a fresh WordPress deployment."
+    },
+    "plugins": {
+      "title": "Plugins",
+      "count": "{count} records",
+      "refresh": "Refresh",
+      "update_all": "Update All",
+      "update_selected": "Update Selected",
+      "delete_selected": "Delete Selected",
+      "loading": "Loading plugin list...",
+      "empty": "No plugin records found.",
+      "name": "Plugin",
+      "version": "Version",
+      "status": "Status",
+      "update": "Update",
+      "delete_confirm": "Delete selected plugins?"
+    },
+    "themes": {
+      "title": "Themes",
+      "count": "{count} records",
+      "refresh": "Refresh",
+      "update_all": "Update All",
+      "update_selected": "Update Selected",
+      "delete_selected": "Delete Selected",
+      "loading": "Loading theme list...",
+      "empty": "No theme records found.",
+      "name": "Theme",
+      "version": "Version",
+      "status": "Status",
+      "update": "Update",
+      "delete_confirm": "Delete selected themes?"
+    },
+    "backups": {
+      "title": "Backup",
+      "subtitle": "Backup operations scoped to this WordPress site.",
+      "full": "Full Backup",
+      "files": "Files Only",
+      "database": "Database Only",
+      "refresh": "Refresh",
+      "create": "Create Backup",
+      "file": "File",
+      "type": "Type",
+      "size": "Size",
+      "date": "Date",
+      "action": "Action",
+      "download": "Download",
+      "restore": "Restore",
+      "empty": "No backup found for this site.",
+      "restore_confirm": "Restore {name}?"
+    },
+    "staging": {
+      "title": "Staging",
+      "subtitle": "Clone the source site into a staging domain.",
+      "placeholder": "staging.example.com",
+      "refresh": "Refresh",
+      "create": "Create Staging",
+      "source": "Source",
+      "target": "Staging",
+      "owner": "Owner",
+      "date": "Date",
+      "status": "Status",
+      "empty": "No staging record found for this site.",
+      "required": "Staging domain is required."
+    },
+    "notices": {
+      "sites_failed": "WordPress sites could not be loaded.",
+      "scan_success": "WordPress scan completed.",
+      "scan_failed": "WordPress scan failed.",
+      "plugins_updated": "Plugins updated.",
+      "plugins_update_failed": "Plugin update failed.",
+      "plugins_deleted": "Selected plugins deleted.",
+      "plugins_delete_failed": "Plugin delete failed.",
+      "themes_updated": "Themes updated.",
+      "themes_update_failed": "Theme update failed.",
+      "themes_deleted": "Selected themes deleted.",
+      "themes_delete_failed": "Theme delete failed.",
+      "backup_created": "WordPress backup created.",
+      "backup_failed": "WordPress backup failed.",
+      "backup_restore_success": "WordPress backup restored.",
+      "backup_restore_failed": "WordPress restore failed.",
+      "backup_download_failed": "WordPress backup could not be downloaded.",
+      "staging_created": "Staging environment created.",
+      "staging_failed": "Staging creation failed."
+    }
+  },
+  "docker_apps_screen": {
+    "title": "Docker Apps",
+    "subtitle": "Install Docker applications from ready-made templates.",
+    "tabs": {
+      "templates": "App Templates",
+      "installed": "Installed Apps",
+      "packages": "Docker Packages"
+    },
+    "refresh": "Refresh",
+    "templates": {
+      "install": "Install",
+      "empty": "No templates found.",
+      "default_icon": "App"
+    },
+    "installed": {
+      "title": "Installed Docker Applications",
+      "app": "Application",
+      "image": "Image",
+      "status": "Status",
+      "ports": "Ports",
+      "package": "Assigned Package",
+      "action": "Action",
+      "empty": "No installed applications found.",
+      "unlimited": "Unlimited",
+      "running": "Running",
+      "stopped": "Stopped",
+      "remove": "Remove"
+    },
+    "packages": {
+      "empty": "No Docker packages found. Add a package first to manage limits.",
+      "memory": "Memory Limit",
+      "cpu": "CPU Limit",
+      "max_containers": "Max Containers",
+      "unlimited": "Unlimited"
+    },
+    "modal": {
+      "title_suffix": "Install",
+      "app_name": "Application Name",
+      "package": "Resource Package (Limits)",
+      "extra_env": "Extra Environment Variables",
+      "extra_env_hint": "Comma separated. Values extend or override the template defaults.",
+      "cancel": "Cancel",
+      "install": "Install and Start",
+      "installing": "Installing...",
+      "unlimited": "Unlimited"
+    },
+    "messages": {
+      "templates_failed": "Templates could not be loaded.",
+      "install_success": "{name} installed successfully.",
+      "install_failed": "Installation failed.",
+      "remove_confirm": "Remove \"{name}\" completely? This action cannot be undone.",
+      "remove_success": "Application removed: {name}",
+      "remove_failed": "Application could not be removed."
+    }
+  },
+  "reseller_acl": {
+    "title": "Reseller and ACL Center",
+    "subtitle": "Manage reseller quotas, white-label settings and ACL policies.",
+    "refresh": "Refresh",
+    "tabs": {
+      "quotas": "Quotas",
+      "whitelabel": "White Label",
+      "policies": "ACL Policies",
+      "assignments": "ACL Assignments"
+    },
+    "quotas": {
+      "title": "Reseller Quota",
+      "user": "User",
+      "plan": "Plan",
+      "disk": "Disk GB",
+      "bandwidth": "Bandwidth GB",
+      "max_sites": "Max Sites",
+      "save": "Save",
+      "action": "Action",
+      "empty": "No quota record found."
+    },
+    "whitelabel": {
+      "title": "White Label",
+      "user": "User",
+      "panel_name": "Panel Name",
+      "logo_url": "Logo URL",
+      "save": "Save",
+      "action": "Action",
+      "empty": "No white-label record found."
+    },
+    "policies": {
+      "title": "ACL Policies",
+      "name": "Policy Name",
+      "description": "Description",
+      "permissions": "Permissions (comma separated)",
+      "save": "Save",
+      "reset": "Reset",
+      "empty": "No policy found.",
+      "action": "Action"
+    },
+    "assignments": {
+      "title": "ACL Assignments",
+      "user": "User",
+      "policy": "Policy",
+      "effective_permissions": "Effective Permissions",
+      "assign": "Assign",
+      "empty": "No assignment found.",
+      "action": "Action"
+    },
+    "messages": {
+      "load_failed": "Reseller and ACL data could not be loaded.",
+      "quota_saved": "Quota saved.",
+      "quota_save_failed": "Quota could not be saved.",
+      "whitelabel_saved": "White-label settings saved.",
+      "whitelabel_failed": "White-label settings could not be saved.",
+      "policy_saved": "ACL policy saved.",
+      "policy_save_failed": "ACL policy could not be saved.",
+      "policy_delete_confirm": "Delete this policy?",
+      "policy_deleted": "ACL policy deleted.",
+      "policy_delete_failed": "ACL policy could not be deleted.",
+      "assignment_saved": "ACL assignment saved.",
+      "assignment_save_failed": "ACL assignment could not be saved.",
+      "assignment_delete_confirm": "Delete this assignment?",
+      "assignment_deleted": "ACL assignment deleted.",
+      "assignment_delete_failed": "ACL assignment could not be deleted."
+    }
+  },
+  "ssl_manager": {
+    "title": "SSL Manager",
+    "subtitle": "Manage website SSL, hostname SSL and mail server SSL flows.",
+    "refresh": "Refresh",
+    "binding_status": "Current Binding Status",
+    "hostname_ssl": "Hostname SSL",
+    "mail_ssl": "Mail SSL",
+    "last_updated": "Last updated: {value}",
+    "tabs": {
+      "manage": "Manage SSL",
+      "hostname": "Hostname SSL",
+      "mail": "Mail Server SSL",
+      "wildcard": "Wildcard SSL"
+    },
+    "manage": {
+      "website_domain": "Website Domain",
+      "admin_email": "Admin Email",
+      "webroot": "Webroot (optional)",
+      "load_details": "Load SSL Details",
+      "loading_details": "Checking...",
+      "issue": "Issue SSL",
+      "issuing": "Issuing SSL..."
+    },
+    "hostname": {
+      "notice": "Issues the hostname certificate. Applying it to the panel TLS listener is a separate step.",
+      "hostname": "Hostname",
+      "email": "Email",
+      "webroot": "Webroot (optional)",
+      "issue": "Issue Hostname SSL",
+      "issuing": "Issuing Hostname SSL..."
+    },
+    "mail": {
+      "notice": "Issues the mail server certificate and applies it to Postfix and Dovecot automatically.",
+      "hostname": "Mail Hostname",
+      "email": "Email",
+      "webroot": "Webroot (optional)",
+      "issue": "Issue Mail SSL",
+      "issuing": "Issuing Mail SSL..."
+    },
+    "wildcard": {
+      "notice": "Wildcard certificates require DNS challenge support. Make sure a DNS API integration is ready.",
+      "domain": "Domain",
+      "email": "Email",
+      "webroot": "Webroot (optional)",
+      "issue": "Issue Wildcard SSL",
+      "issuing": "Issuing Wildcard SSL..."
+    },
+    "details": {
+      "status": "Status",
+      "issuer": "Issuer",
+      "expiry": "Expiry",
+      "days_remaining": "Days Remaining"
+    },
+    "placeholders": {
+      "select_domain": "Select domain",
+      "hostname": "panel.example.com",
+      "mail_hostname": "mail.example.com",
+      "domain": "example.com",
+      "email": "admin{'@'}example.com",
+      "webroot": "Auto-detect (optional)"
+    },
+    "messages": {
+      "details_failed": "SSL details could not be loaded.",
+      "no_domains": "No website domain found yet. Create a website first, then issue SSL.",
+      "manage_success": "Website SSL issued.",
+      "manage_failed": "Website SSL could not be issued.",
+      "hostname_success": "Hostname SSL issued.",
+      "hostname_failed": "Hostname SSL could not be issued.",
+      "mail_success": "Mail SSL issued.",
+      "mail_failed": "Mail SSL could not be issued.",
+      "wildcard_success": "Wildcard SSL issued.",
+      "wildcard_failed": "Wildcard SSL could not be issued."
+    }
+  },
+  "ai_tools": {
+    "title": "AI Tools Orchestrator",
+    "subtitle": "DeepSeek/Gemini planner with secure tool layer (scan, service, malware, shell).",
+    "actions": {
+      "loading": "Loading...",
+      "refresh": "Refresh",
+      "saving": "Saving...",
+      "save_provider": "Save Provider",
+      "save_policy": "Save Policy",
+      "planning": "Generating plan...",
+      "generate_plan": "Generate Plan",
+      "running": "Running...",
+      "execute_plan_all": "Run Entire Plan",
+      "execute_step": "Run Step",
+      "run_shell": "Run Shell"
+    },
+    "overview": {
+      "active_provider": "Active Provider",
+      "policy_status": "Policy Status",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "execution_history": "Execution History"
+    },
+    "provider": {
+      "title": "Provider Config",
+      "active_provider": "Active Provider",
+      "deepseek": "DeepSeek",
+      "gemini": "Gemini",
+      "enabled": "Enabled",
+      "model_placeholder": "Model",
+      "base_url_placeholder": "Base URL",
+      "new_api_key_placeholder": "New API Key (optional)",
+      "clear_key": "Clear key",
+      "stored_key": "Stored"
+    },
+    "policy": {
+      "title": "Policy",
+      "ai_enabled": "AI Enabled",
+      "allow_shell": "Allow Shell",
+      "allow_privileged_shell": "Allow Privileged Shell",
+      "allow_service_control": "Allow Service Control",
+      "allow_malware_scan": "Allow Malware Scan",
+      "require_confirm_token": "Require Confirm Token",
+      "confirm_token_placeholder": "Confirm Token",
+      "max_timeout_placeholder": "Max Timeout (s)",
+      "max_output_placeholder": "Max Output Chars",
+      "default_cwd_placeholder": "Default CWD",
+      "allowed_prefixes_placeholder": "Allowed command prefixes (comma/newline)"
+    },
+    "planner": {
+      "title": "Planner",
+      "auto_ask_and_run": "Ask Approval + Auto Run",
+      "dry_run": "Dry Run",
+      "confirm_token_placeholder": "Confirm token",
+      "prompt_placeholder": "Example: Scan the server, report risky findings, restart required services with dry-run first",
+      "plan_label": "Plan",
+      "default_prompt": "Scan the server, and if there is a critical finding, ask for approval before controlled service restart.",
+      "risk_fallback": "medium"
+    },
+    "quick_execute": {
+      "title": "Quick Execute",
+      "run": "run",
+      "blocked": "blocked",
+      "shell_runner": "Shell Runner",
+      "command_placeholder": "command",
+      "cwd_placeholder": "cwd",
+      "timeout_placeholder": "timeout",
+      "privileged": "privileged",
+      "backend_prompt": "Quick execute from UI"
+    },
+    "result": {
+      "title": "Last Result"
+    },
+    "history": {
+      "title": "History",
+      "headers": {
+        "tool": "Tool",
+        "status": "Status",
+        "risk": "Risk",
+        "dry": "Dry",
+        "by": "By",
+        "time": "Time"
+      },
+      "yes": "yes",
+      "no": "no"
+    },
+    "dialogs": {
+      "auto_execute_confirm": "Plan is ready.\n\n{summary}\n\nDry-run: {dryRun}\n\nDo you want to run all steps automatically?",
+      "confirm_token_prompt": "Confirm token is required for live execution.\nExpected token: {expected}\n\nEnter token:",
+      "hidden_token": "(hidden)"
+    },
+    "messages": {
+      "load_failed": "Load failed.",
+      "provider_saved": "Provider settings saved.",
+      "provider_save_failed": "Failed to save provider settings.",
+      "policy_saved": "Policy saved.",
+      "policy_save_failed": "Failed to save policy.",
+      "fallback_plan": "Fallback plan: {reason}",
+      "plan_created": "Plan created.",
+      "plan_create_failed": "Failed to create plan.",
+      "awaiting_manual_approval": "Plan is ready. Execution is waiting for user approval.",
+      "auto_execute_cancelled_no_token": "Auto execution cancelled because token was not provided.",
+      "step_executed": "Plan step executed.",
+      "step_execute_failed": "Failed to execute plan step.",
+      "plan_executed_all": "Plan executed.",
+      "plan_execute_all_failed": "Failed to execute plan.",
+      "tool_executed": "{tool} executed.",
+      "quick_execute_failed": "Quick execute failed."
+    }
+  },
+  "rbac_permissions": {
+    "users": {
+      "manage": "User Management"
+    },
+    "packages": {
+      "manage": "Package Management"
+    },
+    "reseller": {
+      "manage": "Reseller/ACL Management"
+    },
+    "websites": {
+      "manage": "Website Management"
+    },
+    "dns": {
+      "manage": "DNS Management"
+    },
+    "databases": {
+      "manage": "Database Management"
+    },
+    "mail": {
+      "manage": "Email Management"
+    },
+    "ftp": {
+      "manage": "FTP Management"
+    },
+    "sftp": {
+      "manage": "SFTP Management"
+    },
+    "backups": {
+      "manage": "Backup Management"
+    },
+    "apps": {
+      "manage": "App/WordPress/Plugin"
+    },
+    "runtime": {
+      "manage": "Docker/Runtime Management"
+    },
+    "files": {
+      "manage": "File Manager"
+    },
+    "terminal": {
+      "manage": "Web Terminal"
+    },
+    "php": {
+      "manage": "PHP Management"
+    },
+    "ssl": {
+      "manage": "SSL Management"
+    },
+    "security": {
+      "manage": "Security Management"
+    },
+    "monitoring": {
+      "read": "Server Status"
+    },
+    "logs": {
+      "read": "Log Viewer"
+    },
+    "cron": {
+      "manage": "Cron Management"
+    },
+    "cloudflare": {
+      "manage": "Cloudflare Management"
+    },
+    "migration": {
+      "manage": "Migration Wizard"
+    },
+    "cloudlinux": {
+      "manage": "CloudLinux Management"
+    },
+    "minio": {
+      "manage": "MinIO Management"
+    },
+    "activity": {
+      "read": "Activity Logs"
+    },
+    "ops": {
+      "manage": "Ops/Federated Management"
+    },
+    "panel": {
+      "manage": "Panel Management"
+    },
+    "ai": {
+      "manage": "AI Tools"
+    }
   }
 }

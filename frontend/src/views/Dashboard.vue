@@ -116,6 +116,12 @@ import { Server, Globe, Database, ShieldCheck, Activity, Cpu, MemoryStick, HardD
 import api from '../services/api'
 
 const { t } = useI18n({ useScope: 'global' })
+const silentBackgroundConfig = {
+  headers: {
+    'X-Aura-Silent-Error': '1',
+    'X-Aura-Silent-Loading': '1',
+  },
+}
 
 const loading = ref(false)
 const error = ref('')
@@ -266,7 +272,7 @@ function updateLiveMetrics(metrics = {}) {
 
 async function pollLoadMetrics() {
   try {
-    const metricsRes = await requestWithRetry(() => api.get('/status/metrics'))
+    const metricsRes = await requestWithRetry(() => api.get('/status/metrics', silentBackgroundConfig))
     const metrics = metricsRes.data?.data || {}
     updateLiveMetrics(metrics)
   } catch {
@@ -280,12 +286,12 @@ async function loadDashboard() {
 
   try {
     const settled = await Promise.allSettled([
-      requestWithRetry(() => api.get('/vhost/list')),
-      requestWithRetry(() => api.get('/db/mariadb/list')),
-      requestWithRetry(() => api.get('/db/postgres/list')),
-      requestWithRetry(() => api.get('/security/ebpf/events')),
-      requestWithRetry(() => api.get('/status/metrics')),
-      requestWithRetry(() => api.get('/status/services')),
+      requestWithRetry(() => api.get('/vhost/list', silentBackgroundConfig)),
+      requestWithRetry(() => api.get('/db/mariadb/list', silentBackgroundConfig)),
+      requestWithRetry(() => api.get('/db/postgres/list', silentBackgroundConfig)),
+      requestWithRetry(() => api.get('/security/ebpf/events', silentBackgroundConfig)),
+      requestWithRetry(() => api.get('/status/metrics', silentBackgroundConfig)),
+      requestWithRetry(() => api.get('/status/services', silentBackgroundConfig)),
     ])
 
     const [vhostsRes, mariaRes, pgRes, ebpfRes, metricsRes, servicesRes] = settled

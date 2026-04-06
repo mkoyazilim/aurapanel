@@ -59,6 +59,14 @@ func buildTemporaryDBUsername(engine string) string {
 	return username
 }
 
+func isRuntimeTemporaryDBUser(username string) bool {
+	username = sanitizeDBName(username)
+	if username == "" {
+		return false
+	}
+	return strings.HasPrefix(username, "apsso_")
+}
+
 func createRuntimeTemporaryDBUser(engine, dbName, sourceUser string) (string, string, string, error) {
 	engine = normalizeEngine(engine)
 	dbName = sanitizeDBName(dbName)
@@ -113,7 +121,7 @@ func dropRuntimeTemporaryDBUser(engine, username string) error {
 	if username == "" {
 		return nil
 	}
-	if !strings.HasPrefix(username, "apsso_") {
+	if !isRuntimeTemporaryDBUser(username) {
 		return nil
 	}
 	switch engine {
@@ -209,6 +217,9 @@ func runtimeDatabaseUsers(engine string) ([]DatabaseUser, error) {
 			if len(fields) < 2 {
 				continue
 			}
+			if isRuntimeTemporaryDBUser(fields[0]) {
+				continue
+			}
 			users = append(users, DatabaseUser{Username: fields[0], Host: fields[1], Engine: engine})
 		}
 		return users, nil
@@ -223,7 +234,44 @@ func runtimeDatabaseUsers(engine string) ([]DatabaseUser, error) {
 			if role == "" {
 				continue
 			}
+			if isRuntimeTemporaryDBUser(role) {
+				continue
+			}
 			users = append(users, DatabaseUser{Username: role, Host: "localhost", Engine: engine})
+		}
+		return users, nil
+	}
+}
+
+func runtimeTemporaryDBUsers(engine string) ([]dbToolTempUser, error) {
+	engine = normalizeEngine(engine)
+	switch engine {
+	case "mariadb":
+		out, err := mysqlExec(`SELECT user FROM mysql.user WHERE user LIKE 'apsso_%' ORDER BY user`)
+		if err != nil {
+			return nil, err
+		}
+		users := []dbToolTempUser{}
+		for _, line := range strings.Split(out, "\n") {
+			username := sanitizeDBName(strings.TrimSpace(line))
+			if !isRuntimeTemporaryDBUser(username) {
+				continue
+			}
+			users = append(users, dbToolTempUser{Engine: engine, Username: username})
+		}
+		return users, nil
+	default:
+		out, err := postgresExec(`SELECT rolname FROM pg_roles WHERE rolname LIKE 'apsso_%' ORDER BY rolname`)
+		if err != nil {
+			return nil, err
+		}
+		users := []dbToolTempUser{}
+		for _, line := range strings.Split(out, "\n") {
+			username := sanitizeDBName(strings.TrimSpace(line))
+			if !isRuntimeTemporaryDBUser(username) {
+				continue
+			}
+			users = append(users, dbToolTempUser{Engine: engine, Username: username})
 		}
 		return users, nil
 	}

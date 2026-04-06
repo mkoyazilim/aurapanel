@@ -259,7 +259,7 @@
                       :checked="policyHasPermission(perm.key)"
                       @change="togglePolicyPermission(perm.key, $event.target.checked)"
                     />
-                    <span>{{ perm.label }}</span>
+                    <span>{{ permissionLabel(perm) }}</span>
                     <span class="text-[11px] text-gray-500 ml-auto">{{ perm.key }}</span>
                   </label>
                 </div>
@@ -358,6 +358,17 @@ function packageOptionsForRole(role) {
 }
 
 const addPackageOptions = computed(() => packageOptionsForRole(form.value.role))
+
+function permissionLabel(permission) {
+  const labelKey = String(permission?.labelKey || '').trim()
+  if (labelKey) {
+    const translated = t(labelKey)
+    if (translated && translated !== labelKey) {
+      return translated
+    }
+  }
+  return String(permission?.label || permission?.key || '')
+}
 const editPackageOptions = computed(() => packageOptionsForRole(editForm.value.role))
 
 async function loadUsers() {

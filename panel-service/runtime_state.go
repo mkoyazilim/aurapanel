@@ -12,10 +12,11 @@ import (
 )
 
 type persistedRuntimeState struct {
-	State            appState    `json:"state"`
-	Modules          moduleState `json:"modules"`
-	StateVersion     uint64      `json:"state_version,omitempty"`
-	StateSavedAtUnix int64       `json:"state_saved_at_unix,omitempty"`
+	State            appState            `json:"state"`
+	Modules          moduleState         `json:"modules"`
+	UpdateJob        panelUpdateJobState `json:"update_job,omitempty"`
+	StateVersion     uint64              `json:"state_version,omitempty"`
+	StateSavedAtUnix int64               `json:"state_saved_at_unix,omitempty"`
 }
 
 type runtimeSnapshot struct {
@@ -65,6 +66,16 @@ func (s *service) loadRuntimeState() error {
 	}
 	s.state = best.record.Payload.State
 	s.modules = best.record.Payload.Modules
+	s.updateJob = clonePanelUpdateJobState(best.record.Payload.UpdateJob)
+	if s.updateJob.Running {
+		// A restart cannot keep the original goroutine alive; reflect interruption instead of hanging "running".
+		s.updateJob.Running = false
+		if strings.TrimSpace(s.updateJob.FinishedAt) == "" {
+			s.updateJob.FinishedAt = time.Now().UTC().Format(time.RFC3339)
+		}
+		s.updateJob.Error = "Panel deploy interrupted by panel-service restart."
+		s.updateJob.Message = "Panel deploy interrupted by service restart."
+	}
 	runtimeStateVersionCounter.Store(maxUint64(runtimeStateVersionCounter.Load(), best.record.Payload.StateVersion))
 
 	if best.sourceIndex > 0 && len(stores) > 0 {
@@ -92,6 +103,7 @@ func (s *service) saveRuntimeStateLocked() error {
 	payload := persistedRuntimeState{
 		State:            s.state,
 		Modules:          s.modules,
+		UpdateJob:        clonePanelUpdateJobState(s.updateJob),
 		StateVersion:     nextVersion,
 		StateSavedAtUnix: savedAt,
 	}

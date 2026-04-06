@@ -312,6 +312,8 @@ type service struct {
 	dbACLLastReload     time.Time
 	persistQueue        chan struct{}
 	persistDebounce     time.Duration
+	olsSyncQueue        chan olsSyncRequest
+	olsSyncDebounce     time.Duration
 	housekeepingEvery   time.Duration
 
 	securityMu              sync.Mutex
@@ -319,6 +321,13 @@ type service struct {
 	securityStatusCache     securitySnapshot
 	securityStatusCacheTime time.Time
 	securityStatusRate      map[string]securityStatusRateWindowState
+}
+
+type olsSyncRequest struct {
+	sites    []Website
+	advanced map[string]WebsiteAdvancedConfig
+	aliases  []DomainAlias
+	done     chan error
 }
 
 type jwtClaims struct {
@@ -392,6 +401,8 @@ func newService() *service {
 		dbToolTempUsers:     map[string]dbToolTempUser{},
 		persistQueue:        make(chan struct{}, 1),
 		persistDebounce:     statePersistDebounce(),
+		olsSyncQueue:        make(chan olsSyncRequest, 32),
+		olsSyncDebounce:     olsSyncDebounce(),
 		housekeepingEvery:   housekeepingInterval(),
 		securityStatusTTL:   securityStatusCacheTTL(),
 		securityStatusRate:  map[string]securityStatusRateWindowState{},
@@ -404,10 +415,17 @@ func newService() *service {
 	svc.ensureUserHierarchyLocked()
 	svc.reconcileUserRolePoliciesLocked()
 	svc.mu.Unlock()
+	svc.startOLSSyncWorker()
 	svc.bootstrapModules()
 	svc.initializeDBToolAccessRuntime()
+	svc.cleanupRuntimeTemporaryDBUsersOnStartup()
 	svc.startStatePersistenceWorker()
 	svc.startHousekeepingWorker()
+	go func() {
+		if err := svc.selfHealOLSManagedConfig(); err != nil {
+			log.Printf("OpenLiteSpeed startup self-heal skipped: %v", err)
+		}
+	}()
 	return svc
 }
 
@@ -1218,30 +1236,42 @@ func (s *service) handleHealth(w http.ResponseWriter) {
 }
 
 func (s *service) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	force := isTruthyQueryValue(r.URL.Query().Get("force"))
 	status := s.getUpdateStatus(force)
 	job := s.getUpdateJobSnapshot()
 
+	data := map[string]interface{}{
+		"current_version":  status.CurrentVersion,
+		"latest_version":   status.LatestVersion,
+		"latest_tag":       status.LatestTag,
+		"update_available": status.UpdateAvailable,
+		"release_name":     status.ReleaseName,
+		"release_url":      status.ReleaseURL,
+		"release_notes":    status.ReleaseNotes,
+		"published_at":     status.PublishedAt,
+		"source":           status.Source,
+		"checked_at":       status.CheckedAt,
+		"error":            status.Error,
+	}
+	if !isPanelUpdateJobEmpty(job) {
+		data["job"] = job
+	}
+
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status: "success",
-		Data: map[string]interface{}{
-			"current_version":  status.CurrentVersion,
-			"latest_version":   status.LatestVersion,
-			"latest_tag":       status.LatestTag,
-			"update_available": status.UpdateAvailable,
-			"release_name":     status.ReleaseName,
-			"release_url":      status.ReleaseURL,
-			"release_notes":    status.ReleaseNotes,
-			"published_at":     status.PublishedAt,
-			"source":           status.Source,
-			"checked_at":       status.CheckedAt,
-			"error":            status.Error,
-			"job":              job,
-		},
+		Data:   data,
 	})
 }
 
 func (s *service) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	principal, ok := principalFromContext(r.Context())
 	if !ok || principal.Role != "admin" {
 		writeError(w, http.StatusForbidden, "This endpoint is restricted to admin users.")
@@ -1259,6 +1289,10 @@ func (s *service) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 		return
+	}
+
+	if err := s.saveRuntimeState(); err != nil {
+		log.Printf("panel update job start persist failed: %v", err)
 	}
 
 	go s.runPanelUpdateJob()

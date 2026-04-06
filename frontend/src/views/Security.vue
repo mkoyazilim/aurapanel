@@ -643,6 +643,12 @@ const hardeningResult = ref(null)
 const immutableStatus = ref(null)
 const ebpfEvents = ref([])
 const livePatchTarget = ref('kernel')
+const silentEbpfConfig = {
+  headers: {
+    'X-Aura-Silent-Error': '1',
+    'X-Aura-Silent-Loading': '1',
+  },
+}
 const malwareForm = ref({ path: '/home', engine: 'auto' })
 const malwareJobs = ref([])
 const quarantineRecords = ref([])
@@ -942,9 +948,13 @@ async function loadImmutableStatus() {
 }
 
 async function loadEbpfEvents() {
-  await api.post('/security/ebpf/collect', { limit: 100 })
-  const res = await api.get('/security/ebpf/events')
-  ebpfEvents.value = res.data.data || []
+  try {
+    await api.post('/security/ebpf/collect', { limit: 100 }, silentEbpfConfig)
+    const res = await api.get('/security/ebpf/events', silentEbpfConfig)
+    ebpfEvents.value = res.data.data || []
+  } catch {
+    ebpfEvents.value = []
+  }
 }
 
 async function runLivePatch() {

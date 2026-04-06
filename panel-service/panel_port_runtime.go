@@ -92,11 +92,16 @@ func applyPanelPortChange(port int, openFirewall bool) (panelPortChangeResult, e
 	}
 
 	if edgeEnabled {
-		if err := updatePanelEdgeGatewayUpstream(edgePath, port); err != nil {
-			return result, rollback(fmt.Errorf("panel edge sync failed: %w", err))
-		}
-		if err := reloadOpenLiteSpeed(); err != nil {
-			return result, rollback(fmt.Errorf("openlitespeed reload failed after panel edge sync: %w", err))
+		if err := withOLSConfigLock(func() error {
+			if err := updatePanelEdgeGatewayUpstream(edgePath, port); err != nil {
+				return fmt.Errorf("panel edge sync failed: %w", err)
+			}
+			if err := reloadOpenLiteSpeed(); err != nil {
+				return fmt.Errorf("openlitespeed reload failed after panel edge sync: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return result, rollback(err)
 		}
 		result.EdgeSynced = true
 	}
@@ -202,11 +207,16 @@ func applyPanelEdgeConfigChange(config panelEdgeConfig, gatewayPort int) (panelE
 	}
 
 	if config.Enabled {
-		if err := updatePanelEdgeGatewayUpstream(config.VhostConfigPath, gatewayPort); err != nil {
-			return result, rollback(fmt.Errorf("panel edge sync failed: %w", err))
-		}
-		if err := reloadOpenLiteSpeed(); err != nil {
-			return result, rollback(fmt.Errorf("openlitespeed reload failed after panel edge sync: %w", err))
+		if err := withOLSConfigLock(func() error {
+			if err := updatePanelEdgeGatewayUpstream(config.VhostConfigPath, gatewayPort); err != nil {
+				return fmt.Errorf("panel edge sync failed: %w", err)
+			}
+			if err := reloadOpenLiteSpeed(); err != nil {
+				return fmt.Errorf("openlitespeed reload failed after panel edge sync: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return result, rollback(err)
 		}
 		result.EdgeSynced = true
 	}
@@ -230,7 +240,7 @@ func updatePanelEdgeGatewayUpstream(path string, port int) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(rendered), 0o640)
+	return writeOLSFileAtomically(path, []byte(rendered), 0o640)
 }
 
 func replacePanelEdgeExtProcessorBlock(content, upstreamAddr string) (string, error) {
