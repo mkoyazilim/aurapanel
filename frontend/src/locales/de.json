@@ -2043,6 +2043,7 @@
       "saving": "Speichert..."
     },
     "tabs": {
+      "login": "Anmeldung",
       "zones": "Zonen",
       "dns": "DNS-Einträge",
       "ssl": "SSL/TLS",
@@ -2160,7 +2161,8 @@
       "analytics_loaded": "CloudFlare-Analysen geladen.",
       "analytics_failed": "Analyseanfrage fehlgeschlagen.",
       "server_auth_saved": "CloudFlare-Anmeldeinformationen wurden in der Serverumgebung gespeichert und Auto-Sync wurde aktiviert.",
-      "server_auth_failed": "Serverseitige CloudFlare-Anmeldeinformationen konnten nicht gespeichert werden."
+      "server_auth_failed": "Serverseitige CloudFlare-Anmeldeinformationen konnten nicht gespeichert werden.",
+      "login_required": "Bitte zuerst im Anmelde-Tab verbinden."
     },
     "placeholders": {
       "email": "benutzer{'@'}example.com",
@@ -2175,6 +2177,17 @@
       "page_views": "Seitenaufrufe",
       "bandwidth": "Bandbreite",
       "raw_response": "Rohe Antwort der Analyse"
+    },
+    "login": {
+      "title": "Anmeldung",
+      "description": "Verbinden Sie Ihr CloudFlare-Konto oder pruefen Sie die Server-Authentifizierung.",
+      "status_label": "Verbindungsstatus",
+      "connected": "Verbunden",
+      "disconnected": "Nicht verbunden",
+      "token_valid": "Token gueltig",
+      "token_invalid": "Token nicht bestaetigt",
+      "connected_detail": "{count} Zonen geladen.",
+      "disconnected_detail": "Bitte verbinden Sie sich zuerst im Anmelde-Tab."
     }
   },
   "docker_manager_screen": {

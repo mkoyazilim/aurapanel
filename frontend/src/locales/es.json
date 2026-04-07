@@ -2043,6 +2043,7 @@
       "saving": "Guardando..."
     },
     "tabs": {
+      "login": "Login",
       "zones": "Zonas",
       "dns": "Registros DNS",
       "ssl": "SSL/TLS",
@@ -2160,7 +2161,8 @@
       "analytics_loaded": "Analítica cargada.",
       "analytics_failed": "Fallo en analítica.",
       "server_auth_saved": "Credenciales guardadas en servidor.",
-      "server_auth_failed": "Fallo al guardar en servidor."
+      "server_auth_failed": "Fallo al guardar en servidor.",
+      "login_required": "Conectate primero desde la pestana de Login."
     },
     "placeholders": {
       "email": "usuario{'@'}ejemplo.com",
@@ -2175,6 +2177,17 @@
       "page_views": "Vistas Página",
       "bandwidth": "Banda Ancha",
       "raw_response": "Respuesta analítica raw"
+    },
+    "login": {
+      "title": "Login",
+      "description": "Conecta tu cuenta de CloudFlare o verifica la autenticacion del servidor.",
+      "status_label": "Estado de conexion",
+      "connected": "Conectado",
+      "disconnected": "No conectado",
+      "token_valid": "Token valido",
+      "token_invalid": "Token no verificado",
+      "connected_detail": "{count} zonas cargadas.",
+      "disconnected_detail": "Conectate primero desde la pestana de Login."
     }
   },
   "docker_manager_screen": {

@@ -2043,6 +2043,7 @@
       "saving": "Сохранение..."
     },
     "tabs": {
+      "login": "Login",
       "zones": "Зоны",
       "dns": "Записи DNS",
       "ssl": "SSL/TLS",
@@ -2160,7 +2161,8 @@
       "analytics_loaded": "Аналитика CloudFlare загружена.",
       "analytics_failed": "Сбой запроса аналитики.",
       "server_auth_saved": "Учетные данные CloudFlare сохранены в окружении сервера, автосинхронизация включена.",
-      "server_auth_failed": "Не удалось сохранить учетные данные сервера CloudFlare."
+      "server_auth_failed": "Не удалось сохранить учетные данные сервера CloudFlare.",
+      "login_required": "Сначала подключитесь во вкладке Login."
     },
     "placeholders": {
       "email": "user{'@'}example.com",
@@ -2175,6 +2177,17 @@
       "page_views": "Просмотры страниц",
       "bandwidth": "Трафик",
       "raw_response": "Сырой ответ аналитики"
+    },
+    "login": {
+      "title": "Вход",
+      "description": "Подключите аккаунт CloudFlare или проверьте серверную аутентификацию.",
+      "status_label": "Статус подключения",
+      "connected": "Подключено",
+      "disconnected": "Не подключено",
+      "token_valid": "Токен действителен",
+      "token_invalid": "Токен не подтвержден",
+      "connected_detail": "Загружено зон: {count}.",
+      "disconnected_detail": "Сначала подключитесь во вкладке Login."
     }
   },
   "docker_manager_screen": {

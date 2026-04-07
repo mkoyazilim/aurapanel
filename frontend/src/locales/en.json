@@ -2078,12 +2078,24 @@
       "saving": "Saving..."
     },
     "tabs": {
+      "login": "Login",
       "zones": "Zones",
       "dns": "DNS Records",
       "ssl": "SSL/TLS",
       "cache": "Cache",
       "security": "Security",
       "analytics": "Analytics"
+    },
+    "login": {
+      "title": "Login",
+      "description": "Connect your CloudFlare account or verify server-side authentication.",
+      "status_label": "Connection Status",
+      "connected": "Connected",
+      "disconnected": "Not connected",
+      "token_valid": "Token valid",
+      "token_invalid": "Token not verified",
+      "connected_detail": "{count} zones loaded.",
+      "disconnected_detail": "Connect from this tab before continuing."
     },
     "scope": {
       "select_zone": "Select Website Zone",
@@ -2194,6 +2206,7 @@
       "zone_required": "Select a website zone first.",
       "analytics_loaded": "CloudFlare analytics loaded.",
       "analytics_failed": "Analytics request failed.",
+      "login_required": "Please connect first from the Login tab.",
       "server_auth_saved": "CloudFlare credentials were saved to server env and auto-sync was enabled.",
       "server_auth_failed": "CloudFlare server credentials could not be saved."
     },

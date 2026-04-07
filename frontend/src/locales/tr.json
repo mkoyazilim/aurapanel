@@ -2078,12 +2078,24 @@
       "saving": "Kaydediliyor..."
     },
     "tabs": {
+      "login": "Login",
       "zones": "Bölgeler (Zones)",
       "dns": "DNS Kayıtları",
       "ssl": "SSL/TLS",
       "cache": "Önbellek",
       "security": "Güvenlik",
       "analytics": "Analizler"
+    },
+    "login": {
+      "title": "Login",
+      "description": "CloudFlare hesabinizi baglayin veya sunucu tarafi kimlik dogrulamasini kullanin.",
+      "status_label": "Baglanti Durumu",
+      "connected": "Baglandi",
+      "disconnected": "Bagli degil",
+      "token_valid": "Token gecerli",
+      "token_invalid": "Token dogrulanmadi",
+      "connected_detail": "{count} bolge yuklendi.",
+      "disconnected_detail": "Devam etmeden once bu sekmeden baglanti kurun."
     },
     "scope": {
       "select_zone": "Web Sitesi Bölgesi (Zone) Seçin",
@@ -2194,6 +2206,7 @@
       "zone_required": "Önce bir web sitesi bölgesi (zone) seçin.",
       "analytics_loaded": "CloudFlare analizleri yüklendi.",
       "analytics_failed": "Analiz isteği başarısız oldu.",
+      "login_required": "Devam etmek icin once Login sekmesinden baglanin.",
       "server_auth_saved": "CloudFlare kimlik bilgileri sunucu ortamına kaydedildi ve otomatik senkronizasyon etkinleştirildi.",
       "server_auth_failed": "CloudFlare sunucu kimlik bilgileri kaydedilemedi."
     },

@@ -1203,5 +1203,24 @@
       "checking": "পরীক্ষা করা হচ্ছে...",
       "new_version": "নতুন সংস্করণ উপলব্ধ"
     }
+  },
+  "cloudflare_manager": {
+    "tabs": {
+      "login": "Login"
+    },
+    "login": {
+      "title": "Login",
+      "description": "Connect your CloudFlare account or verify server-side authentication.",
+      "status_label": "Connection Status",
+      "connected": "Connected",
+      "disconnected": "Not connected",
+      "token_valid": "Token valid",
+      "token_invalid": "Token not verified",
+      "connected_detail": "{count} zones loaded.",
+      "disconnected_detail": "Connect from this tab before continuing."
+    },
+    "messages": {
+      "login_required": "Please connect first from the Login tab."
+    }
   }
 }

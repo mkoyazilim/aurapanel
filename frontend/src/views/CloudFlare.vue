@@ -26,26 +26,51 @@
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-if="cfEmail || cfApiKey"
-            class="rounded-lg bg-gradient-to-r from-cyan-600 to-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:from-cyan-700 hover:to-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="serverSaving"
-            @click="saveServerAuth"
-          >
-            {{ serverSaving ? t('cloudflare_manager.server_status.saving') : t('cloudflare_manager.server_status.save_action') }}
-          </button>
           <span class="rounded-full px-3 py-1 text-xs font-medium" :class="serverStatus.configured ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-300'">
             {{ serverStatus.configured ? t('cloudflare_manager.server_status.configured') : t('cloudflare_manager.server_status.not_configured') }}
           </span>
           <span class="rounded-full px-3 py-1 text-xs font-medium" :class="serverStatus.auto_sync ? 'bg-cyan-500/15 text-cyan-300' : 'bg-gray-500/15 text-gray-400'">
             {{ serverStatus.auto_sync ? t('cloudflare_manager.server_status.auto_sync_on') : t('cloudflare_manager.server_status.auto_sync_off') }}
           </span>
+          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="connected ? 'bg-emerald-500/15 text-emerald-300' : 'bg-orange-500/15 text-orange-300'">
+            {{ connected ? t('cloudflare_manager.login.token_valid') : t('cloudflare_manager.login.token_invalid') }}
+          </span>
         </div>
       </div>
     </div>
 
-    <div v-if="!connected" class="rounded-xl border border-panel-border bg-panel-card p-6">
-      <h2 class="cf-connect-title mb-4 text-lg font-semibold">{{ t('cloudflare_manager.connect_title') }}</h2>
+    <div class="border-b border-panel-border">
+      <nav class="flex gap-6">
+        <button
+          v-for="tabItem in tabs"
+          :key="tabItem.id"
+          class="flex items-center gap-2 pb-3 text-sm font-medium transition"
+          :class="activeTab === tabItem.id ? 'border-b-2 border-orange-400 text-orange-400' : 'text-gray-400 hover:text-white'"
+          @click="activeTab = tabItem.id"
+        >
+          {{ tabItem.label }}
+        </button>
+      </nav>
+    </div>
+
+    <div v-if="activeTab === 'login'" class="rounded-xl border border-panel-border bg-panel-card p-6">
+      <h2 class="cf-connect-title mb-1 text-lg font-semibold">{{ t('cloudflare_manager.login.title') }}</h2>
+      <p class="mb-4 text-sm text-gray-400">{{ t('cloudflare_manager.login.description') }}</p>
+      <div
+        class="mb-4 rounded-xl border p-4 text-sm"
+        :class="connected ? 'border-green-500/20 bg-green-500/10 text-green-200' : 'border-yellow-500/20 bg-yellow-500/10 text-yellow-200'"
+      >
+        <p class="font-semibold">{{ t('cloudflare_manager.login.status_label') }}</p>
+        <p class="mt-1">{{ connected ? t('cloudflare_manager.login.connected') : t('cloudflare_manager.login.disconnected') }}</p>
+        <p class="text-xs opacity-90">
+          {{
+            connected
+              ? t('cloudflare_manager.login.connected_detail', { count: zones.length })
+              : t('cloudflare_manager.login.disconnected_detail')
+          }}
+        </p>
+        <p class="mt-1 text-xs font-medium">{{ connected ? t('cloudflare_manager.login.token_valid') : t('cloudflare_manager.login.token_invalid') }}</p>
+      </div>
       <div v-if="serverStatus.configured" class="mb-4 rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-200">
         {{ t('cloudflare_manager.server_status.server_auth_active') }}
       </div>
@@ -59,31 +84,33 @@
           <input v-model="cfApiKey" type="password" :placeholder="t('cloudflare_manager.placeholders.api_key')" class="aura-input" />
         </div>
       </div>
-      <button
-        class="mt-4 rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 px-6 py-2.5 font-medium text-white transition hover:from-orange-700 hover:to-amber-700"
-        :disabled="loading"
-        @click="connectCf"
-      >
-        {{ loading ? t('cloudflare_manager.connecting') : t('cloudflare_manager.connect') }}
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          class="rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 px-6 py-2.5 font-medium text-white transition hover:from-orange-700 hover:to-amber-700"
+          :disabled="loading"
+          @click="connectCf"
+        >
+          {{ loading ? t('cloudflare_manager.connecting') : t('cloudflare_manager.connect') }}
+        </button>
+        <button
+          v-if="cfEmail || cfApiKey"
+          class="rounded-lg bg-gradient-to-r from-cyan-600 to-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:from-cyan-700 hover:to-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="serverSaving"
+          @click="saveServerAuth"
+        >
+          {{ serverSaving ? t('cloudflare_manager.server_status.saving') : t('cloudflare_manager.server_status.save_action') }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="activeTab !== 'login' && !connected" class="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-5 text-sm text-yellow-200">
+      <p class="font-semibold">{{ t('cloudflare_manager.messages.login_required') }}</p>
+      <button class="mt-3 rounded-lg bg-orange-600/20 px-4 py-2 text-xs font-medium text-orange-300 transition hover:bg-orange-600/40" @click="activeTab = 'login'">
+        {{ t('cloudflare_manager.tabs.login') }}
       </button>
     </div>
 
-    <template v-if="connected">
-      <div class="border-b border-panel-border">
-        <nav class="flex gap-6">
-          <button
-            v-for="tabItem in tabs"
-            :key="tabItem.id"
-            class="flex items-center gap-2 pb-3 text-sm font-medium transition"
-            :class="activeTab === tabItem.id ? 'border-b-2 border-orange-400 text-orange-400' : 'text-gray-400 hover:text-white'"
-            @click="activeTab = tabItem.id"
-          >
-            {{ tabItem.label }}
-          </button>
-        </nav>
-      </div>
-
-      <div class="rounded-xl border border-panel-border bg-panel-card p-4">
+    <div v-if="activeTab !== 'login' && connected" class="rounded-xl border border-panel-border bg-panel-card p-4">
         <div class="flex flex-wrap items-center gap-3">
           <label class="text-sm text-gray-400">{{ t('cloudflare_manager.scope.select_zone') }}</label>
           <select
@@ -96,9 +123,9 @@
           </select>
           <span class="text-xs text-gray-500">{{ t('cloudflare_manager.scope.all_actions_apply') }}</span>
         </div>
-      </div>
+    </div>
 
-      <div v-if="activeTab === 'zones'">
+      <div v-if="activeTab === 'zones' && connected">
         <div class="overflow-hidden rounded-xl border border-panel-border bg-panel-card">
           <div class="flex items-center justify-between border-b border-panel-border p-4">
             <h2 class="text-lg font-semibold text-white">{{ t('cloudflare_manager.zones.title') }}</h2>
@@ -138,7 +165,7 @@
         </div>
       </div>
 
-      <div v-if="activeTab === 'dns'" class="space-y-4">
+      <div v-if="activeTab === 'dns' && connected" class="space-y-4">
         <div class="flex items-center gap-3">
           <span class="text-sm text-gray-400">{{ t('cloudflare_manager.dns.zone_label') }}:</span>
           <span class="font-semibold text-white">{{ selectedZone?.name || t('cloudflare_manager.dns.not_selected') }}</span>
@@ -183,7 +210,7 @@
         </div>
       </div>
 
-      <div v-if="activeTab === 'ssl'" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div v-if="activeTab === 'ssl' && connected" class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div class="rounded-xl border border-panel-border bg-panel-card p-5">
           <h3 class="mb-4 font-semibold text-white">{{ t('cloudflare_manager.ssl.mode_title') }}</h3>
           <div class="space-y-3">
@@ -224,7 +251,7 @@
         </div>
       </div>
 
-      <div v-if="activeTab === 'cache'" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div v-if="activeTab === 'cache' && connected" class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div class="rounded-xl border border-panel-border bg-panel-card p-6 text-center">
           <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
             <Trash2 class="h-8 w-8 text-red-400" />
@@ -249,7 +276,7 @@
         </div>
       </div>
 
-      <div v-if="activeTab === 'security'" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div v-if="activeTab === 'security' && connected" class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div class="rounded-xl border border-panel-border bg-panel-card p-5">
           <h3 class="mb-4 font-semibold text-white">{{ t('cloudflare_manager.security.level_title') }}</h3>
           <div class="space-y-2">
@@ -286,7 +313,7 @@
         </div>
       </div>
 
-      <div v-if="activeTab === 'analytics'" class="space-y-4">
+      <div v-if="activeTab === 'analytics' && connected" class="space-y-4">
         <div class="rounded-xl border border-panel-border bg-panel-card p-5">
           <div class="flex flex-wrap items-center gap-3">
             <label class="text-sm text-gray-400">{{ t('cloudflare_manager.dns.zone_label') }}</label>
@@ -325,7 +352,6 @@
           <pre class="max-h-[360px] overflow-auto rounded-lg bg-panel-darker p-3 text-xs text-gray-300">{{ formattedAnalytics }}</pre>
         </div>
       </div>
-    </template>
 
     <div v-if="showAddDns" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showAddDns = false">
       <div class="w-full max-w-lg rounded-2xl border border-panel-border bg-panel-card p-6 shadow-2xl">
@@ -387,7 +413,7 @@ const cfEmail = ref('')
 const cfApiKey = ref('')
 const connected = ref(false)
 const notification = ref(null)
-const activeTab = ref('zones')
+const activeTab = ref('login')
 const loading = ref(false)
 const cfStorageKey = 'aurapanel.cloudflare.auth.v1'
 const serverStatus = ref({
@@ -399,6 +425,7 @@ const serverStatus = ref({
 const serverSaving = ref(false)
 
 const tabs = [
+  { id: 'login', label: t('cloudflare_manager.tabs.login') },
   { id: 'zones', label: t('cloudflare_manager.tabs.zones') },
   { id: 'dns', label: t('cloudflare_manager.tabs.dns') },
   { id: 'ssl', label: t('cloudflare_manager.tabs.ssl') },
@@ -460,10 +487,6 @@ const readStoredCfAuth = () => {
 const saveStoredCfAuth = () => {
   if (typeof window === 'undefined') return
   const payload = { zone_id: selectedZone.value?.id || '' }
-  if (cfEmail.value && cfApiKey.value) {
-    payload.email = cfEmail.value
-    payload.api_key = cfApiKey.value
-  }
   window.localStorage.setItem(cfStorageKey, JSON.stringify(payload))
 }
 
@@ -517,12 +540,16 @@ const connectCf = async (opts = {}) => {
       showNotif(t('cloudflare_manager.messages.connected', { count: zones.value.length }))
     }
   } catch (err) {
+    connected.value = false
+    zones.value = []
+    selectedZone.value = null
+    dnsRecords.value = []
     if (auto) {
-      connected.value = false
       clearStoredCfAuth()
       return
     }
     showNotif(err.response?.data?.error || t('cloudflare_manager.messages.connect_failed'), 'error')
+    activeTab.value = 'login'
   } finally {
     loading.value = false
   }
@@ -824,16 +851,8 @@ const dnsTypeBadge = type => {
 onMounted(async () => {
   await loadServerStatus()
   const saved = readStoredCfAuth()
-  if (saved) {
-    cfEmail.value = saved.email || ''
-    cfApiKey.value = saved.api_key || ''
-    if (cfEmail.value && cfApiKey.value) {
-      await connectCf({ silent: true, auto: true, preferredZoneId: saved.zone_id || '' })
-      return
-    }
-  }
   if (serverStatus.value.configured) {
-    await connectCf({ silent: true, auto: true })
+    await connectCf({ silent: true, auto: true, preferredZoneId: saved?.zone_id || '' })
   }
 })
 
