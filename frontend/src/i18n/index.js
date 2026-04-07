@@ -1,9 +1,16 @@
 import { createI18n } from 'vue-i18n'
 import en from '../locales/en.json'
+import tr from '../locales/tr.json'
+import de from '../locales/de.json'
+import es from '../locales/es.json'
+import fr from '../locales/fr.json'
+import pt from '../locales/pt.json'
+import ru from '../locales/ru.json'
+import bn from '../locales/bn.json'
 
 const STORAGE_KEY = 'aura_locale'
 const DEFAULT_LOCALE = 'en'
-const supportedLocales = ['en']
+const supportedLocales = ['en', 'tr', 'de', 'es', 'fr', 'pt', 'ru', 'bn']
 const rtlLocales = []
 
 const normalizeLocale = (value) => {
@@ -35,6 +42,13 @@ const i18n = createI18n({
   fallbackLocale: 'en',
   messages: {
     en,
+    tr,
+    de,
+    es,
+    fr,
+    pt,
+    ru,
+    bn,
   },
 })
 

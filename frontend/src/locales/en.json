@@ -1247,7 +1247,10 @@
       "en": "English",
       "de": "Deutsch",
       "es": "Espanol",
-      "fr": "Francais"
+      "fr": "Francais",
+      "pt": "Portuguese",
+      "ru": "Russian",
+      "bn": "Bengali"
     }
   },
   "login": {
