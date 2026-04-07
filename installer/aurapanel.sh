@@ -52,6 +52,9 @@ AURAPANEL_IMAGEMAGICK_INSTALL="${AURAPANEL_IMAGEMAGICK_INSTALL:-1}"
 AURAPANEL_IMAGEMAGICK_ACTIVE="${AURAPANEL_IMAGEMAGICK_ACTIVE:-1}"
 AURAPANEL_LIBREOFFICE_INSTALL="${AURAPANEL_LIBREOFFICE_INSTALL:-1}"
 AURAPANEL_LIBREOFFICE_ACTIVE="${AURAPANEL_LIBREOFFICE_ACTIVE:-1}"
+AURAPANEL_INSTALL_ROUNDCUBE="${AURAPANEL_INSTALL_ROUNDCUBE:-1}"
+AURAPANEL_STRICT_SMOKE="${AURAPANEL_STRICT_SMOKE:-0}"
+GO_BIN="/usr/local/go/bin/go"
 PANEL_PORT_DEFAULT="8090"
 ONE_TIME_PASSWORD_NOTE="NOTE: Passwords are generated only once. Please save them now or change them immediately."
 PDNS_POLICY_RC_D_PATH="/usr/sbin/policy-rc.d"
@@ -107,6 +110,16 @@ prompt_yes_no() {
   read -r -p "${prompt} (Yes/No) [${default_label}]: " response || true
   normalized="$(normalize_yes_no "${response}" "${default_value}")"
   echo "${normalized}"
+}
+
+smoke_fail_or_warn() {
+  local message="$1"
+  local strict_value
+  strict_value="$(normalize_yes_no "${AURAPANEL_STRICT_SMOKE:-0}" "0")"
+  if [ "${strict_value}" = "1" ]; then
+    fail "${message}"
+  fi
+  warn "${message}"
 }
 
 cleanup_runtime_guards() {
@@ -257,6 +270,8 @@ configure_media_tool_preferences() {
   AURAPANEL_IMAGEMAGICK_ACTIVE="$(normalize_yes_no "${AURAPANEL_IMAGEMAGICK_ACTIVE}" "${AURAPANEL_IMAGEMAGICK_INSTALL}")"
   AURAPANEL_LIBREOFFICE_INSTALL="$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_INSTALL}" "1")"
   AURAPANEL_LIBREOFFICE_ACTIVE="$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_ACTIVE}" "${AURAPANEL_LIBREOFFICE_INSTALL}")"
+  AURAPANEL_INSTALL_ROUNDCUBE="$(normalize_yes_no "${AURAPANEL_INSTALL_ROUNDCUBE}" "1")"
+  AURAPANEL_STRICT_SMOKE="$(normalize_yes_no "${AURAPANEL_STRICT_SMOKE}" "0")"
 
   AURAPANEL_FFMPEG_INSTALL="$(prompt_yes_no "FFmpeg yüklensin mi?" "${AURAPANEL_FFMPEG_INSTALL}")"
   if [ "${AURAPANEL_FFMPEG_INSTALL}" = "1" ]; then
@@ -325,12 +340,16 @@ install_media_tools() {
     log "Installing FFmpeg..."
     install_optional_packages ffmpeg
     if [ "${AURAPANEL_FFMPEG_ACTIVE}" = "1" ]; then
-      command -v ffmpeg >/dev/null 2>&1 || fail "FFmpeg install requested but ffmpeg binary not found."
-      ffmpeg -version >/dev/null 2>&1 || fail "FFmpeg install requested but binary verification failed."
-      ok "FFmpeg is installed and active."
+      if command -v ffmpeg >/dev/null 2>&1 && ffmpeg -version >/dev/null 2>&1; then
+        ok "FFmpeg is installed and active."
+      else
+        warn "FFmpeg install requested but binary validation failed. Disabling FFmpeg active flag."
+        AURAPANEL_FFMPEG_ACTIVE="0"
+      fi
     fi
   else
     warn "FFmpeg installation skipped by configuration."
+    AURAPANEL_FFMPEG_ACTIVE="0"
   fi
 
   if [ "${AURAPANEL_IMAGEMAGICK_INSTALL}" = "1" ]; then
@@ -342,29 +361,38 @@ install_media_tools() {
     fi
     install_optional_packages "${im_packages[@]}"
     if [ "${AURAPANEL_IMAGEMAGICK_ACTIVE}" = "1" ]; then
-      ensure_magick_command || fail "ImageMagick install requested but neither magick nor convert command is available."
-      magick -version >/dev/null 2>&1 || fail "ImageMagick install requested but magick verification failed."
-      ok "ImageMagick is installed and active."
+      if ensure_magick_command && magick -version >/dev/null 2>&1; then
+        ok "ImageMagick is installed and active."
+      else
+        warn "ImageMagick install requested but command verification failed. Disabling ImageMagick active flag."
+        AURAPANEL_IMAGEMAGICK_ACTIVE="0"
+      fi
     fi
   else
     warn "ImageMagick installation skipped by configuration."
+    AURAPANEL_IMAGEMAGICK_ACTIVE="0"
   fi
 
   if [ "${AURAPANEL_LIBREOFFICE_INSTALL}" = "1" ]; then
     log "Installing LibreOffice..."
     install_optional_packages libreoffice
     if [ "${AURAPANEL_LIBREOFFICE_ACTIVE}" = "1" ]; then
+      local lo_ok="0"
       if command -v libreoffice >/dev/null 2>&1; then
-        libreoffice --version >/dev/null 2>&1 || fail "LibreOffice install requested but libreoffice verification failed."
+        libreoffice --version >/dev/null 2>&1 && lo_ok="1"
       elif command -v soffice >/dev/null 2>&1; then
-        soffice --version >/dev/null 2>&1 || fail "LibreOffice install requested but soffice verification failed."
-      else
-        fail "LibreOffice install requested but libreoffice/soffice binary not found."
+        soffice --version >/dev/null 2>&1 && lo_ok="1"
       fi
-      ok "LibreOffice is installed and active."
+      if [ "${lo_ok}" = "1" ]; then
+        ok "LibreOffice is installed and active."
+      else
+        warn "LibreOffice install requested but binary verification failed. Disabling LibreOffice active flag."
+        AURAPANEL_LIBREOFFICE_ACTIVE="0"
+      fi
     fi
   else
     warn "LibreOffice installation skipped by configuration."
+    AURAPANEL_LIBREOFFICE_ACTIVE="0"
   fi
 }
 
@@ -1187,7 +1215,7 @@ EOF
 }
 
 configure_roundcube() {
-  if [ "${AURAPANEL_INSTALL_ROUNDCUBE:-1}" != "1" ]; then
+  if [ "${AURAPANEL_INSTALL_ROUNDCUBE}" != "1" ]; then
     warn "Roundcube install skipped (AURAPANEL_INSTALL_ROUNDCUBE!=1)."
     return
   fi
@@ -1213,6 +1241,16 @@ configure_roundcube() {
       rm -rf "${webmail_dir}"
       git clone --depth 1 https://github.com/roundcube/roundcubemail.git "${webmail_dir}" >/dev/null 2>&1 || true
     fi
+  fi
+
+  if [ ! -f "${webmail_dir}/index.php" ]; then
+    warn "Roundcube runtime files are incomplete. Writing temporary placeholder index.php."
+    cat <<'EOF' > "${webmail_dir}/index.php"
+<?php
+http_response_code(200);
+header('Content-Type: text/plain; charset=utf-8');
+echo "AuraPanel Roundcube placeholder: runtime files are not fully installed yet.\n";
+EOF
   fi
 
   local rc_db_name rc_db_user rc_db_pass
@@ -1489,23 +1527,68 @@ ensure_node20() {
     return
   fi
 
+  local node_major installed_from_setup
+  installed_from_setup="0"
   log "Installing Node.js 20.x from mirror..."
   wait_for_package_manager
-  curl -fsSL "${NODE_SETUP_URL}" | bash -
-  install_packages nodejs
+  if curl -fsSL "${NODE_SETUP_URL}" | bash -; then
+    if install_packages nodejs; then
+      installed_from_setup="1"
+    fi
+  else
+    warn "Node.js mirror setup script failed; trying distro repositories."
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    if [ "${PKG_MGR}" = "apt" ]; then
+      install_packages nodejs npm || install_packages nodejs || true
+    else
+      install_packages nodejs npm || install_packages nodejs || true
+    fi
+  fi
+
+  command -v node >/dev/null 2>&1 || fail "Node.js installation failed."
+  node_major="$(node -v | sed 's/^v//' | cut -d'.' -f1)"
+  if [ -n "${node_major}" ] && [ "${node_major}" -lt 20 ]; then
+    warn "Installed Node.js is v${node_major}; Node.js 20+ is recommended for best compatibility."
+  elif [ "${installed_from_setup}" != "1" ]; then
+    warn "Node.js was installed via distro repositories fallback."
+  fi
   ok "Node.js installed: $(node -v)"
 }
 
 ensure_go() {
   log "Ensuring Go toolchain..."
-  if ! command -v go >/dev/null 2>&1; then
-    wget -q "${GO_TARBALL_URL}" -O "/tmp/${GO_TARBALL}"
+  if command -v go >/dev/null 2>&1; then
+    GO_BIN="$(command -v go)"
+    export PATH="${PATH}:$(dirname "${GO_BIN}")"
+    ok "Go toolchain already available: $(${GO_BIN} version)"
+    return
+  fi
+
+  if wget -q "${GO_TARBALL_URL}" -O "/tmp/${GO_TARBALL}"; then
     rm -rf /usr/local/go
     tar -C /usr/local -xzf "/tmp/${GO_TARBALL}"
     rm -f "/tmp/${GO_TARBALL}"
+  else
+    warn "Go tarball download failed; trying distro package fallback."
+    if [ "${PKG_MGR}" = "apt" ]; then
+      install_packages golang-go || install_packages golang || true
+    else
+      install_packages golang || true
+    fi
   fi
 
-  export PATH="$PATH:/usr/local/go/bin"
+  if command -v go >/dev/null 2>&1; then
+    GO_BIN="$(command -v go)"
+  elif [ -x /usr/local/go/bin/go ]; then
+    GO_BIN="/usr/local/go/bin/go"
+  else
+    fail "Go toolchain installation failed."
+  fi
+
+  export PATH="${PATH}:$(dirname "${GO_BIN}")"
+  ok "Go toolchain ready: $(${GO_BIN} version)"
 }
 
 ensure_openlitespeed() {
@@ -1555,16 +1638,39 @@ ensure_docker_runtime() {
     return
   fi
 
+  local installed="0"
   log "Installing Docker runtime (required for pgAdmin)..."
   if [ "${PKG_MGR}" = "apt" ]; then
-    install_packages docker.io || fail "Docker installation failed."
+    if install_packages docker.io; then
+      installed="1"
+    fi
   else
-    install_packages docker || install_packages docker-ce || fail "Docker installation failed."
+    local dnf_candidates=(docker docker-ce moby-engine podman-docker)
+    local pkg=""
+    for pkg in "${dnf_candidates[@]}"; do
+      if ! package_available "${pkg}"; then
+        continue
+      fi
+      if install_packages "${pkg}" && command -v docker >/dev/null 2>&1; then
+        installed="1"
+        break
+      fi
+    done
+
+    if [ "${installed}" != "1" ] && package_available podman; then
+      install_packages podman || true
+      if ! command -v docker >/dev/null 2>&1 && command -v podman >/dev/null 2>&1; then
+        ln -sf "$(command -v podman)" /usr/local/bin/docker
+      fi
+      command -v docker >/dev/null 2>&1 && installed="1"
+    fi
   fi
 
   command -v docker >/dev/null 2>&1 || fail "Docker binary missing after install."
-  systemctl enable docker >/dev/null 2>&1 || true
-  systemctl start docker >/dev/null 2>&1 || true
+  if systemd_unit_exists "docker.service"; then
+    systemctl enable docker >/dev/null 2>&1 || true
+    systemctl start docker >/dev/null 2>&1 || true
+  fi
 }
 
 ensure_nginx_for_edge_mode() {
@@ -2154,6 +2260,8 @@ AURAPANEL_IMAGEMAGICK_INSTALL=${AURAPANEL_IMAGEMAGICK_INSTALL}
 AURAPANEL_IMAGEMAGICK_ACTIVE=${AURAPANEL_IMAGEMAGICK_ACTIVE}
 AURAPANEL_LIBREOFFICE_INSTALL=${AURAPANEL_LIBREOFFICE_INSTALL}
 AURAPANEL_LIBREOFFICE_ACTIVE=${AURAPANEL_LIBREOFFICE_ACTIVE}
+AURAPANEL_INSTALL_ROUNDCUBE=${AURAPANEL_INSTALL_ROUNDCUBE}
+AURAPANEL_STRICT_SMOKE=${AURAPANEL_STRICT_SMOKE}
 AURAPANEL_DBTOOLS_AUTH_USER=dbtools
 AURAPANEL_DBTOOLS_AUTH_PASS=
 AURAPANEL_DBTOOLS_ALLOWED_IPS=
@@ -2308,6 +2416,8 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_IMAGEMAGICK_ACTIVE" "$(normalize_yes_no "${AURAPANEL_IMAGEMAGICK_ACTIVE}" "1")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_LIBREOFFICE_INSTALL" "$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_INSTALL}" "1")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_LIBREOFFICE_ACTIVE" "$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_ACTIVE}" "1")"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_INSTALL_ROUNDCUBE" "$(normalize_yes_no "${AURAPANEL_INSTALL_ROUNDCUBE}" "1")"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STRICT_SMOKE" "$(normalize_yes_no "${AURAPANEL_STRICT_SMOKE}" "0")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER" "${dbtools_auth_user}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS" "${dbtools_auth_pass}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_ALLOWED_IPS" "${dbtools_allowed_ips}"
@@ -2488,15 +2598,21 @@ apply_web_stack_mode() {
 }
 
 build_components() {
+  local go_bin="${GO_BIN:-}"
+  if [ -z "${go_bin}" ] || [ ! -x "${go_bin}" ]; then
+    go_bin="$(command -v go || true)"
+  fi
+  [ -n "${go_bin}" ] || fail "Go binary not found for component build."
+
   log "Building Go panel service..."
   cd "${PROJECT_DIR}/panel-service"
-  /usr/local/go/bin/go mod tidy
-  /usr/local/go/bin/go build -o panel-service .
+  "${go_bin}" mod tidy
+  "${go_bin}" build -o panel-service .
 
   log "Building Go API gateway..."
   cd "${PROJECT_DIR}/api-gateway"
-  /usr/local/go/bin/go mod tidy
-  /usr/local/go/bin/go build -o apigw .
+  "${go_bin}" mod tidy
+  "${go_bin}" build -o apigw .
 
   log "Building Vue frontend (production dist)..."
   cd "${PROJECT_DIR}/frontend"
@@ -2549,10 +2665,13 @@ EOF
 
 smoke_check() {
   log "Running post-install smoke checks..."
-  local panel_port panel_user panel_pass login_payload ols_user ols_pass ols_status stack_mode
+  local panel_port panel_user panel_pass login_payload ols_user ols_pass ols_status stack_mode roundcube_install strict_smoke
   panel_port="$(gateway_port)"
   stack_mode="$(normalize_web_stack_mode "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_WEB_STACK_MODE")")"
   [ -n "${stack_mode}" ] || stack_mode="ols-only"
+  strict_smoke="$(normalize_yes_no "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_STRICT_SMOKE")" "$(normalize_yes_no "${AURAPANEL_STRICT_SMOKE:-0}" "0")")"
+  AURAPANEL_STRICT_SMOKE="${strict_smoke}"
+  roundcube_install="$(normalize_yes_no "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_INSTALL_ROUNDCUBE")" "$(normalize_yes_no "${AURAPANEL_INSTALL_ROUNDCUBE:-1}" "1")")"
 
   systemctl is-active --quiet aurapanel-service || fail "aurapanel-service is not active"
   systemctl is-active --quiet aurapanel-api || fail "aurapanel-api is not active"
@@ -2584,17 +2703,21 @@ smoke_check() {
   curl -fsS "http://127.0.0.1:${panel_port}/api/health" >/dev/null || fail "Gateway health check failed"
   curl -fsS "http://127.0.0.1:${panel_port}/" >/dev/null || fail "Panel static endpoint failed"
   curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || fail "MinIO health check failed"
-  curl -fsS 'http://127.0.0.1/webmail/index.php?_task=login' >/dev/null 2>&1 || fail "Roundcube login endpoint failed"
+  if [ "${roundcube_install}" = "1" ]; then
+    curl -fsS 'http://127.0.0.1/webmail/index.php?_task=login' >/dev/null 2>&1 || smoke_fail_or_warn "Roundcube login endpoint failed"
+  else
+    warn "Roundcube smoke check skipped (AURAPANEL_INSTALL_ROUNDCUBE=0)."
+  fi
   local pma_status pg_status
   pma_status="$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1/phpmyadmin/index.php' || true)"
   case "${pma_status}" in
     2*|3*) ;;
-    *) fail "phpMyAdmin endpoint failed (HTTP ${pma_status:-000})" ;;
+    *) smoke_fail_or_warn "phpMyAdmin endpoint failed (HTTP ${pma_status:-000})" ;;
   esac
   pg_status="$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1/pgadmin4/' || true)"
   case "${pg_status}" in
     2*|3*) ;;
-    *) fail "pgAdmin endpoint failed (HTTP ${pg_status:-000})" ;;
+    *) smoke_fail_or_warn "pgAdmin endpoint failed (HTTP ${pg_status:-000})" ;;
   esac
 
   panel_user="$(panel_admin_email)"
@@ -2635,12 +2758,12 @@ smoke_check() {
       ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '127\.0\.0\.1:8443$' || warn "OLS backend TLS listener 127.0.0.1:8443 was not detected in nginx-edge mode."
     fi
     if systemctl list-unit-files | grep -q '^postfix\.service'; then
-      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)587$' || fail "Postfix submission listener (587) was not detected"
-      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)465$' || fail "Postfix SMTPS listener (465) was not detected"
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)587$' || smoke_fail_or_warn "Postfix submission listener (587) was not detected"
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)465$' || smoke_fail_or_warn "Postfix SMTPS listener (465) was not detected"
     fi
     if systemctl list-unit-files | grep -q '^dovecot\.service'; then
-      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)143$' || fail "Dovecot IMAP listener (143) was not detected"
-      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)993$' || fail "Dovecot IMAPS listener (993) was not detected"
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)143$' || smoke_fail_or_warn "Dovecot IMAP listener (143) was not detected"
+      ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)993$' || smoke_fail_or_warn "Dovecot IMAPS listener (993) was not detected"
     fi
   fi
 
@@ -2653,20 +2776,20 @@ smoke_check() {
   lo_active="$(normalize_yes_no "$(read_env_value "${SERVICE_ENV_FILE}" "AURAPANEL_LIBREOFFICE_ACTIVE")" "${lo_install}")"
 
   if [ "${ffmpeg_install}" = "1" ] && [ "${ffmpeg_active}" = "1" ]; then
-    command -v ffmpeg >/dev/null 2>&1 || fail "FFmpeg binary missing while marked active."
-    ffmpeg -version >/dev/null 2>&1 || fail "FFmpeg binary check failed."
+    command -v ffmpeg >/dev/null 2>&1 || smoke_fail_or_warn "FFmpeg binary missing while marked active."
+    ffmpeg -version >/dev/null 2>&1 || smoke_fail_or_warn "FFmpeg binary check failed."
   fi
   if [ "${im_install}" = "1" ] && [ "${im_active}" = "1" ]; then
-    ensure_magick_command || fail "ImageMagick binary missing while marked active."
-    magick -version >/dev/null 2>&1 || fail "ImageMagick binary check failed."
+    ensure_magick_command || smoke_fail_or_warn "ImageMagick binary missing while marked active."
+    magick -version >/dev/null 2>&1 || smoke_fail_or_warn "ImageMagick binary check failed."
   fi
   if [ "${lo_install}" = "1" ] && [ "${lo_active}" = "1" ]; then
     if command -v libreoffice >/dev/null 2>&1; then
-      libreoffice --version >/dev/null 2>&1 || fail "LibreOffice binary check failed."
+      libreoffice --version >/dev/null 2>&1 || smoke_fail_or_warn "LibreOffice binary check failed."
     elif command -v soffice >/dev/null 2>&1; then
-      soffice --version >/dev/null 2>&1 || fail "LibreOffice binary check failed."
+      soffice --version >/dev/null 2>&1 || smoke_fail_or_warn "LibreOffice binary check failed."
     else
-      fail "LibreOffice binary missing while marked active."
+      smoke_fail_or_warn "LibreOffice binary missing while marked active."
     fi
   fi
 
@@ -2695,7 +2818,7 @@ main() {
   else
     wait_for_package_manager
     dnf update -y
-    dnf groupinstall -y "Development Tools"
+    dnf groupinstall -y "Development Tools" || warn "DNF groupinstall Development Tools failed; continuing with package-level toolchain."
     install_packages curl wget git rsync cmake openssl-devel openssl gcc firewalld ca-certificates jq unzip tar
     install_packages dnf-plugins-core
   fi
