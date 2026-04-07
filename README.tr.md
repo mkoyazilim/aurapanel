@@ -206,13 +206,34 @@ powershell -ExecutionPolicy Bypass -File scripts/publish-wiki.ps1
 - AlmaLinux `8/9`
 - Rocky Linux `8/9`
 
-### Standart Uzak Kurulum
+### 1. Kurulum Öncesi Sistem Güncellemesi
+
+Ubuntu için:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+CentOS/Alma/Rocky için:
+
+```bash
+sudo yum check-update
+sudo yum update
+```
+
+### 2. Güncel Kurulum Komutu (Önerilen)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | sudo -E bash
+```
+
+### 2.1 Standart Uzak Kurulum (install.sh)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
-### Acil Mirror Bypass (Installer)
+### 2.2 Acil Mirror Bypass (Installer)
 
 Mirror güncel değilse sadece installer giriş dosyalarını GitHub `main` üzerinden zorlayabilirsiniz:
 
@@ -222,14 +243,14 @@ export AURAPANEL_MAIN_INSTALLER_URL="https://raw.githubusercontent.com/mkoyazili
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-### Verified Release Bootstrap
+### 3. Verified Release Bootstrap
 
 ```bash
 export AURAPANEL_RELEASE_BASE="https://github.com/mkoyazilim/aurapanel/releases/latest/download"
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-### Mevcut Host Güncelleme
+### 4. Mevcut Host Güncelleme
 
 ```bash
 cd /opt/aurapanel

@@ -217,13 +217,34 @@ powershell -ExecutionPolicy Bypass -File scripts/publish-wiki.ps1
 - AlmaLinux `8/9`
 - Rocky Linux `8/9`
 
-### 1. Standard Remote Install
+### 1. Pre-Install System Update
+
+For Ubuntu:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+For CentOS/Alma/Rocky:
+
+```bash
+sudo yum check-update
+sudo yum update
+```
+
+### 2. Current Installer Command (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | sudo -E bash
+```
+
+### 2.1 Bootstrap Wrapper (install.sh)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo bash
 ```
 
-### 1.1 Emergency Mirror Bypass (Installer)
+### 2.2 Emergency Mirror Bypass (Installer)
 
 If mirror installer files are stale, force installer entrypoints from GitHub `main`:
 
@@ -233,7 +254,7 @@ export AURAPANEL_MAIN_INSTALLER_URL="https://raw.githubusercontent.com/mkoyazili
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-### 2. Verified Release Bootstrap
+### 3. Verified Release Bootstrap
 
 ```bash
 export AURAPANEL_RELEASE_BASE="https://github.com/mkoyazilim/aurapanel/releases/latest/download"
@@ -247,7 +268,7 @@ export AURAPANEL_MANIFEST_URL="https://example.com/releases/latest/aurapanel_rel
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/install.sh | sudo -E bash
 ```
 
-### 3. Existing Host Update (Git Pull Deploy)
+### 4. Existing Host Update (Git Pull Deploy)
 
 ```bash
 cd /opt/aurapanel
