@@ -230,8 +230,11 @@ function applyStatusPayload(payload) {
     }
 
     stopPolling()
-    warnings.value = Array.isArray(updateJob.value.warnings) ? updateJob.value.warnings : []
-    steps.value = Array.isArray(updateJob.value.steps) ? updateJob.value.steps : []
+    const jobWarnings = Array.isArray(updateJob.value.warnings) ? updateJob.value.warnings : []
+    const jobSteps = Array.isArray(updateJob.value.steps) ? updateJob.value.steps : []
+    const keepDetailsVisible = !!updateJob.value.error
+    warnings.value = keepDetailsVisible ? jobWarnings : []
+    steps.value = keepDetailsVisible ? jobSteps : []
 
     if (updateJob.value.error) {
       error.value = updateJob.value.error
