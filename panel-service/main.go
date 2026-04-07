@@ -298,6 +298,7 @@ type appState struct {
 
 type service struct {
 	mu                  sync.RWMutex
+	watchdogRunMu       sync.Mutex
 	startedAt           time.Time
 	state               appState
 	modules             moduleState
@@ -421,6 +422,7 @@ func newService() *service {
 	svc.cleanupRuntimeTemporaryDBUsersOnStartup()
 	svc.startStatePersistenceWorker()
 	svc.startHousekeepingWorker()
+	svc.startWatchdogWorker()
 	go func() {
 		if err := svc.selfHealOLSManagedConfig(); err != nil {
 			log.Printf("OpenLiteSpeed startup self-heal skipped: %v", err)
@@ -887,6 +889,7 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/security/ddos",
 		"/api/v1/status/service/control",
 		"/api/v1/status/processes",
+		"/api/v1/status/watchdog",
 		"/api/v1/status/panel-port",
 		"/api/v1/status/panel-reverse-domain",
 		"/api/v1/status/web-stack",
@@ -1146,6 +1149,14 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleServices(w)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/processes":
 		s.handleProcesses(w)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/watchdog":
+		s.handleWatchdogGet(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/watchdog/toggle":
+		s.handleWatchdogToggle(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/watchdog/config":
+		s.handleWatchdogConfigSet(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/watchdog/logs/clear":
+		s.handleWatchdogLogsClear(w)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/status/update":
 		s.handleUpdateStatus(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/update/apply":

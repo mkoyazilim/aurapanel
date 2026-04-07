@@ -66,6 +66,9 @@ type moduleState struct {
 	CloudLinuxRollouts  []cloudLinuxRolloutAuditEntry
 	WebmailTokens       map[string]WebmailToken
 	DBToolTokens        map[string]DBToolToken
+	WatchdogConfig      WatchdogConfig
+	WatchdogStatus      map[string]WatchdogServiceState
+	WatchdogLogs        []WatchdogLogEntry
 	AIToolsProvider     AIToolsProviderRuntime
 	AIToolsPolicy       AIToolsPolicy
 	AIToolsPlans        []AIToolPlan
@@ -567,6 +570,35 @@ type DBToolToken struct {
 	ExpiresAt time.Time
 }
 
+type WatchdogConfig struct {
+	Enabled          bool     `json:"enabled"`
+	IntervalSeconds  int      `json:"interval_seconds"`
+	FailureThreshold int      `json:"failure_threshold"`
+	CooldownSeconds  int      `json:"cooldown_seconds"`
+	MaxLogEntries    int      `json:"max_log_entries"`
+	Services         []string `json:"services"`
+}
+
+type WatchdogServiceState struct {
+	Name                string `json:"name"`
+	LastStatus          string `json:"last_status"`
+	LastError           string `json:"last_error,omitempty"`
+	ConsecutiveFailures int    `json:"consecutive_failures"`
+	LastCheckAt         int64  `json:"last_check_at"`
+	LastSuccessAt       int64  `json:"last_success_at,omitempty"`
+	LastFailureAt       int64  `json:"last_failure_at,omitempty"`
+	LastActionAt        int64  `json:"last_action_at,omitempty"`
+}
+
+type WatchdogLogEntry struct {
+	ID        string `json:"id"`
+	Timestamp string `json:"timestamp"`
+	Service   string `json:"service"`
+	Level     string `json:"level"`
+	Event     string `json:"event"`
+	Message   string `json:"message"`
+}
+
 type AIToolsProviderConfig struct {
 	Enabled      bool   `json:"enabled"`
 	Model        string `json:"model"`
@@ -657,6 +689,9 @@ func seedModuleState() moduleState {
 		CloudflareSettings: map[string]cloudflareZoneConfig{},
 		WebmailTokens:      map[string]WebmailToken{},
 		DBToolTokens:       map[string]DBToolToken{},
+		WatchdogConfig:     defaultWatchdogConfig(),
+		WatchdogStatus:     map[string]WatchdogServiceState{},
+		WatchdogLogs:       []WatchdogLogEntry{},
 		AIToolsProvider: AIToolsProviderRuntime{
 			ActiveProvider: "deepseek",
 			DeepSeek: AIToolsProviderConfig{
@@ -754,6 +789,13 @@ func (s *service) bootstrapModules() {
 	}
 	if s.modules.DBToolTokens == nil {
 		s.modules.DBToolTokens = map[string]DBToolToken{}
+	}
+	s.modules.WatchdogConfig = sanitizeWatchdogConfig(s.modules.WatchdogConfig)
+	if s.modules.WatchdogStatus == nil {
+		s.modules.WatchdogStatus = map[string]WatchdogServiceState{}
+	}
+	if s.modules.WatchdogLogs == nil {
+		s.modules.WatchdogLogs = []WatchdogLogEntry{}
 	}
 	if strings.TrimSpace(s.modules.AIToolsProvider.ActiveProvider) == "" {
 		s.modules.AIToolsProvider.ActiveProvider = "deepseek"

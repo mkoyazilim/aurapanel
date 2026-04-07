@@ -53,6 +53,7 @@ AURAPANEL_IMAGEMAGICK_ACTIVE="${AURAPANEL_IMAGEMAGICK_ACTIVE:-1}"
 AURAPANEL_LIBREOFFICE_INSTALL="${AURAPANEL_LIBREOFFICE_INSTALL:-1}"
 AURAPANEL_LIBREOFFICE_ACTIVE="${AURAPANEL_LIBREOFFICE_ACTIVE:-1}"
 AURAPANEL_INSTALL_ROUNDCUBE="${AURAPANEL_INSTALL_ROUNDCUBE:-1}"
+AURAPANEL_WATCHDOG_ENABLED="${AURAPANEL_WATCHDOG_ENABLED:-1}"
 AURAPANEL_STRICT_SMOKE="${AURAPANEL_STRICT_SMOKE:-0}"
 GO_BIN="/usr/local/go/bin/go"
 PANEL_PORT_DEFAULT="8090"
@@ -271,6 +272,7 @@ configure_media_tool_preferences() {
   AURAPANEL_LIBREOFFICE_INSTALL="$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_INSTALL}" "1")"
   AURAPANEL_LIBREOFFICE_ACTIVE="$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_ACTIVE}" "${AURAPANEL_LIBREOFFICE_INSTALL}")"
   AURAPANEL_INSTALL_ROUNDCUBE="$(normalize_yes_no "${AURAPANEL_INSTALL_ROUNDCUBE}" "1")"
+  AURAPANEL_WATCHDOG_ENABLED="$(normalize_yes_no "${AURAPANEL_WATCHDOG_ENABLED}" "1")"
   AURAPANEL_STRICT_SMOKE="$(normalize_yes_no "${AURAPANEL_STRICT_SMOKE}" "0")"
 
   AURAPANEL_FFMPEG_INSTALL="$(prompt_yes_no "FFmpeg yüklensin mi?" "${AURAPANEL_FFMPEG_INSTALL}")"
@@ -293,6 +295,8 @@ configure_media_tool_preferences() {
   else
     AURAPANEL_LIBREOFFICE_ACTIVE="0"
   fi
+
+  AURAPANEL_WATCHDOG_ENABLED="$(prompt_yes_no "Watchdog otomatik iyilestirme aktif olsun mu?" "${AURAPANEL_WATCHDOG_ENABLED}")"
 }
 
 ensure_magick_command() {
@@ -2261,6 +2265,7 @@ AURAPANEL_IMAGEMAGICK_ACTIVE=${AURAPANEL_IMAGEMAGICK_ACTIVE}
 AURAPANEL_LIBREOFFICE_INSTALL=${AURAPANEL_LIBREOFFICE_INSTALL}
 AURAPANEL_LIBREOFFICE_ACTIVE=${AURAPANEL_LIBREOFFICE_ACTIVE}
 AURAPANEL_INSTALL_ROUNDCUBE=${AURAPANEL_INSTALL_ROUNDCUBE}
+AURAPANEL_WATCHDOG_ENABLED=${AURAPANEL_WATCHDOG_ENABLED}
 AURAPANEL_STRICT_SMOKE=${AURAPANEL_STRICT_SMOKE}
 AURAPANEL_DBTOOLS_AUTH_USER=dbtools
 AURAPANEL_DBTOOLS_AUTH_PASS=
@@ -2417,6 +2422,7 @@ EOF
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_LIBREOFFICE_INSTALL" "$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_INSTALL}" "1")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_LIBREOFFICE_ACTIVE" "$(normalize_yes_no "${AURAPANEL_LIBREOFFICE_ACTIVE}" "1")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_INSTALL_ROUNDCUBE" "$(normalize_yes_no "${AURAPANEL_INSTALL_ROUNDCUBE}" "1")"
+  upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_WATCHDOG_ENABLED" "$(normalize_yes_no "${AURAPANEL_WATCHDOG_ENABLED}" "1")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_STRICT_SMOKE" "$(normalize_yes_no "${AURAPANEL_STRICT_SMOKE}" "0")"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_USER" "${dbtools_auth_user}"
   upsert_env "${SERVICE_ENV_FILE}" "AURAPANEL_DBTOOLS_AUTH_PASS" "${dbtools_auth_pass}"
@@ -2503,7 +2509,7 @@ EOF
 }
 
 enable_stack_services() {
-  local services=(mariadb postgresql redis-server redis docker fail2ban pdns pure-ftpd postfix dovecot aurapanel-htaccess-watcher)
+  local services=(mariadb postgresql redis-server redis docker fail2ban pdns pure-ftpd postfix dovecot)
   local unit=""
 
   if command -v nginx >/dev/null 2>&1; then
@@ -2579,6 +2585,23 @@ sync_project() {
       git -C "${PROJECT_DIR}" pull --ff-only
     fi
   fi
+}
+
+remove_legacy_htaccess_watcher() {
+  local watcher_service="/etc/systemd/system/aurapanel-htaccess-watcher.service"
+  local watcher_script="/usr/local/bin/aurapanel-htaccess-watcher.sh"
+  local fallback_script="/usr/local/bin/aurapanel-htaccess-fallback.sh"
+  local fallback_cron="/etc/cron.d/aurapanel-htaccess-fallback"
+  local stamp_file="/var/lib/aurapanel/htaccess.last_reload"
+
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl disable aurapanel-htaccess-watcher >/dev/null 2>&1 || true
+    systemctl stop aurapanel-htaccess-watcher >/dev/null 2>&1 || true
+  fi
+
+  rm -f "${watcher_service}" "${watcher_script}" "${fallback_script}" "${fallback_cron}" "${stamp_file}" >/dev/null 2>&1 || true
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  ok "Legacy .htaccess watcher removed."
 }
 
 apply_web_stack_mode() {
@@ -2858,7 +2881,7 @@ main() {
   ensure_docker_runtime
   configure_db_tools_hardening
   configure_mail_stack_vmail
-  configure_htaccess_watcher
+  remove_legacy_htaccess_watcher
   build_components
   configure_systemd_services
   enable_stack_services

@@ -227,6 +227,16 @@ sudo yum update
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | sudo -E bash
 ```
 
+Root kullanıcı ile giriş yapmadıysan aşağıdaki scripti kullan:
+
+```bash
+if [ "$(id -u)" -ne 0 ]; then
+  curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | sudo -E bash
+else
+  curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | bash
+fi
+```
+
 ### 2.1 Standart Uzak Kurulum (install.sh)
 
 ```bash

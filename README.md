@@ -238,6 +238,16 @@ sudo yum update
 curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | sudo -E bash
 ```
 
+For some reason, If you are not log in as root user, Then use this below Script.
+
+```bash
+if [ "$(id -u)" -ne 0 ]; then
+  curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | sudo -E bash
+else
+  curl -fsSL https://raw.githubusercontent.com/mkoyazilim/aurapanel/main/installer/aurapanel.sh | bash
+fi
+```
+
 ### 2.1 Bootstrap Wrapper (install.sh)
 
 ```bash
