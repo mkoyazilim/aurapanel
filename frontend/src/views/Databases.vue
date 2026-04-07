@@ -64,12 +64,12 @@
       <div class="flex gap-4 mb-4">
         <button 
           @click="tuningEngine = 'mariadb'; loadTuning()" 
-          :class="['px-4 py-2 rounded-lg text-sm font-medium transition', tuningEngine === 'mariadb' ? 'bg-blue-600 text-white' : 'bg-panel-card text-gray-400 border border-panel-border hover:text-white']">
+          :class="['px-4 py-2 rounded-lg text-sm font-medium transition', tuningEngine === 'mariadb' ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-500/20' : 'bg-panel-card text-gray-400 border border-panel-border hover:text-white']">
           {{ t('database_manager.tuning.mariadb_tab') }}
         </button>
         <button 
           @click="tuningEngine = 'postgresql'; loadTuning()" 
-          :class="['px-4 py-2 rounded-lg text-sm font-medium transition', tuningEngine === 'postgresql' ? 'bg-blue-600 text-white' : 'bg-panel-card text-gray-400 border border-panel-border hover:text-white']">
+          :class="['px-4 py-2 rounded-lg text-sm font-medium transition', tuningEngine === 'postgresql' ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-500/20' : 'bg-panel-card text-gray-400 border border-panel-border hover:text-white']">
           {{ t('database_manager.tuning.postgresql_tab') }}
         </button>
       </div>

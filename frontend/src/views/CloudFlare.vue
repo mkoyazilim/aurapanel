@@ -851,17 +851,22 @@ watch(activeTab, async newTab => {
 <style scoped>
 .cloudflare-view .cf-connect-title,
 .cloudflare-view .cf-field-label {
-  color: rgb(253 186 116);
+  color: rgb(var(--brand-500) / 1);
 }
 
 .cloudflare-view :is(input[type='text'], input[type='email'], input[type='password'], input[type='number'], input[type='search'], input[type='url'], textarea, select) {
-  background-color: rgb(15 23 42) !important;
-  color: rgb(253 186 116) !important;
-  border-color: rgb(249 115 22 / 0.45) !important;
-  caret-color: rgb(251 146 60);
+  background-color: rgb(var(--panel-dark) / 1) !important;
+  color: rgb(var(--tone-100) / 1) !important;
+  border-color: rgb(var(--panel-border) / 1) !important;
+  caret-color: rgb(var(--brand-500) / 1);
 }
 
 .cloudflare-view :is(input[type='text'], input[type='email'], input[type='password'], input[type='number'], input[type='search'], input[type='url'], textarea)::placeholder {
-  color: rgb(251 146 60 / 0.65) !important;
+  color: rgb(var(--tone-500) / 1) !important;
+}
+
+.cloudflare-view select option {
+  background-color: rgb(var(--panel-card) / 1);
+  color: rgb(var(--tone-100) / 1);
 }
 </style>

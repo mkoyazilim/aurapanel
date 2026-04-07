@@ -6,7 +6,7 @@
         <p class="mt-1 text-gray-400">{{ t('wordpress_manager.subtitle') }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <router-link to="/app-runtime" class="btn-secondary">{{ t('wordpress_manager.cms_installation') }}</router-link>
+        <router-link :to="{ path: '/app-runtime', query: { tab: 'cms' } }" class="btn-secondary">{{ t('wordpress_manager.cms_installation') }}</router-link>
         <button class="btn-secondary flex items-center gap-2" :disabled="loadingSites" @click="loadSites">
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loadingSites }" />
           {{ t('wordpress_manager.refresh') }}
@@ -48,7 +48,7 @@
             <p class="mt-2 text-sm text-gray-400">{{ t('wordpress_manager.empty_body') }}</p>
           </div>
           <div class="flex justify-center gap-3">
-            <router-link to="/app-runtime" class="btn-secondary">{{ t('wordpress_manager.go_install') }}</router-link>
+            <router-link :to="{ path: '/app-runtime', query: { tab: 'cms' } }" class="btn-secondary">{{ t('wordpress_manager.go_install') }}</router-link>
             <button class="btn-primary" @click="scanSites">{{ t('wordpress_manager.rescan') }}</button>
           </div>
         </div>

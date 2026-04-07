@@ -153,13 +153,22 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
 
 const { t } = useI18n({ useScope: 'global' })
+const route = useRoute()
+const router = useRouter()
 
-const activeTab = ref('nodejs')
+const normalizeTab = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'python' || normalized === 'cms') return normalized
+  return 'nodejs'
+}
+
+const activeTab = ref(normalizeTab(route.query?.tab))
 const apps = ref([])
 const node = ref({ dir: '', app_name: '', start_script: 'npm start' })
 const python = ref({ dir: '', app_name: '', wsgi_module: 'app:app', port: 8001 })
@@ -276,5 +285,42 @@ async function refreshRuntimeData() {
   await Promise.allSettled([loadApps(), loadCmsDomains()])
 }
 
-onMounted(refreshRuntimeData)
+function syncRouteQuery() {
+  const nextTab = normalizeTab(activeTab.value)
+  const currentTab = normalizeTab(route.query?.tab)
+  if (nextTab === currentTab && route.path === '/app-runtime') {
+    return
+  }
+  router.replace({
+    path: '/app-runtime',
+    query: nextTab === 'nodejs' ? {} : { tab: nextTab },
+  })
+}
+
+watch(activeTab, (value) => {
+  const normalized = normalizeTab(value)
+  if (activeTab.value !== normalized) {
+    activeTab.value = normalized
+    return
+  }
+  if (normalized === 'cms' && cmsDomains.value.length === 0 && !cmsDomainsLoading.value) {
+    loadCmsDomains()
+  }
+  syncRouteQuery()
+})
+
+watch(
+  () => route.query?.tab,
+  (tab) => {
+    const normalized = normalizeTab(tab)
+    if (activeTab.value !== normalized) {
+      activeTab.value = normalized
+    }
+  },
+)
+
+onMounted(async () => {
+  await refreshRuntimeData()
+  syncRouteQuery()
+})
 </script>
