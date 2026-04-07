@@ -281,6 +281,15 @@ func seedOLSManagedDocrootContent(docroot, domain, rules string) error {
 	if !olsDocrootEffectivelyEmpty(docroot) {
 		return nil
 	}
+
+	if shouldUsePublicStarterSeed(rules) {
+		if err := seedOLSPublicStarterTheme(docroot, domain); err != nil {
+			return err
+		}
+		bridgeRules := defaultOLSPublicBridgeRules()
+		return os.WriteFile(filepath.Join(docroot, ".htaccess"), []byte(bridgeRules+"\n"), 0o644)
+	}
+
 	if err := writeOLSHTAccessFile(filepath.Join(docroot, ".htaccess"), rules, false); err != nil {
 		return err
 	}
@@ -303,15 +312,125 @@ func ensureOLSManagedPublicSubdirBridgeForDocroot(docroot string) error {
 	if !fileExists(filepath.Join(docroot, "public", "index.php")) {
 		return nil
 	}
-	bridgeRules := strings.TrimSpace(`
+	bridgeRules := defaultOLSPublicBridgeRules()
+	return os.WriteFile(rootHTAccess, []byte(bridgeRules+"\n"), 0o644)
+}
+
+func shouldUsePublicStarterSeed(rules string) bool {
+	normalized := strings.TrimSpace(rules)
+	return normalized == "" || strings.EqualFold(normalized, "RewriteEngine On")
+}
+
+func defaultOLSPublicBridgeRules() string {
+	return strings.TrimSpace(`
 RewriteEngine On
+RewriteCond %{THE_REQUEST} \s/+public/ [NC]
+RewriteRule ^public/(.*)$ /$1 [R=301,L]
 RewriteRule ^$ public/ [L]
 RewriteCond %{REQUEST_URI} !^/public/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ public/$1 [L]
 `)
-	return os.WriteFile(rootHTAccess, []byte(bridgeRules+"\n"), 0o644)
+}
+
+func seedOLSPublicStarterTheme(docroot, domain string) error {
+	publicDir := filepath.Join(docroot, "public")
+	assetsDir := filepath.Join(publicDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		return err
+	}
+	publicIndexPath := filepath.Join(publicDir, "index.php")
+	if !fileExists(publicIndexPath) {
+		if err := os.WriteFile(publicIndexPath, []byte(defaultOLSPublicIndexPlaceholder(domain)), 0o644); err != nil {
+			return err
+		}
+	}
+	themeCSSPath := filepath.Join(assetsDir, "theme.css")
+	if !fileExists(themeCSSPath) {
+		if err := os.WriteFile(themeCSSPath, []byte(defaultOLSPublicThemeCSS()), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func defaultOLSPublicIndexPlaceholder(domain string) string {
+	domain = normalizeDomain(domain)
+	if domain == "" {
+		domain = "site"
+	}
+	return fmt.Sprintf(`<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>%s - Starter Theme</title>
+    <link rel="stylesheet" href="/assets/theme.css">
+</head>
+<body>
+    <main class="wrap">
+        <p class="badge">AuraPanel Starter</p>
+        <h1>%s</h1>
+        <p>Bu site public_html/public yapisiyla calisiyor.</p>
+        <p>Kokteki .htaccess, temiz URL'leri public/ altina yonlendirir.</p>
+    </main>
+</body>
+</html>
+`, domain, domain)
+}
+
+func defaultOLSPublicThemeCSS() string {
+	return strings.TrimSpace(`
+:root {
+    color-scheme: dark;
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --brand: #22c55e;
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at top right, #1d4ed8 0%, var(--bg) 45%);
+    color: var(--text);
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+.wrap {
+    width: min(92vw, 760px);
+    background: color-mix(in srgb, var(--card) 88%, black);
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 40px 32px;
+    text-align: center;
+}
+.badge {
+    display: inline-block;
+    margin: 0 0 18px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    color: var(--brand);
+    border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+    background: color-mix(in srgb, var(--brand) 15%, transparent);
+    font-size: 12px;
+    font-weight: 700;
+}
+h1 {
+    margin: 0 0 14px;
+    font-size: clamp(26px, 4vw, 40px);
+}
+p {
+    margin: 10px 0 0;
+    color: var(--muted);
+    line-height: 1.6;
+}
+`) + "\n"
 }
 
 func olsDocrootEffectivelyEmpty(docroot string) bool {

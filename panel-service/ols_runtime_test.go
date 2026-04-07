@@ -218,17 +218,49 @@ func TestSeedOLSManagedDocrootContentSeedsOnlyEmptyDocroot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .htaccess: %v", err)
 	}
-	if string(htaccessRaw) != "RewriteEngine On\n" {
+	htaccessContent := string(htaccessRaw)
+	if !strings.Contains(htaccessContent, "RewriteRule ^$ public/ [L]") {
 		t.Fatalf("unexpected .htaccess content: %q", string(htaccessRaw))
 	}
-
-	indexPath := filepath.Join(docroot, "index.html")
-	indexRaw, err := os.ReadFile(indexPath)
-	if err != nil {
-		t.Fatalf("read index.html: %v", err)
+	if !strings.Contains(htaccessContent, "RewriteRule ^public/(.*)$ /$1 [R=301,L]") {
+		t.Fatalf("expected canonical /public cleanup rule, got %q", htaccessContent)
 	}
-	if !strings.Contains(string(indexRaw), "example.com") {
-		t.Fatalf("expected placeholder domain in index.html, got %q", string(indexRaw))
+
+	publicIndexPath := filepath.Join(docroot, "public", "index.php")
+	publicIndexRaw, err := os.ReadFile(publicIndexPath)
+	if err != nil {
+		t.Fatalf("read public/index.php: %v", err)
+	}
+	if !strings.Contains(string(publicIndexRaw), "example.com") {
+		t.Fatalf("expected placeholder domain in public/index.php, got %q", string(publicIndexRaw))
+	}
+
+	if fileExists(filepath.Join(docroot, "index.html")) {
+		t.Fatalf("root index.html should not be created for default public starter seed")
+	}
+}
+
+func TestSeedOLSManagedDocrootContentUsesCustomRulesWhenProvided(t *testing.T) {
+	docroot := t.TempDir()
+	customRules := "RewriteEngine On\nRewriteRule ^ index.php [L]"
+
+	if err := seedOLSManagedDocrootContent(docroot, "custom.example", customRules); err != nil {
+		t.Fatalf("seedOLSManagedDocrootContent: %v", err)
+	}
+
+	htaccessRaw, err := os.ReadFile(filepath.Join(docroot, ".htaccess"))
+	if err != nil {
+		t.Fatalf("read .htaccess: %v", err)
+	}
+	if string(htaccessRaw) != customRules+"\n" {
+		t.Fatalf("expected custom rules to be preserved, got %q", string(htaccessRaw))
+	}
+
+	if !fileExists(filepath.Join(docroot, "index.html")) {
+		t.Fatalf("expected root index.html placeholder for custom rewrite seed")
+	}
+	if fileExists(filepath.Join(docroot, "public", "index.php")) {
+		t.Fatalf("public starter should not be auto-created for custom rewrite seed")
 	}
 }
 
