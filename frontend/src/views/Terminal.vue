@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="flex min-h-0 flex-col">
     <div class="flex items-center justify-between mb-4">
       <div>
         <h1 class="text-2xl font-bold text-white">{{ t('terminal.title') }}</h1>
@@ -9,8 +9,10 @@
         {{ connected ? t('terminal.connected') : connecting ? t('terminal.connecting') : t('terminal.connect') }}
       </button>
     </div>
-    
-    <div class="flex-1 bg-black rounded-lg border border-panel-border p-2 overflow-hidden" ref="terminalContainer"></div>
+
+    <div class="relative h-[62vh] min-h-[420px] max-h-[820px] w-full rounded-lg border border-panel-border bg-black p-2 overflow-hidden">
+      <div ref="terminalContainer" class="h-full min-h-0 w-full overflow-hidden"></div>
+    </div>
   </div>
 </template>
 
@@ -122,7 +124,9 @@ function ensureTerminal() {
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.open(terminalContainer.value)
-  fitAddon.fit()
+  requestAnimationFrame(() => {
+    fitAddon?.fit()
+  })
 
   dataDisposable = term.onData((data) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -234,3 +238,11 @@ onBeforeUnmount(() => {
   connected.value = false
 })
 </script>
+
+<style scoped>
+:deep(.xterm),
+:deep(.xterm-viewport),
+:deep(.xterm-screen) {
+  height: 100%;
+}
+</style>
