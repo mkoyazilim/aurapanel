@@ -417,7 +417,7 @@
             <button class="btn-secondary ml-auto text-xs px-2 py-1" @click="loadMalwareStatus(job.id)">{{ t('security_center.malware.details') }}</button>
           </div>
           <p class="text-xs text-gray-400 break-all">{{ t('security_center.malware.target_label', { path: job.target_path }) }}</p>
-          <div class="h-2 rounded bg-[#0f172a] overflow-hidden">
+          <div class="h-2 rounded bg-panel-darker overflow-hidden">
             <div class="h-full bg-gradient-to-r from-emerald-500 to-cyan-500" :style="{ width: `${job.progress || 0}%` }"></div>
           </div>
           <div v-if="job.findings?.length" class="space-y-2">

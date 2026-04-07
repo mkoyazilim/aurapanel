@@ -450,6 +450,7 @@
         </div>
         
         <div class="flex items-center gap-4">
+          <ThemeSwitcher />
           <LanguageSwitcher />
           <div v-if="canPanelUpdateAccess" class="flex items-center gap-2">
             <button
@@ -606,6 +607,7 @@ import { useNotificationStore } from '../stores/notifications'
 import { useRequestStateStore } from '../stores/requestState'
 import { canAccessPath } from '../security/rbac'
 import api from '../services/api'
+import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import {
   Activity,

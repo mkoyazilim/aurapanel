@@ -444,13 +444,13 @@ onMounted(async () => {
 
 <style scoped>
 .php-theme .php-field {
-  background-color: #1f2d44 !important;
-  color: #fb923c !important;
-  border-color: rgba(251, 146, 60, 0.45) !important;
+  background-color: rgb(var(--panel-darker) / 1) !important;
+  color: rgb(var(--brand-600) / 1) !important;
+  border-color: rgb(var(--panel-border) / 1) !important;
 }
 
 .php-theme .php-field option {
-  background: #1b263a;
-  color: #fb923c;
+  background: rgb(var(--panel-dark) / 1);
+  color: rgb(var(--brand-600) / 1);
 }
 </style>

@@ -88,7 +88,7 @@
             <button @click="showEditor = false" class="px-4 py-1.5 bg-panel-hover text-gray-300 rounded-lg text-sm hover:bg-gray-600 transition">{{ t('common.close') }}</button>
           </div>
         </div>
-        <textarea v-model="editorContent" class="flex-1 p-4 bg-[#0d1117] text-green-400 font-mono text-sm resize-none focus:outline-none" spellcheck="false"></textarea>
+        <textarea v-model="editorContent" class="flex-1 p-4 bg-panel-darker text-brand-700 font-mono text-sm resize-none focus:outline-none" spellcheck="false"></textarea>
       </div>
     </div>
     <!-- Upload Modal -->

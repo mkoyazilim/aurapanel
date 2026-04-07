@@ -10,22 +10,24 @@
       </button>
     </div>
 
-    <div class="relative h-[62vh] min-h-[420px] max-h-[820px] w-full rounded-lg border border-panel-border bg-black p-2 overflow-hidden">
+    <div class="relative h-[62vh] min-h-[420px] max-h-[820px] w-full rounded-lg border border-panel-border bg-panel-darker p-2 overflow-hidden">
       <div ref="terminalContainer" class="h-full min-h-0 w-full overflow-hidden"></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useAuthStore } from '../stores/auth'
+import { useTheme } from '../composables/useTheme'
 
 const { t } = useI18n({ useScope: 'global' })
 const authStore = useAuthStore()
+const { theme } = useTheme()
 
 const terminalContainer = ref(null)
 const connected = ref(false)
@@ -48,6 +50,28 @@ const terminalHeartbeatIntervalMs = 20_000
 const reconnectBaseDelayMs = 1_000
 const reconnectMaxDelayMs = 10_000
 const reconnectMaxAttempts = 8
+
+function terminalTheme() {
+  if (theme.value === 'light') {
+    return {
+      background: '#fff7ed',
+      foreground: '#7c2d12',
+      cursor: '#ea580c',
+      selectionBackground: 'rgba(249, 115, 22, 0.22)',
+    }
+  }
+  return {
+    background: '#000000',
+    foreground: '#ffffff',
+    cursor: '#34d399',
+    selectionBackground: 'rgba(16, 185, 129, 0.22)',
+  }
+}
+
+function applyTerminalTheme() {
+  if (!term) return
+  term.options.theme = terminalTheme()
+}
 
 function buildTerminalUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -115,10 +139,7 @@ function ensureTerminal() {
   if (term) return
 
   term = new Terminal({
-    theme: {
-      background: '#000000',
-      foreground: '#ffffff',
-    },
+    theme: terminalTheme(),
     cursorBlink: true,
   })
   fitAddon = new FitAddon()
@@ -146,6 +167,15 @@ function ensureTerminal() {
     resizeObserver.observe(terminalContainer.value)
   }
 }
+
+watch(theme, () => {
+  applyTerminalTheme()
+  if (fitAddon) {
+    requestAnimationFrame(() => {
+      fitAddon?.fit()
+    })
+  }
+})
 
 function connectTerminal({ manual = false } = {}) {
   if (connected.value || connecting.value || disposed) return

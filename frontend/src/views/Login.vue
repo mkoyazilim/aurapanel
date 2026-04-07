@@ -1,7 +1,8 @@
 <template>
   <div class="min-h-screen bg-panel-darker flex items-center justify-center p-4">
     <div class="w-full max-w-md">
-      <div class="mb-4 flex justify-end">
+      <div class="mb-4 flex justify-end gap-3">
+        <ThemeSwitcher />
         <LanguageSwitcher />
       </div>
 
@@ -90,6 +91,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { User, KeyRound, LogOut, AlertCircle, Loader2 } from 'lucide-vue-next'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

@@ -42,6 +42,12 @@
     "refresh": "Yenile",
     "confirm_action": "İşlemi Onayla"
   },
+  "theme": {
+    "light": "Açık",
+    "dark": "Koyu",
+    "switch_to_light": "Açık Temaya Geç",
+    "switch_to_dark": "Koyu Temaya Geç"
+  },
   "api_settings": {
     "title": "Hosting Entegrasyonu",
     "subtitle": "Faturalandırma sistemleriyle (WHMCS, Müşteri Paneli vb.) entegrasyon için API anahtarınızı yönetin.",

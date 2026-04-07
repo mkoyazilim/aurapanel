@@ -3,62 +3,256 @@
 @tailwind utilities;
 
 @layer base {
+  :root,
+  html[data-theme='dark'] {
+    --brand-50: 236 253 245;
+    --brand-100: 209 250 229;
+    --brand-200: 167 243 208;
+    --brand-300: 110 231 183;
+    --brand-400: 52 211 153;
+    --brand-500: 16 185 129;
+    --brand-600: 5 150 105;
+    --brand-700: 4 120 87;
+    --brand-800: 6 95 70;
+    --brand-900: 6 78 59;
+
+    --panel-dark: 15 23 42;
+    --panel-darker: 2 6 23;
+    --panel-card: 30 41 59;
+    --panel-border: 51 65 85;
+    --panel-hover: 71 85 105;
+
+    --tone-100: 243 244 246;
+    --tone-200: 229 231 235;
+    --tone-300: 209 213 219;
+    --tone-400: 156 163 175;
+    --tone-500: 107 114 128;
+    --tone-600: 75 85 99;
+  }
+
+  html[data-theme='light'] {
+    --brand-50: 255 247 237;
+    --brand-100: 255 237 213;
+    --brand-200: 254 215 170;
+    --brand-300: 253 186 116;
+    --brand-400: 251 146 60;
+    --brand-500: 249 115 22;
+    --brand-600: 234 88 12;
+    --brand-700: 194 65 12;
+    --brand-800: 154 52 18;
+    --brand-900: 124 45 18;
+
+    --panel-dark: 255 252 247;
+    --panel-darker: 255 248 239;
+    --panel-card: 255 255 255;
+    --panel-border: 247 204 168;
+    --panel-hover: 255 235 214;
+
+    --tone-100: 31 41 55;
+    --tone-200: 55 65 81;
+    --tone-300: 75 85 99;
+    --tone-400: 107 114 128;
+    --tone-500: 148 163 184;
+    --tone-600: 100 116 139;
+  }
+
   body {
     @apply bg-panel-darker text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white;
+    background-image:
+      radial-gradient(circle at 10% 10%, rgb(var(--brand-500) / 0.06), transparent 42%),
+      radial-gradient(circle at 90% 12%, rgb(var(--brand-400) / 0.08), transparent 36%),
+      radial-gradient(circle at 50% 100%, rgb(var(--brand-600) / 0.06), transparent 45%);
+    background-attachment: fixed;
+  }
+
+  html[data-theme='light'] body {
+    @apply text-gray-700;
   }
 }
 
 @layer components {
-  /* AuraPanel Premium Card Style */
   .aura-card {
     @apply bg-panel-card border border-panel-border rounded-xl shadow-lg ring-1 ring-white/5 backdrop-blur-sm p-6 transition-all duration-300;
   }
-  
+
   .aura-card:hover {
     @apply border-brand-500/50 shadow-brand-500/10;
   }
-  
-  /* Primary Button */
+
   .btn-primary {
     @apply inline-flex justify-center px-4 py-2 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-400 hover:to-brand-500 text-center text-white font-medium rounded-lg shadow-lg shadow-brand-500/30 transition-all duration-300 transform active:scale-95 items-center gap-2;
   }
-  
-  /* Secondary Button */
+
   .btn-secondary {
     @apply inline-flex justify-center px-4 py-2 bg-panel-dark border border-panel-border hover:border-brand-500/50 hover:bg-panel-card text-center text-gray-300 hover:text-white font-medium rounded-lg transition-all duration-300 items-center gap-2;
   }
 
-  /* Dangerous Button */
   .btn-danger {
     @apply inline-flex justify-center px-4 py-2 bg-red-500/10 border border-red-500/20 hover:bg-red-500 hover:border-red-500 text-center text-red-400 hover:text-white font-medium rounded-lg transition-all duration-300 items-center gap-2;
   }
 
-  /* Form Input */
   .aura-input {
     @apply w-full bg-panel-darker border border-panel-border rounded-lg px-4 py-2 text-orange-400 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all duration-300;
   }
 }
 
-/* Glassmorphism scrollbar */
+@layer utilities {
+  html[data-theme='light'] .text-white {
+    color: rgb(var(--tone-100) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-gray-100 {
+    color: rgb(var(--tone-100) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-gray-200 {
+    color: rgb(var(--tone-200) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-gray-300 {
+    color: rgb(var(--tone-300) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-gray-400 {
+    color: rgb(var(--tone-400) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-gray-500 {
+    color: rgb(var(--tone-500) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-gray-600 {
+    color: rgb(var(--tone-600) / 1) !important;
+  }
+
+  html[data-theme='light'] .text-slate-200,
+  html[data-theme='light'] .text-slate-300 {
+    color: rgb(var(--tone-300) / 1) !important;
+  }
+
+  html[data-theme='light'] .bg-black {
+    background-color: rgb(var(--panel-dark) / 1) !important;
+  }
+
+  html[data-theme='light'] .bg-black\/10 {
+    background-color: rgb(var(--panel-dark) / 0.4) !important;
+  }
+
+  html[data-theme='light'] .bg-black\/20 {
+    background-color: rgb(var(--panel-dark) / 0.52) !important;
+  }
+
+  html[data-theme='light'] .bg-black\/30 {
+    background-color: rgb(var(--panel-dark) / 0.62) !important;
+  }
+
+  html[data-theme='light'] .bg-black\/50 {
+    background-color: rgb(var(--panel-dark) / 0.72) !important;
+  }
+
+  html[data-theme='light'] .bg-black\/60,
+  html[data-theme='light'] .bg-black\/70 {
+    background-color: rgb(var(--panel-dark) / 0.82) !important;
+  }
+
+  html[data-theme='light'] .bg-gray-600 {
+    background-color: rgb(var(--panel-hover) / 1) !important;
+  }
+
+  html[data-theme='light'] .bg-gray-500\/10,
+  html[data-theme='light'] .bg-gray-500\/15,
+  html[data-theme='light'] .bg-gray-500\/20 {
+    background-color: rgb(var(--brand-200) / 0.4) !important;
+  }
+
+  html[data-theme='light'] .bg-slate-950\/35,
+  html[data-theme='light'] .bg-slate-950\/40,
+  html[data-theme='light'] .bg-slate-950\/55,
+  html[data-theme='light'] .bg-slate-950\/80 {
+    background-color: rgb(var(--panel-dark) / 0.74) !important;
+  }
+
+  html[data-theme='light'] .bg-slate-600\/30,
+  html[data-theme='light'] .bg-slate-600\/50,
+  html[data-theme='light'] .bg-slate-500\/10 {
+    background-color: rgb(var(--brand-100) / 0.65) !important;
+  }
+
+  html[data-theme='light'] .bg-white\/5 {
+    background-color: rgb(var(--panel-hover) / 0.45) !important;
+  }
+
+  html[data-theme='light'] .border-white\/5,
+  html[data-theme='light'] .border-white\/10,
+  html[data-theme='light'] .border-white\/30,
+  html[data-theme='light'] .border-gray-500\/20,
+  html[data-theme='light'] .border-gray-500\/30,
+  html[data-theme='light'] .border-slate-500\/20 {
+    border-color: rgb(var(--panel-border) / 1) !important;
+  }
+
+  html[data-theme='light'] .btn-primary,
+  html[data-theme='light'] .btn-primary * {
+    color: #ffffff !important;
+  }
+
+  html[data-theme='light'] .btn-danger,
+  html[data-theme='light'] .btn-danger * {
+    color: #ffffff !important;
+  }
+
+  html[data-theme='light'] .aura-input {
+    color: rgb(var(--tone-100) / 1) !important;
+  }
+
+  html[data-theme='light'] .aura-input::placeholder {
+    color: rgb(var(--tone-500) / 1) !important;
+  }
+
+  html[data-theme='light'] .sidebar-link {
+    color: rgb(var(--tone-300) / 1) !important;
+  }
+
+  html[data-theme='light'] .sidebar-link:hover {
+    color: rgb(var(--tone-100) / 1) !important;
+  }
+
+  html[data-theme='light'] .sidebar-link-section-active,
+  html[data-theme='light'] .sidebar-sub-link-active {
+    color: rgb(var(--tone-100) / 1) !important;
+    background-color: rgb(var(--brand-100) / 0.45) !important;
+  }
+
+  html[data-theme='light'] .sidebar-sub-link {
+    color: rgb(var(--tone-300) / 1) !important;
+  }
+
+  html[data-theme='light'] .sidebar-sub-link:hover {
+    color: rgb(var(--tone-100) / 1) !important;
+    background-color: rgb(var(--brand-100) / 0.4) !important;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   @apply bg-panel-darker;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-panel-border rounded-full hover:bg-brand-500/50 transition-colors;
 }
 
-/* Chrome Autofill Fix for Dark Theme */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
-  -webkit-text-fill-color: theme('colors.orange.400') !important;
-  -webkit-box-shadow: 0 0 0 1000px theme('colors.panel.darker') inset !important;
-  box-shadow: 0 0 0 1000px theme('colors.panel.darker') inset !important;
+  -webkit-text-fill-color: rgb(var(--brand-600) / 1) !important;
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--panel-darker) / 1) inset !important;
+  box-shadow: 0 0 0 1000px rgb(var(--panel-darker) / 1) inset !important;
   transition: background-color 9999s ease-in-out 0s;
 }

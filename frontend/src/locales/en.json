@@ -42,6 +42,12 @@
     "refresh": "Refresh",
     "confirm_action": "Confirm Action"
   },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "switch_to_light": "Switch to Light Theme",
+    "switch_to_dark": "Switch to Dark Theme"
+  },
   "api_settings": {
     "title": "Hosting Integration",
     "subtitle": "Manage your AuraPanel API token for integration with billing systems (WHMCS, AuraPanel Customer, etc.).",
