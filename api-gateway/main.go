@@ -146,6 +146,7 @@ func main() {
 	resellerMux.HandleFunc("/api/v1/reseller/account/password", controllers.ResellerChangePassword)
 	resellerMux.HandleFunc("/api/v1/reseller/account/package", controllers.ResellerChangePackage)
 	resellerMux.HandleFunc("/api/v1/reseller/packages", controllers.ResellerListPackages)
+	resellerMux.HandleFunc("/api/v1/reseller/vhost/list", controllers.ResellerListVhosts)
 	resellerMux.HandleFunc("/api/v1/reseller/sso", controllers.ResellerSSO)
 
 	resellerHandler := middleware.RequestIDMiddleware(
@@ -179,6 +180,7 @@ func main() {
 	mainRouter.Handle("/api/v1/reseller/account/password", resellerHandler)
 	mainRouter.Handle("/api/v1/reseller/account/package", resellerHandler)
 	mainRouter.Handle("/api/v1/reseller/packages", resellerHandler)
+	mainRouter.Handle("/api/v1/reseller/vhost/list", resellerHandler)
 	mainRouter.Handle("/api/v1/reseller/sso", resellerHandler)
 
 	// Protected

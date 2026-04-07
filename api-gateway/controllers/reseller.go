@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -565,6 +566,37 @@ func ResellerListPackages(w http.ResponseWriter, r *http.Request) {
 	var apiResp BaseResponse
 	_ = json.NewDecoder(resp.Body).Decode(&apiResp)
 	writeJSON(w, resp.StatusCode, apiResp)
+}
+
+func ResellerListVhosts(w http.ResponseWriter, r *http.Request) {
+	search := strings.TrimSpace(r.URL.Query().Get("search"))
+	page, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page")))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	perPage, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("per_page")))
+	if err != nil || perPage < 1 {
+		perPage = 20
+	}
+	if perPage > 200 {
+		perPage = 200
+	}
+
+	params := url.Values{}
+	params.Set("page", strconv.Itoa(page))
+	params.Set("per_page", strconv.Itoa(perPage))
+	if search != "" {
+		params.Set("search", search)
+	}
+
+	path := "/api/v1/vhost/list?" + params.Encode()
+	statusCode, apiResp, err := callService(http.MethodGet, path, nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, BaseResponse{Status: "error", Message: "Service error: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, statusCode, apiResp)
 }
 
 func ResellerSSO(w http.ResponseWriter, r *http.Request) {
