@@ -191,8 +191,8 @@
     },
     "placeholders": {
       "domain": "ornek.com",
-      "admin_email": "admin@ornek.com",
-      "webmaster_email": "webmaster@ornek.com",
+      "admin_email": "admin{'@'}ornek.com",
+      "webmaster_email": "webmaster{'@'}ornek.com",
       "subdomain": "blog",
       "alias": "alias.ornek.com",
       "rewrite_rules": "RewriteEngine On",
@@ -351,7 +351,7 @@
     "enable": "Etkinleştir",
     "reconcile": "Uzlaştır (Eşitle)",
     "domain_label": "Bölge (Alan Adı)",
-    "record_name_placeholder": "alt alan adı veya @",
+    "record_name_placeholder": "alt alan adı veya {'@'}",
     "wizard_base_domain": "Sihirbaz Temel Alan Adı",
     "wizard_fill": "Sihirbaz",
     "nameserver_1": "İsim Sunucusu 1",
@@ -624,7 +624,7 @@
       "db_name": "wp_veritabani",
       "db_user": "wp_kullanici",
       "password": "********",
-      "admin_email": "admin@ornek.com",
+      "admin_email": "admin{'@'}ornek.com",
       "admin_user": "admin"
     },
     "install": "Yükle",
@@ -1732,7 +1732,7 @@
     "target_owner": "Hedef sahip",
     "job_id": "İş (Job) ID",
     "status": "Durum:",
-    "separator": "|",
+    "separator": "{'|'}",
     "status_failed": "İş durumu getirilemedi.",
     "live_log": "Canlı Log",
     "import_summary": "İçe Aktarım Özeti",
@@ -2198,9 +2198,9 @@
       "server_auth_failed": "CloudFlare sunucu kimlik bilgileri kaydedilemedi."
     },
     "placeholders": {
-      "email": "kullanici@ornek.com",
+      "email": "kullanici{'@'}ornek.com",
       "api_key": "****************",
-      "dns_name": "@, www, mail",
+      "dns_name": "{'@'}, www, mail",
       "dns_value": "93.184.216.34"
     },
     "analytics": {

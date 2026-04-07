@@ -191,8 +191,8 @@
     },
     "placeholders": {
       "domain": "example.com",
-      "admin_email": "admin@example.com",
-      "webmaster_email": "webmaster@example.com",
+      "admin_email": "admin{'@'}example.com",
+      "webmaster_email": "webmaster{'@'}example.com",
       "subdomain": "blog",
       "alias": "alias.example.com",
       "rewrite_rules": "RewriteEngine On",
@@ -351,7 +351,7 @@
     "enable": "Enable",
     "reconcile": "Reconcile",
     "domain_label": "Zone (Domain)",
-    "record_name_placeholder": "subdomain or @",
+    "record_name_placeholder": "subdomain or {'@'}",
     "wizard_base_domain": "Wizard Base Domain",
     "wizard_fill": "Wizard",
     "nameserver_1": "Nameserver 1",
@@ -624,7 +624,7 @@
       "db_name": "wp_database",
       "db_user": "wp_user",
       "password": "********",
-      "admin_email": "admin@example.com",
+      "admin_email": "admin{'@'}example.com",
       "admin_user": "admin"
     },
     "install": "Install",
@@ -1732,7 +1732,7 @@
     "target_owner": "Target owner",
     "job_id": "Job ID",
     "status": "Status:",
-    "separator": "|",
+    "separator": "{'|'}",
     "status_failed": "Could not fetch job status.",
     "live_log": "Live Log",
     "import_summary": "Import Summary",
@@ -2198,9 +2198,9 @@
       "server_auth_failed": "CloudFlare server credentials could not be saved."
     },
     "placeholders": {
-      "email": "user@example.com",
+      "email": "user{'@'}example.com",
       "api_key": "****************",
-      "dns_name": "@, www, mail",
+      "dns_name": "{'@'}, www, mail",
       "dns_value": "93.184.216.34"
     },
     "analytics": {

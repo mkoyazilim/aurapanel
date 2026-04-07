@@ -185,8 +185,8 @@
     },
     "placeholders": {
       "domain": "exemplo.com",
-      "admin_email": "admin@exemplo.com",
-      "webmaster_email": "webmaster@exemplo.com",
+      "admin_email": "admin{'@'}exemplo.com",
+      "webmaster_email": "webmaster{'@'}exemplo.com",
       "subdomain": "blog",
       "alias": "alias.exemplo.com",
       "rewrite_rules": "RewriteEngine On",
@@ -345,7 +345,7 @@
     "enable": "Ativar",
     "reconcile": "Reconciliar",
     "domain_label": "Zona (Domínio)",
-    "record_name_placeholder": "subdomínio ou @",
+    "record_name_placeholder": "subdomínio ou {'@'}",
     "wizard_base_domain": "Assistente de Domínio Base",
     "wizard_fill": "Assistente",
     "nameserver_1": "Servidor de Nomes 1",
@@ -589,7 +589,7 @@
       "db_name": "wp_database",
       "db_user": "wp_user",
       "password": "********",
-      "admin_email": "admin@exemplo.com",
+      "admin_email": "admin{'@'}exemplo.com",
       "admin_user": "admin"
     },
     "install": "Instalar",
@@ -1697,7 +1697,7 @@
     "target_owner": "Proprietário de destino",
     "job_id": "ID do Trabalho",
     "status": "Status:",
-    "separator": "|",
+    "separator": "{'|'}",
     "status_failed": "Não foi possível buscar o status.",
     "live_log": "Log ao Vivo",
     "import_summary": "Resumo da Importação",
@@ -2163,9 +2163,9 @@
       "server_auth_failed": "Não foi possível salvar as credenciais no servidor."
     },
     "placeholders": {
-      "email": "usuario@exemplo.com",
+      "email": "usuario{'@'}exemplo.com",
       "api_key": "****************",
-      "dns_name": "@, www, mail",
+      "dns_name": "{'@'}, www, mail",
       "dns_value": "93.184.216.34"
     },
     "analytics": {

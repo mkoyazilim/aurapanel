@@ -185,8 +185,8 @@
     },
     "placeholders": {
       "domain": "example.com",
-      "admin_email": "admin@example.com",
-      "webmaster_email": "webmaster@example.com",
+      "admin_email": "admin{'@'}example.com",
+      "webmaster_email": "webmaster{'@'}example.com",
       "subdomain": "blog",
       "alias": "alias.example.com",
       "rewrite_rules": "RewriteEngine On",
@@ -345,7 +345,7 @@
     "enable": "Включить",
     "reconcile": "Синхронизировать",
     "domain_label": "Зона (Домен)",
-    "record_name_placeholder": "субдомен или @",
+    "record_name_placeholder": "субдомен или {'@'}",
     "wizard_base_domain": "Мастер базового домена",
     "wizard_fill": "Мастер",
     "nameserver_1": "Имя сервера 1",
@@ -589,7 +589,7 @@
       "db_name": "wp_database",
       "db_user": "wp_user",
       "password": "********",
-      "admin_email": "admin@example.com",
+      "admin_email": "admin{'@'}example.com",
       "admin_user": "admin"
     },
     "install": "Установить",
@@ -1697,7 +1697,7 @@
     "target_owner": "Целевой владелец",
     "job_id": "ID задачи (Job)",
     "status": "Статус:",
-    "separator": "|",
+    "separator": "{'|'}",
     "status_failed": "Не удалось получить статус задачи.",
     "live_log": "Живой лог",
     "import_summary": "Сводка импорта",
@@ -2163,9 +2163,9 @@
       "server_auth_failed": "Не удалось сохранить учетные данные сервера CloudFlare."
     },
     "placeholders": {
-      "email": "user@example.com",
+      "email": "user{'@'}example.com",
       "api_key": "****************",
-      "dns_name": "@, www, mail",
+      "dns_name": "{'@'}, www, mail",
       "dns_value": "93.184.216.34"
     },
     "analytics": {

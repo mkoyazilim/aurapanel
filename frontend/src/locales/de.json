@@ -185,8 +185,8 @@
     },
     "placeholders": {
       "domain": "example.com",
-      "admin_email": "admin@example.com",
-      "webmaster_email": "webmaster@example.com",
+      "admin_email": "admin{'@'}example.com",
+      "webmaster_email": "webmaster{'@'}example.com",
       "subdomain": "blog",
       "alias": "alias.example.com",
       "rewrite_rules": "RewriteEngine On",
@@ -345,7 +345,7 @@
     "enable": "Aktivieren",
     "reconcile": "Abgleichen",
     "domain_label": "Zone (Domain)",
-    "record_name_placeholder": "subdomain oder @",
+    "record_name_placeholder": "subdomain oder {'@'}",
     "wizard_base_domain": "Assistent Basisdomain",
     "wizard_fill": "Assistent",
     "nameserver_1": "Nameserver 1",
@@ -589,7 +589,7 @@
       "db_name": "wp_datenbank",
       "db_user": "wp_benutzer",
       "password": "********",
-      "admin_email": "admin@example.com",
+      "admin_email": "admin{'@'}example.com",
       "admin_user": "admin"
     },
     "install": "Installieren",
@@ -1697,7 +1697,7 @@
     "target_owner": "Ziel-Besitzer",
     "job_id": "Job-ID",
     "status": "Status:",
-    "separator": "|",
+    "separator": "{'|'}",
     "status_failed": "Job-Status konnte nicht abgerufen werden.",
     "live_log": "Live-Log",
     "import_summary": "Import-Zusammenfassung",
@@ -2163,9 +2163,9 @@
       "server_auth_failed": "Serverseitige CloudFlare-Anmeldeinformationen konnten nicht gespeichert werden."
     },
     "placeholders": {
-      "email": "benutzer@example.com",
+      "email": "benutzer{'@'}example.com",
       "api_key": "****************",
-      "dns_name": "@, www, mail",
+      "dns_name": "{'@'}, www, mail",
       "dns_value": "93.184.216.34"
     },
     "analytics": {

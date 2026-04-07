@@ -185,8 +185,8 @@
     },
     "placeholders": {
       "domain": "example.com",
-      "admin_email": "admin@example.com",
-      "webmaster_email": "webmaster@example.com",
+      "admin_email": "admin{'@'}example.com",
+      "webmaster_email": "webmaster{'@'}example.com",
       "subdomain": "blog",
       "alias": "alias.example.com",
       "rewrite_rules": "RewriteEngine On",
@@ -345,7 +345,7 @@
     "enable": "সক্রিয় করুন",
     "reconcile": "রিকনসাইল",
     "domain_label": "জোন (ডোমেইন)",
-    "record_name_placeholder": "সাবডোমেইন বা @",
+    "record_name_placeholder": "সাবডোমেইন বা {'@'}",
     "wizard_base_domain": "উইজার্ড বেস ডোমেইন",
     "wizard_fill": "উইজার্ড",
     "nameserver_1": "নেমসার্ভার ১",
@@ -589,7 +589,7 @@
       "db_name": "wp_database",
       "db_user": "wp_user",
       "password": "********",
-      "admin_email": "admin@example.com",
+      "admin_email": "admin{'@'}example.com",
       "admin_user": "admin"
     },
     "install": "ইনস্টল করুন",
