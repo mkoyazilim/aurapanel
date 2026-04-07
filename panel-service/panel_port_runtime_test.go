@@ -15,6 +15,10 @@ func TestReplacePanelEdgeExtProcessorBlockUpdatesAddress(t *testing.T) {
 		"  address                 127.0.0.1:8090",
 		"  maxConns                1000",
 		"}",
+		"",
+		"websocket /api/v1/terminal/ws {",
+		"  address                 127.0.0.1:8090",
+		"}",
 		panelEdgeExtprocEndMarker,
 		"",
 		"index  {",
@@ -31,6 +35,9 @@ func TestReplacePanelEdgeExtProcessorBlockUpdatesAddress(t *testing.T) {
 	}
 	if strings.Contains(out, "address                 127.0.0.1:8090") {
 		t.Fatalf("old upstream address still present in output:\n%s", out)
+	}
+	if !strings.Contains(out, "websocket /api/v1/terminal/ws {") {
+		t.Fatalf("websocket proxy block missing in output:\n%s", out)
 	}
 	if !strings.Contains(out, panelEdgeExtprocBeginMarker) || !strings.Contains(out, panelEdgeExtprocEndMarker) {
 		t.Fatalf("managed markers should be preserved")

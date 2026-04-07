@@ -115,6 +115,10 @@ ensure_ols_panel_gateway() {
   awk '
     $0=="# AURAPANEL PANEL EDGE EXTPROC BEGIN" {skip=1; next}
     $0=="# AURAPANEL PANEL EDGE EXTPROC END" {skip=0; next}
+    $0=="# AURAPANEL TERMINAL WS CONTEXT BEGIN" {skip=1; next}
+    $0=="# AURAPANEL TERMINAL WS CONTEXT END" {skip=0; next}
+    $0=="# AURAPANEL TERMINAL WS PROXY TEST BEGIN" {skip=1; next}
+    $0=="# AURAPANEL TERMINAL WS PROXY TEST END" {skip=0; next}
     !skip {print}
   ' "${VHOST_CONF}" > "${tmp}"
 
@@ -128,6 +132,10 @@ extprocessor aurapanel_gateway {
   initTimeout             60
   retryTimeout            0
   respBuffer              0
+}
+
+websocket /api/v1/terminal/ws {
+  address                 ${proxy_addr}
 }
 # AURAPANEL PANEL EDGE EXTPROC END
 EOF

@@ -1457,10 +1457,13 @@
     "title": "Web Terminal",
     "subtitle": "Access your server securely via browser",
     "connect": "Connect",
+    "disconnect": "Disconnect",
     "connected": "Connected",
     "connecting": "Connecting to terminal...",
     "connected_msg": "Terminal connected successfully.",
-    "disconnected": "Terminal disconnected."
+    "disconnected": "Terminal disconnected.",
+    "disconnected_by_user": "Terminal disconnected by user.",
+    "proxy_hint": "If this keeps failing, check OpenLiteSpeed WebSocket Proxy URI mapping for /api/v1/terminal/ws."
   },
   "file_manager": {
     "title": "File Manager",

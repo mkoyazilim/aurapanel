@@ -1457,10 +1457,13 @@
     "title": "Web Terminal",
     "subtitle": "Tarayıcı üzerinden sunucunuza güvenli bir şekilde erişin",
     "connect": "Bağlan",
+    "disconnect": "Bağlantıyı Kes",
     "connected": "Bağlandı",
     "connecting": "Terminale bağlanıyor...",
     "connected_msg": "Terminal başarıyla bağlandı.",
-    "disconnected": "Terminal bağlantısı kesildi."
+    "disconnected": "Terminal bağlantısı kesildi.",
+    "disconnected_by_user": "Terminal bağlantısı kullanıcı tarafından kesildi.",
+    "proxy_hint": "Sorun devam ederse OpenLiteSpeed üzerinde /api/v1/terminal/ws için WebSocket Proxy URI eşlemesini kontrol edin."
   },
   "file_manager": {
     "title": "Dosya Yöneticisi",

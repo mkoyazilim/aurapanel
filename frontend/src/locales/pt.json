@@ -1422,10 +1422,13 @@
     "title": "Terminal Web",
     "subtitle": "Acesse seu servidor de forma segura pelo navegador",
     "connect": "Conectar",
+    "disconnect": "Desconectar",
     "connected": "Conectado",
     "connecting": "Conectando ao terminal...",
     "connected_msg": "Terminal conectado com sucesso.",
-    "disconnected": "Terminal desconectado."
+    "disconnected": "Terminal desconectado.",
+    "disconnected_by_user": "Terminal desconectado pelo usuario.",
+    "proxy_hint": "Se isso continuar falhando, verifique o mapeamento WebSocket Proxy URI do OpenLiteSpeed para /api/v1/terminal/ws."
   },
   "file_manager": {
     "title": "Gerenciador de Arquivos",

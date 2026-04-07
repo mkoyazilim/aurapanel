@@ -1422,10 +1422,13 @@
     "title": "Веб-терминал",
     "subtitle": "Безопасный доступ к вашему серверу через браузер",
     "connect": "Подключиться",
+    "disconnect": "Отключить",
     "connected": "Подключено",
     "connecting": "Подключение к терминалу...",
     "connected_msg": "Терминал успешно подключен.",
-    "disconnected": "Терминал отключен."
+    "disconnected": "Терминал отключен.",
+    "disconnected_by_user": "Терминал отключен пользователем.",
+    "proxy_hint": "Если это повторяется, проверьте WebSocket Proxy URI OpenLiteSpeed для /api/v1/terminal/ws."
   },
   "file_manager": {
     "title": "Файловый менеджер",

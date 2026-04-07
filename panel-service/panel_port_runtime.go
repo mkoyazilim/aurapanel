@@ -290,6 +290,10 @@ func renderPanelEdgeExtProcessorLines(upstreamAddr string) []string {
 		"  retryTimeout            0",
 		"  respBuffer              0",
 		"}",
+		"",
+		"websocket /api/v1/terminal/ws {",
+		"  address                 " + strings.TrimSpace(upstreamAddr),
+		"}",
 		panelEdgeExtprocEndMarker,
 	}
 }

@@ -5,9 +5,14 @@
         <h1 class="text-2xl font-bold text-white">{{ t('terminal.title') }}</h1>
         <p class="text-gray-400 mt-1">{{ t('terminal.subtitle') }}</p>
       </div>
-      <button class="btn-primary" @click="connectTerminal({ manual: true })" :disabled="connected || connecting">
-        {{ connected ? t('terminal.connected') : connecting ? t('terminal.connecting') : t('terminal.connect') }}
-      </button>
+      <div class="flex items-center gap-2">
+        <button class="btn-primary" @click="connectTerminal({ manual: true })" :disabled="connected || connecting">
+          {{ connected ? t('terminal.connected') : connecting ? t('terminal.connecting') : t('terminal.connect') }}
+        </button>
+        <button class="btn-secondary" @click="disconnectTerminal" :disabled="!canDisconnect">
+          {{ t('terminal.disconnect') }}
+        </button>
+      </div>
     </div>
 
     <div class="relative h-[62vh] min-h-[420px] max-h-[820px] w-full rounded-lg border border-panel-border bg-panel-darker p-2 overflow-hidden">
@@ -17,7 +22,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -44,6 +49,9 @@ let reconnectAttempts = 0
 let shouldReconnect = false
 let disposed = false
 let connectGeneration = 0
+const reconnectPending = ref(false)
+
+const canDisconnect = computed(() => connected.value || connecting.value || reconnectPending.value)
 
 const terminalHeartbeatFrame = '__AURA_HEARTBEAT__'
 const terminalHeartbeatIntervalMs = 20_000
@@ -104,6 +112,7 @@ function clearReconnectTimer() {
     window.clearTimeout(reconnectTimer)
     reconnectTimer = null
   }
+  reconnectPending.value = false
 }
 
 function scheduleReconnect() {
@@ -117,7 +126,9 @@ function scheduleReconnect() {
   reconnectAttempts += 1
   const delay = Math.min(reconnectBaseDelayMs * (2 ** (reconnectAttempts - 1)), reconnectMaxDelayMs)
   clearReconnectTimer()
+  reconnectPending.value = true
   reconnectTimer = window.setTimeout(() => {
+    reconnectPending.value = false
     connectTerminal({ manual: false })
   }, delay)
 }
@@ -168,6 +179,18 @@ function ensureTerminal() {
   }
 }
 
+function closeReason(event) {
+  if (!event) return ''
+  const parts = []
+  if (typeof event.code === 'number' && event.code > 0) {
+    parts.push(`code ${event.code}`)
+  }
+  if (typeof event.reason === 'string' && event.reason.trim() !== '') {
+    parts.push(event.reason.trim())
+  }
+  return parts.join(', ')
+}
+
 watch(theme, () => {
   applyTerminalTheme()
   if (fitAddon) {
@@ -193,6 +216,7 @@ function connectTerminal({ manual = false } = {}) {
   const wsUrl = buildTerminalUrl()
   const generation = ++connectGeneration
   const socket = new WebSocket(wsUrl)
+  let opened = false
   ws = socket
 
   socket.onopen = () => {
@@ -200,6 +224,7 @@ function connectTerminal({ manual = false } = {}) {
       socket.close()
       return
     }
+    opened = true
     connecting.value = false
     connected.value = true
     reconnectAttempts = 0
@@ -230,16 +255,35 @@ function connectTerminal({ manual = false } = {}) {
     }
   }
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     if (generation !== connectGeneration) return
     clearHeartbeat()
     ws = null
     if (!disposed) {
-      term?.writeln('\r\n' + t('terminal.disconnected') + '\r\n')
+      const detail = closeReason(event)
+      const disconnectLine = detail ? `${t('terminal.disconnected')} (${detail})` : t('terminal.disconnected')
+      term?.writeln('\r\n' + disconnectLine + '\r\n')
+      if (!opened) {
+        term?.writeln(t('terminal.proxy_hint') + '\r\n')
+      }
     }
     connecting.value = false
     connected.value = false
     scheduleReconnect()
+  }
+}
+
+function disconnectTerminal() {
+  shouldReconnect = false
+  reconnectAttempts = 0
+  clearReconnectTimer()
+  clearHeartbeat()
+  connectGeneration += 1
+  closeSocket()
+  connecting.value = false
+  connected.value = false
+  if (term) {
+    term.writeln('\r\n' + t('terminal.disconnected_by_user') + '\r\n')
   }
 }
 
