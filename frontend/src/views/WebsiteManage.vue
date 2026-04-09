@@ -571,7 +571,10 @@ const backupFile = ref(null)
 const backupFileInput = ref(null)
 
 const siteHomePath = computed(() => `/home/${domain.value}/public_html`)
-const isSuspended = computed(() => String(site.value?.status || 'active').toLowerCase() === 'suspended')
+const isSuspended = computed(() => {
+  const status = String(site.value?.status || '').trim().toLowerCase()
+  return status === 'suspended' || status === 'suspend'
+})
 const recentTrafficSeries = computed(() => (traffic.value.series || []).slice(-12))
 const recentMaxTrafficHit = computed(() => Math.max(1, ...recentTrafficSeries.value.map(item => Number(item.hits || 0))))
 const packageOptions = computed(() => {
@@ -891,9 +894,10 @@ function formatDateTime(value) {
 }
 
 async function loadSite() {
-  const res = await api.get('/vhost/list', { params: { search: domain.value, page: 1, per_page: 100 } })
+  const normalizedDomain = String(domain.value || '').trim().toLowerCase()
+  const res = await api.get('/vhost/list', { params: { search: normalizedDomain, page: 1, per_page: 100, _ts: Date.now() } })
   const data = res.data?.data || []
-  site.value = data.find(item => String(item.domain || '').toLowerCase() === domain.value) || {}
+  site.value = data.find(item => String(item.domain || '').trim().toLowerCase() === normalizedDomain) || {}
   form.value = {
     owner: site.value.owner || site.value.user || '',
     php_version: site.value.php_version || site.value.php || '8.3',
@@ -1212,14 +1216,24 @@ async function toggleSuspend() {
   error.value = ''
   success.value = ''
   try {
+    let res
     if (isSuspended.value) {
-      const res = await api.post('/vhost/unsuspend', { domain: domain.value })
-      success.value = res.data?.message || t('common.success')
+      res = await api.post('/vhost/unsuspend', { domain: domain.value })
     } else {
-      const res = await api.post('/vhost/suspend', { domain: domain.value })
-      success.value = res.data?.message || t('common.success')
+      res = await api.post('/vhost/suspend', { domain: domain.value })
     }
-    await loadSite()
+    success.value = res.data?.message || t('common.success')
+
+    const updatedSite = res?.data?.data
+    if (updatedSite && typeof updatedSite === 'object') {
+      site.value = { ...(site.value || {}), ...updatedSite }
+    }
+
+    try {
+      await loadSite()
+    } catch {
+      // Keep local state from action response if refresh fails.
+    }
   } catch (err) {
     error.value = msg(err, 'website_manage.messages.status_failed')
   }
