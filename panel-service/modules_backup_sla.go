@@ -141,6 +141,13 @@ func (s *service) handleBackupRestoreDrill(w http.ResponseWriter, r *http.Reques
 		targetDomain = domain
 	}
 
+	snapshotPrepared, prepErr := s.prepareSnapshotForRestore(snapshot, BackupDestination{ID: snapshot.DestinationID, Enabled: true})
+	if prepErr != nil {
+		writeError(w, http.StatusBadRequest, prepErr.Error())
+		return
+	}
+	snapshot = snapshotPrepared
+
 	startedAt := time.Now().UTC()
 	preview, previewErr := previewRuntimeSiteRestore(snapshot, targetDomain)
 

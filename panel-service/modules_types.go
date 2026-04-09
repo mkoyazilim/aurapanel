@@ -359,18 +359,22 @@ type BackupSchedule struct {
 }
 
 type BackupSnapshot struct {
-	ID            string   `json:"id"`
-	ShortID       string   `json:"short_id"`
-	Time          string   `json:"time"`
-	CreatedAt     int64    `json:"created_at,omitempty"`
-	Hostname      string   `json:"hostname"`
-	Tags          []string `json:"tags"`
-	Domain        string   `json:"domain"`
-	DestinationID string   `json:"destination_id,omitempty"`
-	Incremental   bool     `json:"incremental,omitempty"`
-	RetentionKeep int      `json:"retention_keep,omitempty"`
-	SizeBytes     int64    `json:"size_bytes,omitempty"`
-	BackupPath    string   `json:"backup_path"`
+	ID              string   `json:"id"`
+	ShortID         string   `json:"short_id"`
+	Time            string   `json:"time"`
+	CreatedAt       int64    `json:"created_at,omitempty"`
+	Hostname        string   `json:"hostname"`
+	Tags            []string `json:"tags"`
+	Domain          string   `json:"domain"`
+	DestinationID   string   `json:"destination_id,omitempty"`
+	Incremental     bool     `json:"incremental,omitempty"`
+	RetentionKeep   int      `json:"retention_keep,omitempty"`
+	SizeBytes       int64    `json:"size_bytes,omitempty"`
+	BackupPath      string   `json:"backup_path"`
+	RemoteProvider  string   `json:"remote_provider,omitempty"`
+	RemoteEndpoint  string   `json:"remote_endpoint,omitempty"`
+	RemoteBucket    string   `json:"remote_bucket,omitempty"`
+	RemoteObjectKey string   `json:"remote_object_key,omitempty"`
 }
 
 type BackupRestoreDrill struct {
@@ -726,6 +730,19 @@ func seedModuleState() moduleState {
 	}
 }
 
+func defaultInternalMinIOBackupDestination() (BackupDestination, bool) {
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("AURAPANEL_BACKUP_TARGET")), "internal-minio") {
+		return BackupDestination{}, false
+	}
+	return BackupDestination{
+		ID:            "internal-minio",
+		Name:          "Internal MinIO",
+		RemoteRepo:    "internal-minio",
+		RetentionKeep: backupRetentionKeepFromEnv(),
+		Enabled:       true,
+	}, true
+}
+
 func (s *service) bootstrapModules() {
 	if s.modules.PHPIni == nil {
 		s.modules.PHPIni = map[string]string{}
@@ -753,6 +770,11 @@ func (s *service) bootstrapModules() {
 	}
 	if strings.TrimSpace(s.modules.MinIOS3Config.Region) == "" {
 		s.modules.MinIOS3Config.Region = "us-east-1"
+	}
+	if len(s.modules.BackupDestinations) == 0 {
+		if destination, ok := defaultInternalMinIOBackupDestination(); ok {
+			s.modules.BackupDestinations = append(s.modules.BackupDestinations, destination)
+		}
 	}
 	if s.modules.WordPressPlugins == nil {
 		s.modules.WordPressPlugins = map[string][]WordPressPlugin{}

@@ -289,9 +289,22 @@ func (s *service) handleDockerAppRemove(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *service) handleMinIOBucketsList(w http.ResponseWriter) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.modules.MinIOBuckets})
+	cfg, ok := internalMinIOBackupConfigFromEnv()
+	if !ok {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: s.modules.MinIOBuckets})
+		return
+	}
+	buckets, err := listObjectStoreBuckets(cfg)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to list MinIO buckets: %v", err))
+		return
+	}
+	s.mu.Lock()
+	s.modules.MinIOBuckets = buckets
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: buckets})
 }
 
 func (s *service) handleMinIOBucketCreate(w http.ResponseWriter, r *http.Request) {
@@ -307,9 +320,20 @@ func (s *service) handleMinIOBucketCreate(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "Bucket name is required.")
 		return
 	}
+
+	cfg, ok := internalMinIOBackupConfigFromEnv()
+	if ok {
+		if err := createObjectStoreBucket(cfg, name); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to create MinIO bucket: %v", err))
+			return
+		}
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.modules.MinIOBuckets = append(s.modules.MinIOBuckets, name)
+	if !containsString(s.modules.MinIOBuckets, name) {
+		s.modules.MinIOBuckets = append(s.modules.MinIOBuckets, name)
+	}
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Bucket created."})
 }
 

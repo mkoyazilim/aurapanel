@@ -125,9 +125,6 @@
               <router-link v-if="can('/emails')" to="/emails" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('menu.emails') }}</span>
               </router-link>
-              <router-link v-if="can('/minio')" to="/minio" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('routes.MinIO') }}</span>
-              </router-link>
 
               <button @click="ftpMenuOpen = !ftpMenuOpen" class="sidebar-sub-link w-full justify-between" :class="{ 'sidebar-sub-link-active': isFtpRoute }">
                 <div class="flex items-center">
@@ -160,6 +157,9 @@
                 <div v-show="backupsMenuOpen" class="ml-3 mt-1 space-y-0.5 border-l border-panel-border/40 pl-3">
                   <router-link v-if="can('/backups')" to="/backups" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                     <span>{{ t('layout.links.file_backups') }}</span>
+                  </router-link>
+                  <router-link v-if="can('/minio')" to="/minio" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
+                    <span>{{ t('routes.MinIO') }}</span>
                   </router-link>
                   <router-link v-if="can('/db-backup')" to="/db-backup" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                     <span>{{ t('routes.DbBackup') }}</span>
@@ -840,7 +840,7 @@ const isDockerRoute = computed(() => route.path.startsWith('/docker'))
 const isSecurityRoute = computed(() => route.path.startsWith('/security'))
 const isSslRoute = computed(() => route.path.startsWith('/ssl'))
 const isFtpRoute = computed(() => route.path === '/sftp' || (route.path === '/ftp' && !isFtpTuningRoute.value))
-const isBackupsRoute = computed(() => route.path === '/backups' || route.path === '/db-backup')
+const isBackupsRoute = computed(() => route.path === '/backups' || route.path === '/db-backup' || route.path === '/minio')
 const isLogsRoute = computed(() => route.path === '/activity-log' || route.path === '/log-viewer')
 const isHostingRoute = computed(() =>
   ['/websites', '/dns', '/filemanager', '/migration', '/packages', '/users', '/reseller'].some(prefix => route.path.startsWith(prefix)),

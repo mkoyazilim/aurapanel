@@ -2706,6 +2706,57 @@ func (s *service) backupDestinationByIDLocked(id string) (BackupDestination, boo
 	return BackupDestination{}, false
 }
 
+func (s *service) destinationForBackupLocked(id, remoteRepo, password string) (BackupDestination, error) {
+	lookupID := strings.TrimSpace(id)
+	if lookupID == "" {
+		return BackupDestination{
+			RemoteRepo: strings.TrimSpace(remoteRepo),
+			Password:   strings.TrimSpace(password),
+			Enabled:    true,
+		}, nil
+	}
+
+	destination, ok := s.backupDestinationByIDLocked(lookupID)
+	if !ok {
+		return BackupDestination{}, fmt.Errorf("backup destination not found")
+	}
+	if !destination.Enabled {
+		return BackupDestination{}, fmt.Errorf("backup destination is disabled")
+	}
+	if strings.TrimSpace(remoteRepo) != "" {
+		destination.RemoteRepo = strings.TrimSpace(remoteRepo)
+	}
+	if strings.TrimSpace(password) != "" {
+		destination.Password = strings.TrimSpace(password)
+	}
+	return destination, nil
+}
+
+func (s *service) prepareSnapshotForRestore(snapshot BackupSnapshot, destinationHint BackupDestination) (BackupSnapshot, error) {
+	destination := destinationHint
+
+	s.mu.RLock()
+	if strings.TrimSpace(destination.ID) == "" {
+		if stored, ok := s.backupDestinationByIDLocked(snapshot.DestinationID); ok {
+			destination = stored
+		}
+	} else if stored, ok := s.backupDestinationByIDLocked(destination.ID); ok {
+		if strings.TrimSpace(destination.RemoteRepo) == "" {
+			destination.RemoteRepo = stored.RemoteRepo
+		}
+		if strings.TrimSpace(destination.Password) == "" {
+			destination.Password = stored.Password
+		}
+		if !destination.Enabled {
+			destination.Enabled = stored.Enabled
+		}
+	}
+	runtimeCfg := s.modules.MinIOS3Config
+	s.mu.RUnlock()
+
+	return ensureBackupSnapshotLocalCopy(snapshot, destination, runtimeCfg)
+}
+
 func (s *service) enforceBackupRetentionLocked(domain string, keep int) (int, error) {
 	targetDomain := normalizeDomain(domain)
 	if targetDomain == "" {
@@ -2727,15 +2778,40 @@ func (s *service) enforceBackupRetentionLocked(domain string, keep int) (int, er
 	})
 	pruned := domainItems[keep:]
 	prunedIDs := make(map[string]struct{}, len(pruned))
+	destinationsByID := make(map[string]BackupDestination, len(s.modules.BackupDestinations))
+	for _, item := range s.modules.BackupDestinations {
+		destinationsByID[item.ID] = item
+	}
+	runtimeCfg := s.modules.MinIOS3Config
 	var firstErr error
 	for _, item := range pruned {
 		prunedIDs[item.ID] = struct{}{}
 		path := filepath.Clean(strings.TrimSpace(item.BackupPath))
-		if path == "" || !isSiteBackupPathAllowed(path, targetDomain) {
+		if path != "" && isSiteBackupPathAllowed(path, targetDomain) {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) && firstErr == nil {
+				firstErr = fmt.Errorf("retention cleanup failed for %s: %w", filepath.Base(path), err)
+			}
+		}
+
+		if strings.TrimSpace(item.RemoteObjectKey) == "" {
 			continue
 		}
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) && firstErr == nil {
-			firstErr = fmt.Errorf("retention cleanup failed for %s: %w", filepath.Base(path), err)
+		destination := destinationsByID[item.DestinationID]
+		cfg, enabled, cfgErr := resolveBackupObjectStoreConfig(destination, runtimeCfg)
+		if cfgErr != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("retention remote cleanup failed: %w", cfgErr)
+			}
+			continue
+		}
+		if !enabled {
+			continue
+		}
+		if bucket := normalizeS3Bucket(item.RemoteBucket); bucket != "" {
+			cfg.Bucket = bucket
+		}
+		if err := deleteBackupArchiveFromObjectStore(cfg, item.RemoteObjectKey); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("retention remote cleanup failed for %s: %w", item.RemoteObjectKey, err)
 		}
 	}
 
@@ -2895,14 +2971,25 @@ func (s *service) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payload.Incremental = false
+	destinationID := strings.TrimSpace(payload.DestinationID)
 
 	retentionKeep := payload.RetentionKeep
+	var (
+		destination BackupDestination
+		runtimeCfg  MinIOS3Config
+	)
 	s.mu.RLock()
-	if destination, ok := s.backupDestinationByIDLocked(payload.DestinationID); ok {
-		if retentionKeep <= 0 && destination.RetentionKeep > 0 {
-			retentionKeep = destination.RetentionKeep
-		}
+	resolvedDestination, err := s.destinationForBackupLocked(destinationID, payload.RemoteRepo, payload.Password)
+	if err != nil {
+		s.mu.RUnlock()
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
+	destination = resolvedDestination
+	if retentionKeep <= 0 && destination.RetentionKeep > 0 {
+		retentionKeep = destination.RetentionKeep
+	}
+	runtimeCfg = s.modules.MinIOS3Config
 	s.mu.RUnlock()
 	if retentionKeep <= 0 {
 		retentionKeep = backupRetentionKeepFromEnv()
@@ -2914,19 +3001,40 @@ func (s *service) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	snapshot.Domain = domain
+	snapshot.DestinationID = destinationID
+	snapshot.RetentionKeep = retentionKeep
+	snapshot.Incremental = false
+
+	objectStoreCfg, objectStoreEnabled, err := resolveBackupObjectStoreConfig(destination, runtimeCfg)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if objectStoreEnabled {
+		objectKey := defaultBackupObjectKey(domain, snapshot.CreatedAt, snapshot.BackupPath, objectStoreCfg.Prefix)
+		if err := uploadBackupArchiveToObjectStore(objectStoreCfg, snapshot.BackupPath, objectKey); err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Sprintf("Backup archive was created locally but upload failed: %v", err))
+			return
+		}
+		snapshot.RemoteProvider = objectStoreCfg.Provider
+		snapshot.RemoteEndpoint = objectStoreCfg.Endpoint
+		snapshot.RemoteBucket = objectStoreCfg.Bucket
+		snapshot.RemoteObjectKey = objectKey
+		snapshot.Tags = append(snapshot.Tags, "object-storage")
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	snapshot.Domain = domain
-	snapshot.DestinationID = strings.TrimSpace(payload.DestinationID)
-	snapshot.RetentionKeep = retentionKeep
-	snapshot.Incremental = false
 	s.modules.BackupSnapshots = append([]BackupSnapshot{snapshot}, s.modules.BackupSnapshots...)
 	prunedCount, retentionErr := s.enforceBackupRetentionLocked(domain, retentionKeep)
 
 	s.appendActivityLocked("system", "backup_create", fmt.Sprintf("Backup created for %s.", domain), "")
 
 	message := fmt.Sprintf("Backup completed for %s.", domain)
+	if objectStoreEnabled {
+		message = fmt.Sprintf("%s Uploaded to object storage bucket %s.", message, snapshot.RemoteBucket)
+	}
 	if prunedCount > 0 {
 		message = fmt.Sprintf("%s Retention policy pruned %d old snapshot(s).", message, prunedCount)
 	}
@@ -2966,6 +3074,8 @@ func (s *service) handleBackupUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	destinationID := strings.TrimSpace(r.FormValue("destination_id"))
 	backupPath := strings.TrimSpace(r.FormValue("backup_path"))
+	remoteRepo := strings.TrimSpace(r.FormValue("remote_repo"))
+	password := strings.TrimSpace(r.FormValue("password"))
 	retentionKeep, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("retention_keep")))
 
 	file, header, err := r.FormFile("file")
@@ -2980,29 +3090,60 @@ func (s *service) handleBackupUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	snapshot.Domain = domain
+	snapshot.DestinationID = destinationID
 
+	var (
+		destination BackupDestination
+		runtimeCfg  MinIOS3Config
+	)
 	s.mu.RLock()
-	if destination, ok := s.backupDestinationByIDLocked(destinationID); ok {
-		if retentionKeep <= 0 && destination.RetentionKeep > 0 {
-			retentionKeep = destination.RetentionKeep
-		}
+	resolvedDestination, err := s.destinationForBackupLocked(destinationID, remoteRepo, password)
+	if err != nil {
+		s.mu.RUnlock()
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
+	destination = resolvedDestination
+	if retentionKeep <= 0 && destination.RetentionKeep > 0 {
+		retentionKeep = destination.RetentionKeep
+	}
+	runtimeCfg = s.modules.MinIOS3Config
 	s.mu.RUnlock()
 	if retentionKeep <= 0 {
 		retentionKeep = backupRetentionKeepFromEnv()
 	}
 	retentionKeep = normalizeBackupRetentionKeep(retentionKeep)
 
+	objectStoreCfg, objectStoreEnabled, err := resolveBackupObjectStoreConfig(destination, runtimeCfg)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if objectStoreEnabled {
+		objectKey := defaultBackupObjectKey(domain, snapshot.CreatedAt, snapshot.BackupPath, objectStoreCfg.Prefix)
+		if err := uploadBackupArchiveToObjectStore(objectStoreCfg, snapshot.BackupPath, objectKey); err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Sprintf("Backup archive was uploaded locally but object storage sync failed: %v", err))
+			return
+		}
+		snapshot.RemoteProvider = objectStoreCfg.Provider
+		snapshot.RemoteEndpoint = objectStoreCfg.Endpoint
+		snapshot.RemoteBucket = objectStoreCfg.Bucket
+		snapshot.RemoteObjectKey = objectKey
+		snapshot.Tags = append(snapshot.Tags, "object-storage")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	snapshot.Domain = domain
-	snapshot.DestinationID = destinationID
 	snapshot.RetentionKeep = retentionKeep
 	s.modules.BackupSnapshots = append([]BackupSnapshot{snapshot}, s.modules.BackupSnapshots...)
 	prunedCount, retentionErr := s.enforceBackupRetentionLocked(domain, retentionKeep)
 	s.appendActivityLocked("system", "backup_upload", fmt.Sprintf("Backup uploaded for %s from %s.", domain, header.Filename), "")
 
 	message := fmt.Sprintf("Backup uploaded for %s.", domain)
+	if objectStoreEnabled {
+		message = fmt.Sprintf("%s Uploaded to object storage bucket %s.", message, snapshot.RemoteBucket)
+	}
 	if prunedCount > 0 {
 		message = fmt.Sprintf("%s Retention policy pruned %d old snapshot(s).", message, prunedCount)
 	}
@@ -3043,9 +3184,12 @@ func (s *service) handleBackupSnapshots(w http.ResponseWriter, r *http.Request) 
 
 func (s *service) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Domain     string `json:"domain"`
-		SnapshotID string `json:"snapshot_id"`
-		DryRun     bool   `json:"dry_run"`
+		Domain        string `json:"domain"`
+		SnapshotID    string `json:"snapshot_id"`
+		DestinationID string `json:"destination_id"`
+		RemoteRepo    string `json:"remote_repo"`
+		Password      string `json:"password"`
+		DryRun        bool   `json:"dry_run"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid restore payload.")
@@ -3064,6 +3208,17 @@ func (s *service) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 	if !found {
 		writeError(w, http.StatusNotFound, "Backup snapshot not found.")
+		return
+	}
+	destinationHint := BackupDestination{
+		ID:         strings.TrimSpace(firstNonEmpty(payload.DestinationID, snapshot.DestinationID)),
+		RemoteRepo: strings.TrimSpace(payload.RemoteRepo),
+		Password:   strings.TrimSpace(payload.Password),
+		Enabled:    true,
+	}
+	snapshot, err := s.prepareSnapshotForRestore(snapshot, destinationHint)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	targetDomain := normalizeDomain(firstNonEmpty(payload.Domain, snapshot.Domain))
