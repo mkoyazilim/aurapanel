@@ -67,6 +67,24 @@
             </button>
           </div>
 
+          <div v-if="demoProfiles.length > 0" class="space-y-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-3">
+            <p class="text-xs font-semibold tracking-wide text-amber-200">
+              Demo Login
+            </p>
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                v-for="profile in demoProfiles"
+                :key="profile.key"
+                type="button"
+                class="btn-secondary justify-center px-3 py-2 text-sm"
+                :disabled="loading"
+                @click="handleDemoLogin(profile)"
+              >
+                {{ profile.label }}
+              </button>
+            </div>
+          </div>
+
           <div class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
             {{ t('login.hint') }}
           </div>
@@ -104,6 +122,26 @@ const errorMsg = ref('')
 const loading = ref(false)
 const requires2fa = ref(false)
 const totpToken = ref('')
+const demoProfiles = [
+  {
+    key: 'demo-admin',
+    label: 'Demo Admin',
+    email: String(import.meta.env.VITE_DEMO_ADMIN_EMAIL || '').trim(),
+    password: String(import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '').trim(),
+  },
+  {
+    key: 'demo-reseller',
+    label: 'Demo Reseller',
+    email: String(import.meta.env.VITE_DEMO_RESELLER_EMAIL || '').trim(),
+    password: String(import.meta.env.VITE_DEMO_RESELLER_PASSWORD || '').trim(),
+  },
+  {
+    key: 'demo-user',
+    label: 'Demo User',
+    email: String(import.meta.env.VITE_DEMO_USER_EMAIL || '').trim(),
+    password: String(import.meta.env.VITE_DEMO_USER_PASSWORD || '').trim(),
+  },
+].filter((profile) => profile.email !== '' && profile.password !== '')
 
 const handleLogin = async () => {
   errorMsg.value = ''
@@ -120,6 +158,15 @@ const handleLogin = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleDemoLogin = async (profile) => {
+  if (!profile || !profile.email || !profile.password) return
+  email.value = profile.email
+  password.value = profile.password
+  requires2fa.value = false
+  totpToken.value = ''
+  await handleLogin()
 }
 
 </script>
