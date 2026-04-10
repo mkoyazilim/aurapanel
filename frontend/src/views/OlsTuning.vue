@@ -75,13 +75,32 @@ const form = ref({
   keep_alive_timeout_secs: 5,
   max_keep_alive_requests: 10000,
   gzip_compression: true,
-  static_cache_enabled: true,
+  static_cache_enabled: false,
   static_cache_max_age_secs: 3600,
 })
 
 function toIntOrFallback(value, fallback) {
   const parsed = Number.parseInt(`${value ?? ''}`, 10)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function toBoolOrFallback(value, fallback) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['1', 'true', 'yes', 'on', 'enable', 'enabled'].includes(normalized)) {
+      return true
+    }
+    if (['0', 'false', 'no', 'off', 'disable', 'disabled', ''].includes(normalized)) {
+      return false
+    }
+  }
+  return fallback
 }
 
 function sanitizeOLSTuningConfig(input = {}) {
@@ -92,8 +111,8 @@ function sanitizeOLSTuningConfig(input = {}) {
     conn_timeout_secs: toIntOrFallback(input.conn_timeout_secs, base.conn_timeout_secs),
     keep_alive_timeout_secs: toIntOrFallback(input.keep_alive_timeout_secs, base.keep_alive_timeout_secs),
     max_keep_alive_requests: toIntOrFallback(input.max_keep_alive_requests, base.max_keep_alive_requests),
-    gzip_compression: Boolean(input.gzip_compression),
-    static_cache_enabled: Boolean(input.static_cache_enabled),
+    gzip_compression: toBoolOrFallback(input.gzip_compression, base.gzip_compression),
+    static_cache_enabled: toBoolOrFallback(input.static_cache_enabled, base.static_cache_enabled),
     static_cache_max_age_secs: toIntOrFallback(input.static_cache_max_age_secs, base.static_cache_max_age_secs),
   }
 }
@@ -121,7 +140,8 @@ async function saveConfig() {
   error.value = ''
   success.value = ''
   try {
-    await api.post('/ols/tuning', buildOLSTuningPayload())
+    const res = await api.post('/ols/tuning', buildOLSTuningPayload())
+    form.value = sanitizeOLSTuningConfig(res.data?.data || form.value)
     success.value = t('ols_tuning.messages.saved')
   } catch (e) {
     error.value = apiErrorMessage(e, 'ols_tuning.messages.save_failed')
@@ -133,6 +153,7 @@ async function applyConfig() {
   success.value = ''
   try {
     const res = await api.post('/ols/tuning/apply', buildOLSTuningPayload())
+    form.value = sanitizeOLSTuningConfig(res.data?.data || form.value)
     success.value = res.data?.message || t('ols_tuning.messages.applied')
   } catch (e) {
     error.value = apiErrorMessage(e, 'ols_tuning.messages.apply_failed')
