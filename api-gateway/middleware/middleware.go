@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -59,8 +60,10 @@ type ErrorResponse struct {
 }
 
 var (
-	originInit    sync.Once
-	cachedOrigins map[string]struct{}
+	originInit        sync.Once
+	cachedOrigins     map[string]struct{}
+	blockedHostsInit  sync.Once
+	cachedBlockedHost map[string]struct{}
 )
 
 func devSimulationEnabled() bool {
@@ -170,7 +173,7 @@ func ResellerAuthMiddleware(next http.Handler) http.Handler {
 		if strings.HasPrefix(tokenString, "Bearer ") {
 			tokenString = tokenString[7:]
 		}
-		
+
 		expectedToken := ""
 		tokenFile := "data/reseller.token"
 		if b, err := os.ReadFile(tokenFile); err == nil {
@@ -391,6 +394,61 @@ func isOriginAllowed(origin string) bool {
 	}
 	_, ok := allowedOrigins()[origin]
 	return ok
+}
+
+func blockedHosts() map[string]struct{} {
+	blockedHostsInit.Do(func() {
+		cachedBlockedHost = make(map[string]struct{})
+		raw := strings.TrimSpace(os.Getenv("AURAPANEL_BLOCKED_HOSTS"))
+		if raw == "" {
+			raw = "demo.aurapanel.com,demo.aurapanel.info,demo.auraoanel.info"
+		}
+		for _, item := range strings.Split(raw, ",") {
+			host := normalizeHostForCompare(item)
+			if host == "" {
+				continue
+			}
+			cachedBlockedHost[host] = struct{}{}
+		}
+	})
+	return cachedBlockedHost
+}
+
+func normalizeHostForCompare(value string) string {
+	host := strings.TrimSpace(strings.ToLower(value))
+	if host == "" {
+		return ""
+	}
+	if idx := strings.Index(host, ","); idx >= 0 {
+		host = strings.TrimSpace(host[:idx])
+	}
+	if parsed, _, err := net.SplitHostPort(host); err == nil && parsed != "" {
+		host = parsed
+	}
+	host = strings.Trim(host, "[]")
+	return host
+}
+
+func requestHostForCompare(r *http.Request) string {
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		host = strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	}
+	return normalizeHostForCompare(host)
+}
+
+// BlockedHostMiddleware rejects requests from blocked hostnames.
+func BlockedHostMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := requestHostForCompare(r)
+		if host != "" {
+			if _, blocked := blockedHosts()[host]; blocked {
+				http.NotFound(w, r)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // CorsMiddleware injects CORS headers with allowlist logic.

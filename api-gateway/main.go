@@ -198,7 +198,7 @@ func main() {
 	fmt.Printf("API Gateway listening on %s\n", listenAddr)
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           mainRouter,
+		Handler:           middleware.BlockedHostMiddleware(mainRouter),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      90 * time.Second,

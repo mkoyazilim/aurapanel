@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -90,6 +91,72 @@ func TestHandleUsersDeleteRejectsAdmin(t *testing.T) {
 	}
 	if admin := svc.findUserLocked("admin"); admin == nil {
 		t.Fatalf("admin user should remain in runtime state")
+	}
+}
+
+func TestHandleUsersDeleteAllowsSecondaryAdminForAdminPrincipal(t *testing.T) {
+	t.Setenv("AURAPANEL_STATE_FILE", filepath.Join(t.TempDir(), "panel-service-state.json"))
+
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+	svc.state.Users = append(svc.state.Users, PanelUser{
+		ID:           2,
+		Username:     "sercantapsin",
+		Name:         "Sercan Tapsin",
+		Email:        "tapsin@tapsin.com",
+		Role:         "admin",
+		Package:      "default",
+		Active:       true,
+		PasswordHash: mustHashPassword("secret"),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/delete", strings.NewReader(`{"username":"sercantapsin"}`))
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "info@mkoyazilim.com",
+		Role:     "admin",
+		Username: "admin",
+	}))
+	rec := httptest.NewRecorder()
+
+	svc.handleUsersDelete(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if user := svc.findUserLocked("sercantapsin"); user != nil {
+		t.Fatalf("secondary admin should be deleted")
+	}
+}
+
+func TestHandleUsersDeleteRejectsPrimaryAdminForAdminPrincipal(t *testing.T) {
+	t.Setenv("AURAPANEL_STATE_FILE", filepath.Join(t.TempDir(), "panel-service-state.json"))
+
+	svc := &service{
+		startedAt: seedTime(),
+		state:     seedState(),
+		modules:   seedModuleState(),
+	}
+	svc.bootstrapModules()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/delete", strings.NewReader(`{"username":"admin"}`))
+	req = req.WithContext(context.WithValue(req.Context(), servicePrincipalContextKey, servicePrincipal{
+		Email:    "info@mkoyazilim.com",
+		Role:     "admin",
+		Username: "admin",
+	}))
+	rec := httptest.NewRecorder()
+
+	svc.handleUsersDelete(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if admin := svc.findUserLocked("admin"); admin == nil {
+		t.Fatalf("primary admin should remain in runtime state")
 	}
 }
 

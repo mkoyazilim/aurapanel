@@ -2856,22 +2856,32 @@ func (s *service) handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "User not found.")
 		return
 	}
-	if s.state.Users[index].Role == "admin" {
-		writeError(w, http.StatusForbidden, "Admin user cannot be deleted.")
+	target := s.state.Users[index]
+	targetUsername := sanitizeName(target.Username)
+	principalRole := normalizeRole(principal.Role)
+
+	if hasPrincipal && targetUsername != "" && targetUsername == principalDefaultOwner(principal) {
+		writeError(w, http.StatusForbidden, "You cannot delete your own account.")
 		return
+	}
+
+	if normalizeRole(target.Role) == "admin" || target.IsOwner {
+		if !hasPrincipal || principalRole != "admin" {
+			writeError(w, http.StatusForbidden, "Admin user cannot be deleted.")
+			return
+		}
+		if target.IsOwner || targetUsername == s.defaultOwnerLocked() {
+			writeError(w, http.StatusForbidden, "Primary admin user cannot be deleted.")
+			return
+		}
 	}
 	if hasPrincipal && normalizeRole(principal.Role) != "admin" {
 		if normalizeRole(principal.Role) != "reseller" {
 			writeError(w, http.StatusForbidden, "Only reseller or admin can delete users.")
 			return
 		}
-		target := s.state.Users[index]
 		if !s.principalCanManageUserLocked(principal, target) {
 			writeError(w, http.StatusForbidden, "User is outside your management scope.")
-			return
-		}
-		if sanitizeName(target.Username) == principalDefaultOwner(principal) {
-			writeError(w, http.StatusForbidden, "You cannot delete your own account.")
 			return
 		}
 	}
