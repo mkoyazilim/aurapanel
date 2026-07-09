@@ -35,3 +35,16 @@ web-site/
 .vscode/
 AuraClient/
 patch.diff
+
+# MiMo Code agent
+.mimocode/
+
+# Anahtar Medya site files (external project, kept local)
+index.html
+script.js
+styles.css
+youtube-proxy.php
+youtube-cache.json
+poll.php
+poll-results.json
+data/

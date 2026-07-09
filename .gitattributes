@@ -1,0 +1,6 @@
+# Shell scripts always use LF (Unix line endings)
+*.sh text eol=lf
+
+# Batch scripts always use CRLF (Windows line endings)
+*.bat text eol=crlf
+*.cmd text eol=crlf
