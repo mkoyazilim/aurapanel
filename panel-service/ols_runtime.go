@@ -678,7 +678,14 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	}
 	builder.WriteString("}\n\n")
 	if certPath != "" && keyPath != "" {
+		vhDomains := []string{item.Site.Domain}
+		for _, alias := range item.Aliases {
+			if alias != item.Site.Domain {
+				vhDomains = append(vhDomains, alias)
+			}
+		}
 		builder.WriteString("vhssl  {\n")
+		builder.WriteString("  vhDomain                " + strings.Join(vhDomains, ", ") + "\n")
 		builder.WriteString("  keyFile                 " + filepath.ToSlash(keyPath) + "\n")
 		builder.WriteString("  certFile                " + filepath.ToSlash(certPath) + "\n")
 		builder.WriteString("  certChain               1\n")
