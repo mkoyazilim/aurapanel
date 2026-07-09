@@ -67,6 +67,9 @@ func TestReloadOpenLiteSpeedWithHooksAcceptsSuccessfulTransitionAfterReloadError
 	err := reloadOpenLiteSpeedWithHooks(
 		func(_ string, args ...string) (string, error) {
 			calls = append(calls, args[0])
+			if args[0] == "configtest" {
+				return "", nil
+			}
 			if args[0] == "reload" {
 				return "", errors.New("[ERROR] litespeed is not running.")
 			}
@@ -88,8 +91,8 @@ func TestReloadOpenLiteSpeedWithHooksAcceptsSuccessfulTransitionAfterReloadError
 	if err != nil {
 		t.Fatalf("expected transition-based reload recovery, got %v", err)
 	}
-	if len(calls) != 1 || calls[0] != "reload" {
-		t.Fatalf("expected only reload command, got %v", calls)
+	if len(calls) != 2 || calls[0] != "configtest" || calls[1] != "reload" {
+		t.Fatalf("expected configtest then reload command, got %v", calls)
 	}
 }
 
@@ -99,6 +102,9 @@ func TestReloadOpenLiteSpeedWithHooksFallsBackToRestart(t *testing.T) {
 	err := reloadOpenLiteSpeedWithHooks(
 		func(_ string, args ...string) (string, error) {
 			calls = append(calls, args[0])
+			if args[0] == "configtest" {
+				return "", nil
+			}
 			if args[0] == "reload" {
 				return "", errors.New("[ERROR] litespeed is not running.")
 			}
@@ -115,14 +121,17 @@ func TestReloadOpenLiteSpeedWithHooksFallsBackToRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected restart fallback to succeed, got %v", err)
 	}
-	if got := strings.Join(calls, ","); got != "reload,restart" {
-		t.Fatalf("expected reload then restart, got %s", got)
+	if got := strings.Join(calls, ","); got != "configtest,reload,restart" {
+		t.Fatalf("expected configtest, reload then restart, got %s", got)
 	}
 }
 
 func TestReloadOpenLiteSpeedWithHooksReturnsCombinedErrorWhenRecoveryFails(t *testing.T) {
 	err := reloadOpenLiteSpeedWithHooks(
 		func(_ string, args ...string) (string, error) {
+			if args[0] == "configtest" {
+				return "", nil
+			}
 			if args[0] == "reload" {
 				return "", errors.New("[ERROR] litespeed is not running.")
 			}

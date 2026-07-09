@@ -1072,7 +1072,26 @@ func waitForOpenLiteSpeedTransition(previousPID string, pidReader func() string,
 	}
 }
 
+func configTestOpenLiteSpeedWithHooks(runCommand func(string, ...string) (string, error)) error {
+	output, err := runCommand(olsLSWSControlPath, "configtest")
+	if err != nil {
+		return fmt.Errorf("openlitespeed config test failed: %v", err)
+	}
+	if strings.Contains(strings.ToLower(output), "error") || strings.Contains(strings.ToLower(output), "fail") {
+		return fmt.Errorf("openlitespeed config test failed: %s", output)
+	}
+	return nil
+}
+
+func configTestOpenLiteSpeed() error {
+	return configTestOpenLiteSpeedWithHooks(commandOutputTrimmed)
+}
+
 func reloadOpenLiteSpeedWithHooks(runCommand func(string, ...string) (string, error), pidReader func() string, isRunning func() bool, sleep func(time.Duration)) error {
+	if err := configTestOpenLiteSpeedWithHooks(runCommand); err != nil {
+		return err
+	}
+
 	previousPID := strings.TrimSpace(pidReader())
 	_, reloadErr := runCommand(olsLSWSControlPath, "reload")
 	if reloadErr == nil {
