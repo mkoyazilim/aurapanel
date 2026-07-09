@@ -199,6 +199,11 @@ func applyPanelUpdateFromDeployScript(scheduleRestart bool) (panelUpdateResult, 
 		return result, fmt.Errorf("deploy script not found: %s", scriptPath)
 	}
 
+	// Auto-stash dirty working tree before running deploy script
+	if stashErr := autoStashBeforeDeploy(&result, repoPath); stashErr != nil {
+		return result, stashErr
+	}
+
 	if scheduleRestart {
 		if err := runPanelUpdateStep(&result, "Run deploy pipeline (git pull + build)", "env", "AURAPANEL_DEPLOY_SKIP_RESTART=1", "bash", scriptPath); err != nil {
 			return result, err
@@ -226,11 +231,40 @@ func applyPanelUpdateFromDeployScript(scheduleRestart bool) (panelUpdateResult, 
 		}
 	}
 
+	restoreStashAfterDeploy(repoPath)
 	result.CurrentVersion = resolveCurrentPanelVersion()
 	if strings.TrimSpace(result.CurrentVersion) == strings.TrimSpace(result.PreviousVersion) {
 		result.Warnings = append(result.Warnings, "No version change detected after deploy. The server may already be up to date.")
 	}
 	return result, nil
+}
+
+func autoStashBeforeDeploy(result *panelUpdateResult, repoPath string) error {
+	dirty, err := commandOutputTrimmed("git", "-C", repoPath, "status", "--porcelain", "--untracked-files=no")
+	if err != nil {
+		return nil // If we can't check status, let deploy script handle it
+	}
+	if strings.TrimSpace(dirty) == "" {
+		return nil
+	}
+
+	stashMsg := fmt.Sprintf("aurapanel-auto-stash-%d", time.Now().UTC().Unix())
+	if err := runPanelUpdateStep(result, "Auto-stash dirty working tree", "git", "-C", repoPath, "stash", "push", "-m", stashMsg); err != nil {
+		return fmt.Errorf("failed to stash local changes: %w. Commit or stash manually before updating.", err)
+	}
+	return nil
+}
+
+func restoreStashAfterDeploy(repoPath string) {
+	// Check if there's a stash to pop
+	out, err := commandOutputTrimmed("git", "-C", repoPath, "stash", "list")
+	if err != nil || strings.TrimSpace(out) == "" {
+		return
+	}
+	// Only pop if it's our auto-stash
+	if strings.Contains(out, "aurapanel-auto-stash-") {
+		_, _ = runCommandCombinedOutputWithTimeout(30*time.Second, "git", "-C", repoPath, "stash", "pop")
+	}
 }
 
 func applyPanelUpdateToRelease(target string) (panelUpdateResult, error) {
@@ -253,8 +287,9 @@ func applyPanelUpdateToRelease(target string) (panelUpdateResult, error) {
 		return result, fmt.Errorf("repository path is not a git checkout: %s", repoPath)
 	}
 
-	if dirty, err := commandOutputTrimmed("git", "-C", repoPath, "status", "--porcelain"); err == nil && strings.TrimSpace(dirty) != "" {
-		return result, fmt.Errorf("repository is dirty; commit or stash local changes before panel update")
+	// Auto-stash dirty working tree before release update
+	if stashErr := autoStashBeforeDeploy(&result, repoPath); stashErr != nil {
+		return result, stashErr
 	}
 
 	if err := runPanelUpdateStep(&result, "Fetch latest tags", "git", "-C", repoPath, "fetch", "--tags", "origin"); err != nil {
@@ -295,6 +330,7 @@ func applyPanelUpdateToRelease(target string) (panelUpdateResult, error) {
 	if scheduleServiceRestartWithFallback(&result, "aurapanel-service", "aurapanel-service-delayed-restart", 3, false) {
 		result.Warnings = append(result.Warnings, "Panel-service restart is scheduled to run in a few seconds.")
 	}
+	restoreStashAfterDeploy(repoPath)
 	result.CurrentVersion = resolveCurrentPanelVersion()
 	return result, nil
 }
