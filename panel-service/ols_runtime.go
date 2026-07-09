@@ -52,13 +52,10 @@ func (s *service) syncOLSVhostsLocked() error {
 		aliases:  aliases,
 		done:     make(chan error, 1),
 	}
-	select {
-	case s.olsSyncQueue <- req:
-		return <-req.done
-	default:
-		// If queue is saturated, fall back to direct sync to keep control-plane operations responsive.
-		return syncOLSRuntimeState(sites, advanced, aliases)
-	}
+	// Always queue the request to prevent concurrent direct syncs (race condition fix).
+	// The queue consumer processes requests sequentially, ensuring config consistency.
+	s.olsSyncQueue <- req
+	return <-req.done
 }
 
 func (s *service) selfHealOLSManagedConfig() error {
@@ -531,7 +528,9 @@ func olsManagedVhostName(domain string) string {
 		case r >= '0' && r <= '9':
 			b.WriteRune(r)
 		case r == '.':
-			b.WriteByte('_')
+			b.WriteString("__")
+		case r == '-':
+			b.WriteString("--")
 		default:
 			b.WriteByte('_')
 		}
@@ -595,12 +594,12 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	builder.WriteString("  indexFiles              index.php, index.html\n")
 	builder.WriteString("  autoIndex               0\n")
 	builder.WriteString("}\n\n")
-	builder.WriteString("errorlog " + errorLog + "{\n")
+	builder.WriteString("errorlog " + errorLog + " {\n")
 	builder.WriteString("  useServer               0\n")
 	builder.WriteString("  logLevel                NOTICE\n")
 	builder.WriteString("  rollingSize             10M\n")
 	builder.WriteString("}\n\n")
-	builder.WriteString("accessLog " + accessLog + "{\n")
+	builder.WriteString("accessLog " + accessLog + " {\n")
 	builder.WriteString("  useServer               0\n")
 	builder.WriteString("  logReferer              1\n")
 	builder.WriteString("  logUserAgent            1\n")
@@ -628,7 +627,7 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	builder.WriteString("  }\n")
 	builder.WriteString("}\n\n")
 
-	builder.WriteString("extProcessor " + socketName + "{\n")
+	builder.WriteString("extProcessor " + socketName + " {\n")
 	builder.WriteString("  type                    lsapi\n")
 	builder.WriteString("  address                 " + olsManagedSocket(item.Site.Domain) + "\n")
 	builder.WriteString("  maxConns                10\n")
@@ -659,13 +658,21 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	}
 	builder.WriteString("}\n\n")
 	certPath, keyPath := findCertificatePair(item.Site.Domain)
+	// SSL redirect is placed in a context block (higher priority than rewrite/.htaccess)
+	// to prevent conflicts with WordPress and other .htaccess-heavy applications.
+	if certPath != "" && keyPath != "" {
+		builder.WriteString("context / {\n")
+		builder.WriteString("  allowBrowse             1\n")
+		builder.WriteString("  rewrite  {\n")
+		builder.WriteString("    enable                1\n")
+		builder.WriteString("    RewriteCond           %{HTTPS} !=on\n")
+		builder.WriteString("    RewriteRule           ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]\n")
+		builder.WriteString("  }\n")
+		builder.WriteString("}\n\n")
+	}
 	builder.WriteString("rewrite  {\n")
 	builder.WriteString("  enable                  1\n")
 	builder.WriteString("  autoLoadHtaccess        1\n")
-	if certPath != "" && keyPath != "" {
-		builder.WriteString("  RewriteCond %{HTTPS} !=on\n")
-		builder.WriteString("  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]\n")
-	}
 	if !strings.EqualFold(item.Site.Status, "active") {
 		builder.WriteString("  RewriteRule ^(.*)$ - [F,L]\n")
 	}
@@ -693,11 +700,11 @@ func olsOpenBasedirValue(domain string) string {
 func renderOLSHTTPDConfig(current string, sites []olsManagedSite) (string, error) {
 	managedVhosts := renderOLSManagedVhostBlocks(sites)
 	withVhosts := replaceOrInsertManagedBlock(current, olsManagedVhostsBegin, olsManagedVhostsEnd, managedVhosts, "module cache {")
-	withDefault, err := replaceOLSListenerMaps(withVhosts, "Default", renderOLSManagedListenerMapBlock(sites))
+	withDefault, err := replaceOLSListenerMaps(withVhosts, "Default", renderOLSManagedListenerMapBlock(sites), true)
 	if err != nil {
 		return "", err
 	}
-	withSSL, err := replaceOLSListenerMaps(withDefault, "AuraPanelSSL", renderOLSManagedListenerMapBlock(sites))
+	withSSL, err := replaceOLSListenerMaps(withDefault, "AuraPanelSSL", renderOLSManagedListenerMapBlock(sites), false)
 	if err != nil {
 		return "", err
 	}
@@ -741,9 +748,20 @@ func renderOLSManagedListenerMapBlock(sites []olsManagedSite) string {
 	for _, item := range sites {
 		lines = append(lines, fmt.Sprintf("    map                      %s %s", olsManagedVhostName(item.Site.Domain), strings.Join(item.Aliases, ", ")))
 	}
-	lines = append(lines, "    map                      Example *")
+	panelEdgeDomain := panelEdgeDomainName()
+	if panelEdgeDomain != "" {
+		lines = append(lines, fmt.Sprintf("    map                      Example %s, www.%s", panelEdgeDomain, panelEdgeDomain))
+	}
 	lines = append(lines, olsManagedListenerEnd)
 	return strings.Join(lines, "\n")
+}
+
+func panelEdgeDomainName() string {
+	domain := strings.TrimSpace(os.Getenv("AURAPANEL_PANEL_EDGE_DOMAIN"))
+	if domain == "" {
+		domain = "panel.aurapanel.info"
+	}
+	return normalizeDomain(domain)
 }
 
 func siteSystemOwner(site Website) string {
@@ -926,10 +944,19 @@ func replaceOrInsertManagedBlock(current, beginMarker, endMarker, replacement, a
 	return current + "\n\n" + replacement + "\n"
 }
 
-func replaceOLSListenerMaps(current, listenerName, replacement string) (string, error) {
-	token := "listener " + listenerName + "{"
+func replaceOLSListenerMaps(current, listenerName, replacement string, required bool) (string, error) {
+	token := "listener " + listenerName + " {"
 	start := strings.Index(current, token)
 	if start < 0 {
+		// Fallback: try without space for legacy configs
+		token = "listener " + listenerName + "{"
+		start = strings.Index(current, token)
+	}
+	if start < 0 {
+		if required {
+			return "", fmt.Errorf("required listener %s not found in httpd_config.conf", listenerName)
+		}
+		log.Printf("OpenLiteSpeed: optional listener %s not found; skipping map update.", listenerName)
 		return current, nil
 	}
 	openBrace := strings.Index(current[start:], "{")
@@ -947,7 +974,13 @@ func replaceOLSListenerMaps(current, listenerName, replacement string) (string, 
 }
 
 func olsManagedMarkersHealthy(content string) bool {
-	if strings.Count(content, olsManagedVhostsBegin) != 1 || strings.Count(content, olsManagedVhostsEnd) != 1 {
+	vhostBegin := strings.Count(content, olsManagedVhostsBegin)
+	vhostEnd := strings.Count(content, olsManagedVhostsEnd)
+	if vhostBegin != 1 || vhostEnd != 1 {
+		return false
+	}
+	// Validate marker order: begin must come before end
+	if strings.Index(content, olsManagedVhostsBegin) > strings.Index(content, olsManagedVhostsEnd) {
 		return false
 	}
 	if !olsListenerManagedMarkersHealthy(content, "Default", true) {
@@ -960,8 +993,13 @@ func olsManagedMarkersHealthy(content string) bool {
 }
 
 func olsListenerManagedMarkersHealthy(content, listenerName string, required bool) bool {
-	token := "listener " + listenerName + "{"
+	token := "listener " + listenerName + " {"
 	start := strings.Index(content, token)
+	if start < 0 {
+		// Fallback: try without space for legacy configs
+		token = "listener " + listenerName + "{"
+		start = strings.Index(content, token)
+	}
 	if start < 0 {
 		return !required
 	}

@@ -20,10 +20,11 @@ func TestRenderOLSManagedListenerMapBlockKeepsExampleFallback(t *testing.T) {
 		},
 	})
 
-	if !strings.Contains(block, "map                      AuraPanel_aurapanel_info aurapanel.info, www.aurapanel.info") {
+	if !strings.Contains(block, "map                      AuraPanel_aurapanel__info aurapanel.info, www.aurapanel.info") {
 		t.Fatalf("managed site mapping missing from listener block: %s", block)
 	}
-	if !strings.Contains(block, "map                      Example *") {
+	// Example vhost is mapped to the panel edge domain (default: panel.aurapanel.info)
+	if !strings.Contains(block, "map                      Example ") {
 		t.Fatalf("example fallback mapping missing from listener block: %s", block)
 	}
 }
@@ -406,17 +407,17 @@ func TestOLSManagedMarkersHealthy(t *testing.T) {
 	content := `listener Default{
     map                      Example *
     # AURAPANEL MAPS BEGIN
-    map                      AuraPanel_demo demo.example
+    map                      AuraPanel_demo__example demo.example
     # AURAPANEL MAPS END
 }
 listener AuraPanelSSL{
     map                      Example *
     # AURAPANEL MAPS BEGIN
-    map                      AuraPanel_demo demo.example
+    map                      AuraPanel_demo__example demo.example
     # AURAPANEL MAPS END
 }
 # AURAPANEL VHOSTS BEGIN
-virtualHost AuraPanel_demo{
+virtualHost AuraPanel_demo__example{
     vhRoot                   /home/demo.example/
 }
 # AURAPANEL VHOSTS END
@@ -432,10 +433,10 @@ func TestOLSManagedMarkersHealthyDetectsDrift(t *testing.T) {
 	content := `listener Default{
     map                      Example *
     # AURAPANEL MAPS BEGIN
-    map                      AuraPanel_demo demo.example
+    map                      AuraPanel_demo__example demo.example
 }
 # AURAPANEL VHOSTS BEGIN
-virtualHost AuraPanel_demo{
+virtualHost AuraPanel_demo__example{
     vhRoot                   /home/demo.example/
 }
 # AURAPANEL VHOSTS END
