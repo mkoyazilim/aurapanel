@@ -2253,7 +2253,12 @@
       "start": "Başlat",
       "stop": "Durdur",
       "restart": "Yeniden Başlat",
-      "remove": "Kaldır"
+      "remove": "Kaldır",
+      "files": "Dosyalar",
+      "files_empty": "Boş dizin",
+      "file_name": "Ad",
+      "file_size": "Boyut",
+      "file_permissions": "İzinler"
     },
     "images": {
       "title": "Docker İmajları",

@@ -229,8 +229,8 @@ func runtimeDockerContainerFiles(containerID, path string) ([]DockerFileEntry, e
 	if path == "" {
 		path = "/"
 	}
-	// List files with detailed info using ls -la
-	output, err := containerRuntimeOutputTrimmed(30*time.Second, command, "exec", containerID, "ls", "-la", "--time-style=+%", path)
+	// List files with detailed info using ls -la (compatible with BusyBox)
+	output, err := containerRuntimeOutputTrimmed(30*time.Second, command, "exec", containerID, "ls", "-la", path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files in container: %w", err)
 	}
@@ -241,18 +241,22 @@ func runtimeDockerContainerFiles(containerID, path string) ([]DockerFileEntry, e
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 9 {
+		if len(fields) < 7 {
 			continue
 		}
 		permissions := fields[0]
-		name := fields[8]
+		name := fields[6]
+		// Handle names with spaces - join remaining fields
+		if len(fields) > 7 {
+			name = strings.Join(fields[6:], " ")
+		}
 		// Skip . and .. entries
 		if name == "." || name == ".." {
 			continue
 		}
 		isDir := permissions[0] == 'd'
 		var size int64
-		if !isDir {
+		if !isDir && len(fields) >= 5 {
 			fmt.Sscanf(fields[4], "%d", &size)
 		}
 		entries = append(entries, DockerFileEntry{

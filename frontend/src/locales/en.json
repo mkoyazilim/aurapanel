@@ -2253,7 +2253,12 @@
       "start": "Start",
       "stop": "Stop",
       "restart": "Restart",
-      "remove": "Remove"
+      "remove": "Remove",
+      "files": "Files",
+      "files_empty": "Empty directory",
+      "file_name": "Name",
+      "file_size": "Size",
+      "file_permissions": "Permissions"
     },
     "images": {
       "title": "Docker Images",
