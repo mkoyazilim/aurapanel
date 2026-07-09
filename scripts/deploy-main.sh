@@ -78,13 +78,20 @@ fi
 
 cd "${REPO_DIR}"
 
-dirty="$(git status --porcelain --untracked-files=no)"
-if [ -n "${dirty}" ]; then
-  log "Working tree has uncommitted changes. Stashing before pull..."
-  git stash push -m "aurapanel-auto-deploy-stash-$(date +%s)"
-  STASHED=1
-else
+# Check if there's already an auto-stash from panel_update_runtime.go
+existing_stash="$(git stash list 2>/dev/null | grep -m1 'aurapanel-auto-stash-' || true)"
+if [ -n "${existing_stash}" ]; then
+  log "Auto-stash already exists from panel update runtime, skipping stash."
   STASHED=0
+else
+  dirty="$(git status --porcelain --untracked-files=no)"
+  if [ -n "${dirty}" ]; then
+    log "Working tree has uncommitted changes. Stashing before pull..."
+    git stash push -m "aurapanel-auto-deploy-stash-$(date +%s)"
+    STASHED=1
+  else
+    STASHED=0
+  fi
 fi
 
 log "Fetching latest refs"
@@ -135,6 +142,12 @@ log "Deployed commit: $(git rev-parse --short HEAD)"
 if [ "${STASHED:-0}" = "1" ]; then
   log "Restoring stashed changes..."
   git stash pop || log "Warning: stash pop had conflicts. Run 'git stash drop' to discard."
+else
+  # Check if panel_update_runtime stashed - it will handle its own pop
+  existing_stash="$(git stash list 2>/dev/null | grep -m1 'aurapanel-auto-stash-' || true)"
+  if [ -n "${existing_stash}" ]; then
+    log "Auto-stash from panel update runtime detected; will be restored by panel service."
+  fi
 fi
 
 log "Done"
