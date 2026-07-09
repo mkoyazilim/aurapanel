@@ -158,6 +158,42 @@ func (s *service) handleDockerImageRemove(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Image removed."})
 }
 
+func (s *service) handleDockerContainerFiles(w http.ResponseWriter, r *http.Request) {
+	containerID := strings.TrimSpace(r.URL.Query().Get("container"))
+	path := strings.TrimSpace(r.URL.Query().Get("path"))
+	if containerID == "" {
+		writeError(w, http.StatusBadRequest, "Container ID is required.")
+		return
+	}
+	entries, err := runtimeDockerContainerFiles(containerID, path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: entries})
+}
+
+func (s *service) handleDockerContainerFileContent(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Container string `json:"container"`
+		Path      string `json:"path"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid file content payload.")
+		return
+	}
+	if payload.Container == "" || payload.Path == "" {
+		writeError(w, http.StatusBadRequest, "Container ID and file path are required.")
+		return
+	}
+	content, err := runtimeDockerContainerFileContent(payload.Container, payload.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Data: content})
+}
+
 func (s *service) handleDockerTemplatesGet(w http.ResponseWriter) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

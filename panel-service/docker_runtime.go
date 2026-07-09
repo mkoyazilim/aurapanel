@@ -208,3 +208,79 @@ func removeRuntimeDockerImage(id string) error {
 	_, err = containerRuntimeOutputTrimmed(dockerActionTimeout, command, "rmi", "-f", id)
 	return err
 }
+
+type DockerFileEntry struct {
+	Name  string `json:"name"`
+	IsDir bool   `json:"is_dir"`
+	Size  int64  `json:"size"`
+	Mode  string `json:"mode"`
+}
+
+func runtimeDockerContainerFiles(containerID, path string) ([]DockerFileEntry, error) {
+	command, err := containerRuntimeCommand()
+	if err != nil {
+		return nil, err
+	}
+	containerID = strings.TrimSpace(containerID)
+	if containerID == "" {
+		return nil, fmt.Errorf("container id is required")
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		path = "/"
+	}
+	// List files with detailed info using ls -la
+	output, err := containerRuntimeOutputTrimmed(30*time.Second, command, "exec", containerID, "ls", "-la", "--time-style=+%", path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list files in container: %w", err)
+	}
+	entries := make([]DockerFileEntry, 0)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "total") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 9 {
+			continue
+		}
+		permissions := fields[0]
+		name := fields[8]
+		// Skip . and .. entries
+		if name == "." || name == ".." {
+			continue
+		}
+		isDir := permissions[0] == 'd'
+		var size int64
+		if !isDir {
+			fmt.Sscanf(fields[4], "%d", &size)
+		}
+		entries = append(entries, DockerFileEntry{
+			Name:  name,
+			IsDir: isDir,
+			Size:  size,
+			Mode:  permissions,
+		})
+	}
+	return entries, nil
+}
+
+func runtimeDockerContainerFileContent(containerID, filePath string) (string, error) {
+	command, err := containerRuntimeCommand()
+	if err != nil {
+		return "", err
+	}
+	containerID = strings.TrimSpace(containerID)
+	if containerID == "" {
+		return "", fmt.Errorf("container id is required")
+	}
+	filePath = strings.TrimSpace(filePath)
+	if filePath == "" {
+		return "", fmt.Errorf("file path is required")
+	}
+	output, err := containerRuntimeOutputTrimmed(30*time.Second, command, "exec", containerID, "cat", filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+	return output, nil
+}

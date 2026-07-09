@@ -100,6 +100,9 @@
                 <button class="rounded bg-blue-600/20 px-2 py-1 text-xs text-blue-400 transition hover:bg-blue-600/40" @click="containerAction(container.id, 'restart')">
                   {{ t('docker_manager_screen.containers.restart') }}
                 </button>
+                <button v-if="container.status.includes('Up')" class="rounded bg-purple-600/20 px-2 py-1 text-xs text-purple-400 transition hover:bg-purple-600/40" @click="openContainerFiles(container)">
+                  {{ t('docker_manager_screen.containers.files') || 'Dosyalar' }}
+                </button>
                 <button class="rounded bg-red-600/20 px-2 py-1 text-xs text-red-400 transition hover:bg-red-600/40" @click="containerAction(container.id, 'remove')">
                   {{ t('docker_manager_screen.containers.remove') }}
                 </button>
@@ -212,6 +215,74 @@
     <div v-if="notification" :class="['fixed bottom-6 right-6 z-50 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-2xl', notification.type === 'success' ? 'bg-green-600' : 'bg-red-600']">
       {{ notification.message }}
     </div>
+
+    <!-- Container Files Modal -->
+    <div v-if="showFileBrowser" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="closeFileBrowser">
+      <div class="mx-4 flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl border border-panel-border bg-panel-card shadow-2xl">
+        <div class="flex items-center justify-between border-b border-panel-border px-6 py-4">
+          <div>
+            <h3 class="text-lg font-semibold text-white">{{ t('docker_manager_screen.containers.files') || 'Dosyalar' }} - {{ fileBrowserContainer?.name }}</h3>
+            <p class="mt-1 text-sm text-gray-400 font-mono">{{ fileBrowserPath }}</p>
+          </div>
+          <button class="rounded-lg p-2 text-gray-400 transition hover:bg-panel-hover hover:text-white" @click="closeFileBrowser">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="flex-1 overflow-auto p-4">
+          <!-- Breadcrumb -->
+          <div class="mb-4 flex items-center gap-1 text-sm">
+            <button class="rounded px-2 py-1 text-blue-400 transition hover:bg-panel-hover" @click="navigateToContainerPath('/')">
+              /
+            </button>
+            <template v-for="(part, index) in pathParts" :key="index">
+              <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <button class="rounded px-2 py-1 text-blue-400 transition hover:bg-panel-hover" @click="navigateToContainerPath(getPathUpTo(index))">
+                {{ part }}
+              </button>
+            </template>
+          </div>
+          <!-- File List -->
+          <div v-if="isLoadingFiles" class="flex items-center justify-center py-12">
+            <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-400 border-t-transparent"></div>
+          </div>
+          <div v-else-if="containerFiles.length === 0" class="py-12 text-center text-gray-500">
+            {{ t('docker_manager_screen.containers.files_empty') || 'Boş dizin' }}
+          </div>
+          <div v-else class="overflow-hidden rounded-lg border border-panel-border">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-panel-border bg-panel-hover/30 text-gray-400">
+                  <th class="px-4 py-2 text-left font-medium">{{ t('docker_manager_screen.containers.file_name') || 'Ad' }}</th>
+                  <th class="px-4 py-2 text-left font-medium">{{ t('docker_manager_screen.containers.file_size') || 'Boyut' }}</th>
+                  <th class="px-4 py-2 text-left font-medium">{{ t('docker_manager_screen.containers.file_permissions') || 'İzinler' }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Parent directory link -->
+                <tr v-if="fileBrowserPath !== '/'" class="border-b border-panel-border/50 transition hover:bg-panel-hover/30 cursor-pointer" @click="goUpDirectory">
+                  <td class="flex items-center gap-2 px-4 py-2.5 font-medium text-white">
+                    <svg class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    ..
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-400">-</td>
+                  <td class="px-4 py-2.5 text-gray-400">-</td>
+                </tr>
+                <!-- File/Folder entries -->
+                <tr v-for="entry in containerFiles" :key="entry.name" class="border-b border-panel-border/50 transition hover:bg-panel-hover/30" :class="entry.is_dir ? 'cursor-pointer' : ''" @click="entry.is_dir && navigateToContainerPath(fileBrowserPath === '/' ? '/' + entry.name : fileBrowserPath + '/' + entry.name)">
+                  <td class="flex items-center gap-2 px-4 py-2.5 font-medium text-white">
+                    <svg v-if="entry.is_dir" class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    <svg v-else class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    {{ entry.name }}
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-400">{{ entry.is_dir ? '-' : formatFileSize(entry.size) }}</td>
+                  <td class="px-4 py-2.5 font-mono text-xs text-gray-400">{{ entry.mode }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -233,6 +304,13 @@ const isRefreshingImages = ref(false)
 const isPullingImage = ref(false)
 let refreshInterval = null
 
+// Container file browser state
+const showFileBrowser = ref(false)
+const fileBrowserContainer = ref(null)
+const fileBrowserPath = ref('/')
+const containerFiles = ref([])
+const isLoadingFiles = ref(false)
+
 const newContainer = ref({
   name: '',
   image: '',
@@ -246,6 +324,16 @@ const newContainer = ref({
 
 const runningCount = computed(() => (Array.isArray(containers.value) ? containers.value : []).filter(container => String(container.status || '').includes('Up')).length)
 const stoppedCount = computed(() => (Array.isArray(containers.value) ? containers.value : []).filter(container => !String(container.status || '').includes('Up')).length)
+
+const pathParts = computed(() => {
+  const parts = fileBrowserPath.value.split('/').filter(Boolean)
+  return parts
+})
+
+const getPathUpTo = (index) => {
+  const parts = fileBrowserPath.value.split('/').filter(Boolean)
+  return '/' + parts.slice(0, index + 1).join('/')
+}
 
 const showNotif = (message, type = 'success') => {
   notification.value = { message, type }
@@ -308,6 +396,59 @@ const containerAction = async (id, action) => {
   } catch (err) {
     showNotif(err.response?.data?.error || t('docker_manager_screen.messages.container_action_failed', { action }), 'error')
   }
+}
+
+const openContainerFiles = async (container) => {
+  fileBrowserContainer.value = container
+  fileBrowserPath.value = '/'
+  showFileBrowser.value = true
+  await loadContainerFiles()
+}
+
+const closeFileBrowser = () => {
+  showFileBrowser.value = false
+  fileBrowserContainer.value = null
+  fileBrowserPath.value = '/'
+  containerFiles.value = []
+}
+
+const loadContainerFiles = async () => {
+  if (!fileBrowserContainer.value) return
+  isLoadingFiles.value = true
+  try {
+    const { data } = await api.get('/docker/containers/files', {
+      params: {
+        container: fileBrowserContainer.value.id,
+        path: fileBrowserPath.value,
+      },
+    })
+    containerFiles.value = Array.isArray(data.data) ? data.data : []
+  } catch (err) {
+    showNotif(err.response?.data?.error || 'Dosya listesi alınamadı', 'error')
+    containerFiles.value = []
+  } finally {
+    isLoadingFiles.value = false
+  }
+}
+
+const navigateToContainerPath = async (path) => {
+  fileBrowserPath.value = path
+  await loadContainerFiles()
+}
+
+const goUpDirectory = async () => {
+  const parts = fileBrowserPath.value.split('/').filter(Boolean)
+  parts.pop()
+  fileBrowserPath.value = parts.length === 0 ? '/' : '/' + parts.join('/')
+  await loadContainerFiles()
+}
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
 const pullImage = async () => {

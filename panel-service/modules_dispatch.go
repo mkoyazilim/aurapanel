@@ -670,6 +670,12 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/docker/containers/remove":
 		s.handleDockerContainerAction(w, r, "remove")
 		return true
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/docker/containers/files":
+		s.handleDockerContainerFiles(w, r)
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/docker/containers/files/content":
+		s.handleDockerContainerFileContent(w, r)
+		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/docker/images":
 		s.handleDockerImagesGet(w)
 		return true
