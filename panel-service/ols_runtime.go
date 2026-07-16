@@ -215,6 +215,10 @@ func ensureOLSManagedFilesystem(item olsManagedSite) error {
 	if err := os.MkdirAll(docroot, 0o755); err != nil {
 		return err
 	}
+	acmeDir := filepath.Join(docroot, ".well-known", "acme-challenge")
+	if err := os.MkdirAll(acmeDir, 0o755); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(olsManagedVhostDir(item.Site.Domain), 0o755); err != nil {
 		return err
 	}
@@ -766,7 +770,7 @@ func renderOLSManagedListenerMapBlock(sites []olsManagedSite) string {
 func panelEdgeDomainName() string {
 	domain := strings.TrimSpace(os.Getenv("AURAPANEL_PANEL_EDGE_DOMAIN"))
 	if domain == "" {
-		domain = "panel.aurapanel.info"
+		domain = readEnvFileValue("/etc/aurapanel/aurapanel.env", "AURAPANEL_PANEL_EDGE_DOMAIN")
 	}
 	return normalizeDomain(domain)
 }
@@ -1087,6 +1091,9 @@ func configTestOpenLiteSpeedWithHooks(runCommand func(string, ...string) (string
 	if strings.Contains(strings.ToLower(output), "error") || strings.Contains(strings.ToLower(output), "fail") {
 		return fmt.Errorf("openlitespeed config test failed: %s", output)
 	}
+	if strings.Contains(strings.ToLower(output), "warn") {
+		log.Printf("OpenLiteSpeed config test warning: %s", output)
+	}
 	return nil
 }
 
@@ -1102,6 +1109,7 @@ func reloadOpenLiteSpeedWithHooks(runCommand func(string, ...string) (string, er
 	previousPID := strings.TrimSpace(pidReader())
 	_, reloadErr := runCommand(olsLSWSControlPath, "reload")
 	if reloadErr == nil {
+		waitForOpenLiteSpeedTransition(previousPID, pidReader, isRunning, sleep, olsReloadWaitTimeout, olsReloadPollInterval)
 		return nil
 	}
 
