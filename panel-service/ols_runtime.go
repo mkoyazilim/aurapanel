@@ -15,6 +15,7 @@ import (
 const (
 	olsHTTPDConfigPath      = "/usr/local/lsws/conf/httpd_config.conf"
 	olsLSWSControlPath      = "/usr/local/lsws/bin/lswsctrl"
+	olsLSWSBinaryPath       = "/usr/local/lsws/bin/openlitespeed"
 	olsManagedVhostPrefix   = "AuraPanel_"
 	olsManagedVhostsBegin   = "# AURAPANEL VHOSTS BEGIN"
 	olsManagedVhostsEnd     = "# AURAPANEL VHOSTS END"
@@ -1084,7 +1085,7 @@ func waitForOpenLiteSpeedTransition(previousPID string, pidReader func() string,
 }
 
 func configTestOpenLiteSpeedWithHooks(runCommand func(string, ...string) (string, error)) error {
-	output, err := runCommand(olsLSWSControlPath, "configtest")
+	output, err := runCommand(olsLSWSBinaryPath, "-t")
 	if err != nil {
 		return fmt.Errorf("openlitespeed config test failed: %v", err)
 	}
