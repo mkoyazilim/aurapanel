@@ -23,10 +23,13 @@ const (
 	olsManagedListenerEnd   = "    # AURAPANEL MAPS END"
 	olsReloadWaitTimeout    = 10 * time.Second
 	olsReloadPollInterval   = 250 * time.Millisecond
-	olsConfigLockDirPath    = "/tmp/aurapanel-ols-config.lock.d"
-	olsConfigLockTimeout    = 45 * time.Second
-	olsConfigLockRetry      = 200 * time.Millisecond
-	olsConfigLockStaleAfter = 15 * time.Minute
+	olsConfigLockDirPath          = "/tmp/aurapanel-ols-config.lock.d"
+	olsConfigLockTimeoutDefault   = 45 * time.Second
+	olsConfigLockTimeoutMin       = 10 * time.Second
+	olsConfigLockTimeoutMax       = 300 * time.Second
+	olsConfigLockRetry            = 200 * time.Millisecond
+	olsConfigLockStaleAfter       = 15 * time.Minute
+	olsStaleCleanupDelayDefault   = 2 * time.Second
 )
 
 var olsSleep = time.Sleep
@@ -92,6 +95,12 @@ func syncOLSRuntimeState(sites []Website, advanced map[string]WebsiteAdvancedCon
 			return err
 		}
 
+		// Keep logrotate configuration in sync with managed sites.
+		// Best-effort: logrotate failures must not block config sync.
+		if err := ensureOLSLogrotateConfig(managedSites); err != nil {
+			log.Printf("OpenLiteSpeed: logrotate config update skipped: %v", err)
+		}
+
 		previousHTTPD, err := os.ReadFile(olsHTTPDConfigPath)
 		if err != nil {
 			return err
@@ -102,6 +111,7 @@ func syncOLSRuntimeState(sites []Website, advanced map[string]WebsiteAdvancedCon
 		}
 
 		desiredDirs := map[string]struct{}{}
+		vhostChanged := false
 		for _, item := range managedSites {
 			if err := ensureOLSManagedFilesystem(item); err != nil {
 				return err
@@ -109,8 +119,17 @@ func syncOLSRuntimeState(sites []Website, advanced map[string]WebsiteAdvancedCon
 			vhostDir := olsManagedVhostDir(item.Site.Domain)
 			desiredDirs[vhostDir] = struct{}{}
 			vhostConfPath := filepath.Join(vhostDir, "vhconf.conf")
-			if err := writeOLSFileAtomically(vhostConfPath, []byte(renderOLSVhostConfig(item)), 0o600); err != nil {
-				return err
+			newContent := renderOLSVhostConfig(item)
+
+			// Diff-based update: only write vhost config if content actually changed.
+			// This avoids unnecessary disk I/O and prevents OLS from detecting
+			// spurious config changes on every sync (critical for hosts with many sites).
+			existingContent, _ := os.ReadFile(vhostConfPath)
+			if string(existingContent) != newContent {
+				if err := writeOLSFileAtomically(vhostConfPath, []byte(newContent), 0o600); err != nil {
+					return err
+				}
+				vhostChanged = true
 			}
 			if err := ensureOLSManagedVhostOwnership(item.Site.Domain); err != nil {
 				return err
@@ -121,23 +140,41 @@ func syncOLSRuntimeState(sites []Website, advanced map[string]WebsiteAdvancedCon
 		if err != nil {
 			return err
 		}
-		if err := writeOLSFileAtomically(olsHTTPDConfigPath, []byte(renderedHTTPD), 0o640); err != nil {
-			return err
-		}
-		if err := ensureOLSHTTPDConfigOwnership(); err != nil {
-			return err
-		}
-
-		// Always do a gracefull reload to apply new vhost configs immediately
-		if err := reloadOpenLiteSpeed(); err != nil {
-			// Rollback if reload fails due to syntax error
-			_ = writeOLSFileAtomically(olsHTTPDConfigPath, previousHTTPD, 0o640)
-			_ = ensureOLSHTTPDConfigOwnership()
-			_ = restoreOLSManagedVhostFiles(previousVhostFiles)
-			_ = reloadOpenLiteSpeed()
-			return err
+		httpdChanged := string(previousHTTPD) != renderedHTTPD
+		if httpdChanged {
+			if err := writeOLSFileAtomically(olsHTTPDConfigPath, []byte(renderedHTTPD), 0o640); err != nil {
+				return err
+			}
+			if err := ensureOLSHTTPDConfigOwnership(); err != nil {
+				return err
+			}
 		}
 
+		// Only reload/restart OLS if something actually changed.
+		if vhostChanged || httpdChanged {
+			// Use restart when listener-level config changed (addresses, ports, etc.).
+			// Graceful reload is sufficient for vhost-only changes and preserves connections.
+			var applyErr error
+			if httpdChanged && olsListenerConfigChanged(string(previousHTTPD), renderedHTTPD) {
+				log.Printf("OpenLiteSpeed: listener config changed, using restart instead of reload.")
+				applyErr = restartOpenLiteSpeed()
+			} else {
+				applyErr = reloadOpenLiteSpeed()
+			}
+			if applyErr != nil {
+				// Rollback if apply fails due to syntax error
+				_ = writeOLSFileAtomically(olsHTTPDConfigPath, previousHTTPD, 0o640)
+				_ = ensureOLSHTTPDConfigOwnership()
+				_ = restoreOLSManagedVhostFiles(previousVhostFiles)
+				_ = reloadOpenLiteSpeed()
+				return applyErr
+			}
+		}
+
+		// Brief pause to allow OLS worker processes to finish transitioning
+		// before cleaning up stale vhost directories (prevents race with active connections).
+		// Delay is configurable via AURAPANEL_OLS_STALE_CLEANUP_DELAY_SECONDS (default 2s, max 30s).
+		olsSleep(olsStaleCleanupDelay())
 		return cleanupStaleOLSVhostDirs(desiredDirs)
 	})
 }
@@ -1134,6 +1171,40 @@ func reloadOpenLiteSpeed() error {
 	return reloadOpenLiteSpeedWithHooks(commandOutputTrimmed, currentOpenLiteSpeedPID, openLiteSpeedRunning, olsSleep)
 }
 
+// restartOpenLiteSpeed explicitly restarts OLS (not just graceful reload).
+// Use this when listener addresses, ports, or other core settings change —
+// graceful reload may not fully apply those changes.
+func restartOpenLiteSpeed() error {
+	if err := configTestOpenLiteSpeed(); err != nil {
+		return err
+	}
+	previousPID := strings.TrimSpace(currentOpenLiteSpeedPID())
+	if _, err := commandOutputTrimmed(olsLSWSControlPath, "restart"); err != nil {
+		return fmt.Errorf("openlitespeed restart failed: %w", err)
+	}
+	if waitForOpenLiteSpeedTransition(previousPID, currentOpenLiteSpeedPID, openLiteSpeedRunning, olsSleep, olsReloadWaitTimeout, olsReloadPollInterval) {
+		return nil
+	}
+	// Restart may take longer; try the reload path as fallback
+	_, _ = commandOutputTrimmed(olsLSWSControlPath, "reload")
+	if waitForOpenLiteSpeedTransition(previousPID, currentOpenLiteSpeedPID, openLiteSpeedRunning, olsSleep, olsReloadWaitTimeout, olsReloadPollInterval) {
+		return nil
+	}
+	return fmt.Errorf("openlitespeed restart did not transition to a new PID")
+}
+
+// olsListenerConfigChanged detects whether the listener sections (outside managed blocks)
+// changed between two httpd_config.conf revisions. When listeners change, a restart is
+// recommended over a graceful reload.
+func olsListenerConfigChanged(previous, current string) bool {
+	// Strip managed blocks to compare only the structural config
+	prevClean := replaceOrInsertManagedBlock(previous, olsManagedVhostsBegin, olsManagedVhostsEnd, "", "")
+	prevClean = replaceOrInsertManagedBlock(prevClean, olsManagedListenerBegin, olsManagedListenerEnd, "", "")
+	currClean := replaceOrInsertManagedBlock(current, olsManagedVhostsBegin, olsManagedVhostsEnd, "", "")
+	currClean = replaceOrInsertManagedBlock(currClean, olsManagedListenerBegin, olsManagedListenerEnd, "", "")
+	return prevClean != currClean
+}
+
 func backupOLSManagedVhostFiles() (map[string][]byte, error) {
 	pattern := filepath.Join("/usr/local/lsws/conf/vhosts", olsManagedVhostPrefix+"*", "vhconf.conf")
 	matches, err := filepath.Glob(pattern)
@@ -1194,6 +1265,48 @@ func cleanupStaleOLSVhostDirs(desiredDirs map[string]struct{}) error {
 		}
 	}
 	return nil
+}
+
+const olsLogrotateConfigPath = "/etc/logrotate.d/aurapanel-sites"
+
+// ensureOLSLogrotateConfig writes a logrotate configuration for all AuraPanel-managed
+// site log files. This provides centralized log rotation (compress, dateext, maxage)
+// in addition to OLS's built-in rollingSize/keepDays directives, and ensures logs
+// do not silently exhaust user disk quotas.
+func ensureOLSLogrotateConfig(sites []olsManagedSite) error {
+	if len(sites) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("# Managed by AuraPanel — do not edit manually.\n")
+	for _, item := range sites {
+		domain := normalizeDomain(item.Site.Domain)
+		logDir := olsSiteLogDir(domain)
+		// Match access, error, and PHP error logs for this site
+		b.WriteString(filepath.ToSlash(filepath.Join(logDir, domain+".access_log")) + " ")
+		b.WriteString(filepath.ToSlash(filepath.Join(logDir, domain+".error_log")) + " ")
+		b.WriteString(filepath.ToSlash(filepath.Join(logDir, domain+".php.error.log")) + " ")
+		b.WriteString("{\n")
+		b.WriteString("    daily\n")
+		b.WriteString("    rotate 14\n")
+		b.WriteString("    compress\n")
+		b.WriteString("    delaycompress\n")
+		b.WriteString("    dateext\n")
+		b.WriteString("    missingok\n")
+		b.WriteString("    notifempty\n")
+		b.WriteString("    create 0640 root " + olsSharedRuntimeGroup() + "\n")
+		b.WriteString("    postrotate\n")
+		b.WriteString("        # Notify OLS to reopen log files after rotation\n")
+		b.WriteString("        /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1 || true\n")
+		b.WriteString("    endscript\n")
+		b.WriteString("}\n\n")
+	}
+	content := b.String()
+	existing, err := os.ReadFile(olsLogrotateConfigPath)
+	if err == nil && string(existing) == content {
+		return nil
+	}
+	return writeOLSFileAtomically(olsLogrotateConfigPath, []byte(content), 0o644)
 }
 
 func runtimeOLSTuningConfig() (OLSTuningConfig, error) {
@@ -1313,6 +1426,39 @@ func writeOLSFileAtomically(path string, content []byte, perm os.FileMode) error
 	return nil
 }
 
+func olsConfigLockTimeoutDuration() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("AURAPANEL_OLS_LOCK_TIMEOUT_SECONDS"))
+	if raw == "" {
+		return olsConfigLockTimeoutDefault
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil {
+		return olsConfigLockTimeoutDefault
+	}
+	if seconds < int(olsConfigLockTimeoutMin/time.Second) {
+		return olsConfigLockTimeoutMin
+	}
+	if seconds > int(olsConfigLockTimeoutMax/time.Second) {
+		return olsConfigLockTimeoutMax
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func olsStaleCleanupDelay() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("AURAPANEL_OLS_STALE_CLEANUP_DELAY_SECONDS"))
+	if raw == "" {
+		return olsStaleCleanupDelayDefault
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds < 0 {
+		return olsStaleCleanupDelayDefault
+	}
+	if seconds > 30 {
+		seconds = 30
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func withOLSConfigLock(run func() error) error {
 	release, err := acquireOLSConfigLock()
 	if err != nil {
@@ -1323,7 +1469,7 @@ func withOLSConfigLock(run func() error) error {
 }
 
 func acquireOLSConfigLock() (func(), error) {
-	deadline := time.Now().Add(olsConfigLockTimeout)
+	deadline := time.Now().Add(olsConfigLockTimeoutDuration())
 	for {
 		if err := os.Mkdir(olsConfigLockDirPath, 0o700); err == nil {
 			ownerFile := filepath.Join(olsConfigLockDirPath, "owner")

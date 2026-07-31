@@ -4945,15 +4945,27 @@ func normalizePlanType(value string) string {
 }
 
 func normalizeDomain(value string) string {
-	return strings.Trim(strings.ToLower(strings.TrimSpace(value)), ".")
+	cleaned := strings.ToLower(strings.TrimSpace(value))
+	cleaned = strings.Trim(cleaned, ".")
+	// Collapse consecutive dots that could slip past validation (defense in depth)
+	for strings.Contains(cleaned, "..") {
+		cleaned = strings.ReplaceAll(cleaned, "..", ".")
+	}
+	cleaned = strings.Trim(cleaned, ".")
+	return cleaned
 }
 
 func isValidDomainName(value string) bool {
+	// Check raw input for consecutive dots before normalization.
+	// normalizeDomain collapses them, so we must catch ".." here.
+	if strings.Contains(value, "..") {
+		return false
+	}
 	domain := normalizeDomain(value)
 	if domain == "" || len(domain) > 253 {
 		return false
 	}
-	if strings.Contains(domain, "/") || strings.Contains(domain, "\\") || strings.Contains(domain, "..") {
+	if strings.Contains(domain, "/") || strings.Contains(domain, "\\") {
 		return false
 	}
 	labels := strings.Split(domain, ".")

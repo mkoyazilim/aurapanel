@@ -10,6 +10,9 @@ import (
 )
 
 func TestRenderOLSManagedListenerMapBlockKeepsExampleFallback(t *testing.T) {
+	// Ensure panel edge domain is set for the test; the Example fallback is only
+	// rendered when a panel edge domain is explicitly configured.
+	t.Setenv("AURAPANEL_PANEL_EDGE_DOMAIN", "panel.aurapanel.info")
 	block := renderOLSManagedListenerMapBlock([]olsManagedSite{
 		{
 			Site: Website{Domain: "aurapanel.info"},
@@ -23,7 +26,7 @@ func TestRenderOLSManagedListenerMapBlockKeepsExampleFallback(t *testing.T) {
 	if !strings.Contains(block, "map                      AuraPanel_aurapanel__info aurapanel.info, www.aurapanel.info") {
 		t.Fatalf("managed site mapping missing from listener block: %s", block)
 	}
-	// Example vhost is mapped to the panel edge domain (default: panel.aurapanel.info)
+	// Example vhost is mapped to the panel edge domain when configured.
 	if !strings.Contains(block, "map                      Example ") {
 		t.Fatalf("example fallback mapping missing from listener block: %s", block)
 	}
