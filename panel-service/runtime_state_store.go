@@ -110,11 +110,27 @@ func (s *fileRuntimeStateStore) Save(payload persistedRuntimeState) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	tempPath := s.path + ".tmp"
-	if err := os.WriteFile(tempPath, raw, 0o600); err != nil {
+	// Use a unique temp file per save to prevent corruption when two goroutines
+	// concurrently call Save() (e.g., sync persist + debounced worker).
+	dir := filepath.Dir(s.path)
+	f, err := os.CreateTemp(dir, filepath.Base(s.path)+".tmp.*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tempPath, s.path)
+	tempPath := f.Name()
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	if err := os.WriteFile(tempPath, raw, 0o600); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	if err := os.Rename(tempPath, s.path); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	return nil
 }
 
 func (s *mariadbRuntimeStateStore) Name() string {

@@ -19,8 +19,16 @@ type UpdateResellerTokenRequest struct {
 	Token string `json:"token"`
 }
 
+func resellerTokenFilePath() string {
+	stateDir := strings.TrimSpace(os.Getenv("AURAPANEL_STATE_DIR"))
+	if stateDir == "" {
+		stateDir = "/var/lib/aurapanel"
+	}
+	return filepath.Join(stateDir, "reseller.token")
+}
+
 func GetResellerToken(w http.ResponseWriter, r *http.Request) {
-	tokenFile := "data/reseller.token"
+	tokenFile := resellerTokenFilePath()
 	var token string
 	if b, err := os.ReadFile(tokenFile); err == nil {
 		token = strings.TrimSpace(string(b))
@@ -42,9 +50,9 @@ func UpdateResellerToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenFile := "data/reseller.token"
-	if err := os.MkdirAll(filepath.Dir(tokenFile), 0755); err != nil {
-		writeJSON(w, http.StatusInternalServerError, BaseResponse{Status: "error", Message: "Could not create data directory"})
+	tokenFile := resellerTokenFilePath()
+	if err := os.MkdirAll(filepath.Dir(tokenFile), 0750); err != nil {
+		writeJSON(w, http.StatusInternalServerError, BaseResponse{Status: "error", Message: "Could not create state directory"})
 		return
 	}
 
@@ -57,7 +65,7 @@ func UpdateResellerToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteResellerToken(w http.ResponseWriter, r *http.Request) {
-	tokenFile := "data/reseller.token"
+	tokenFile := resellerTokenFilePath()
 	if err := os.Remove(tokenFile); err != nil && !errors.Is(err, os.ErrNotExist) {
 		writeJSON(w, http.StatusInternalServerError, BaseResponse{Status: "error", Message: "Could not delete token"})
 		return

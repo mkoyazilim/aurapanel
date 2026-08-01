@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -306,7 +307,9 @@ func (s *service) handleMariaDBTuningSet(w http.ResponseWriter, r *http.Request)
 	}
 
 	go func() {
-		_ = exec.Command("systemctl", "restart", "mariadb").Run()
+		if err := exec.Command("systemctl", "restart", "mariadb").Run(); err != nil {
+			log.Printf("WARNING: failed to restart mariadb: %v", err)
+		}
 	}()
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "MariaDB settings updated. Service is restarting in the background."})
 }
@@ -427,7 +430,9 @@ func (s *service) handlePostgresTuningSet(w http.ResponseWriter, r *http.Request
 	}
 
 	go func() {
-		_ = exec.Command("systemctl", "restart", "postgresql").Run()
+		if err := exec.Command("systemctl", "restart", "postgresql").Run(); err != nil {
+			log.Printf("WARNING: failed to restart postgresql: %v", err)
+		}
 	}()
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "PostgreSQL settings updated. Service is restarting in the background."})
 }
@@ -500,7 +505,9 @@ func (s *service) handleMailTuningSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		_ = exec.Command("systemctl", "restart", "postfix").Run()
+		if err := exec.Command("systemctl", "restart", "postfix").Run(); err != nil {
+			log.Printf("WARNING: failed to restart postfix: %v", err)
+		}
 	}()
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "Mail server settings updated. Postfix is restarting in the background."})
 }
@@ -1862,7 +1869,9 @@ func (s *service) handleFTPTuningSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		_ = exec.Command("systemctl", "restart", "pure-ftpd").Run()
+		if err := exec.Command("systemctl", "restart", "pure-ftpd").Run(); err != nil {
+			log.Printf("WARNING: failed to restart pure-ftpd: %v", err)
+		}
 	}()
 	writeJSON(w, http.StatusOK, apiResponse{Status: "success", Message: "FTP settings updated. Service is restarting in the background."})
 }
@@ -3425,11 +3434,21 @@ func (s *service) handleSSLHostnameIssue(w http.ResponseWriter, r *http.Request)
 	// Bind to OpenLiteSpeed
 	certPath, keyPath := findCertificatePair(domain)
 	if certPath != "" && keyPath != "" {
-		certData, _ := os.ReadFile(certPath)
-		keyData, _ := os.ReadFile(keyPath)
-		_ = os.WriteFile("/usr/local/lsws/admin/conf/webadmin.crt", certData, 0o644)
-		_ = os.WriteFile("/usr/local/lsws/admin/conf/webadmin.key", keyData, 0o600)
-		_ = reloadOpenLiteSpeed()
+		certData, certErr := os.ReadFile(certPath)
+		keyData, keyErr := os.ReadFile(keyPath)
+		if certErr != nil || keyErr != nil {
+			log.Printf("WARNING: failed to read OLS admin SSL certificate for %s: cert=%v key=%v", domain, certErr, keyErr)
+			return
+		}
+		if err := os.WriteFile("/usr/local/lsws/admin/conf/webadmin.crt", certData, 0o644); err != nil {
+			log.Printf("WARNING: failed to write OLS admin webadmin.crt for %s: %v", domain, err)
+		}
+		if err := os.WriteFile("/usr/local/lsws/admin/conf/webadmin.key", keyData, 0o600); err != nil {
+			log.Printf("WARNING: failed to write OLS admin webadmin.key for %s: %v", domain, err)
+		}
+		if err := reloadOpenLiteSpeed(); err != nil {
+			log.Printf("WARNING: failed to reload OLS after admin SSL update for %s: %v", domain, err)
+		}
 	}
 
 	s.mu.Lock()
@@ -3496,8 +3515,12 @@ func (s *service) handleSSLMailIssue(w http.ResponseWriter, r *http.Request) {
 		}
 
 		go func() {
-			_ = exec.Command("systemctl", "restart", "postfix").Run()
-			_ = exec.Command("systemctl", "restart", "dovecot").Run()
+			if err := exec.Command("systemctl", "restart", "postfix").Run(); err != nil {
+				log.Printf("WARNING: failed to restart postfix: %v", err)
+			}
+			if err := exec.Command("systemctl", "restart", "dovecot").Run(); err != nil {
+				log.Printf("WARNING: failed to restart dovecot: %v", err)
+			}
 		}()
 	}
 

@@ -119,19 +119,23 @@ func main() {
 	protectedMux.Handle("/pgadmin4", dbToolsProxy)
 	protectedMux.Handle("/pgadmin4/", dbToolsProxy)
 
-	publicHandler := middleware.RequestIDMiddleware(
-		middleware.CorsMiddleware(
-			middleware.Logger(
-				middleware.DDoSGuardMiddleware(publicMux),
+	publicHandler := middleware.SecurityHeadersMiddleware(
+		middleware.RequestIDMiddleware(
+			middleware.CorsMiddleware(
+				middleware.Logger(
+					middleware.DDoSGuardMiddleware(publicMux),
+				),
 			),
 		),
 	)
-	protectedHandler := middleware.RequestIDMiddleware(
-		middleware.CorsMiddleware(
-			middleware.Logger(
-				middleware.DDoSGuardMiddleware(
-					middleware.AuthMiddleware(
-						middleware.RBACMiddleware(protectedMux),
+	protectedHandler := middleware.SecurityHeadersMiddleware(
+		middleware.RequestIDMiddleware(
+			middleware.CorsMiddleware(
+				middleware.Logger(
+					middleware.DDoSGuardMiddleware(
+						middleware.AuthMiddleware(
+							middleware.RBACMiddleware(protectedMux),
+						),
 					),
 				),
 			),
@@ -149,11 +153,13 @@ func main() {
 	resellerMux.HandleFunc("/api/v1/reseller/vhost/list", controllers.ResellerListVhosts)
 	resellerMux.HandleFunc("/api/v1/reseller/sso", controllers.ResellerSSO)
 
-	resellerHandler := middleware.RequestIDMiddleware(
-		middleware.CorsMiddleware(
-			middleware.Logger(
-				middleware.DDoSGuardMiddleware(
-					middleware.ResellerAuthMiddleware(resellerMux),
+	resellerHandler := middleware.SecurityHeadersMiddleware(
+		middleware.RequestIDMiddleware(
+			middleware.CorsMiddleware(
+				middleware.Logger(
+					middleware.DDoSGuardMiddleware(
+						middleware.ResellerAuthMiddleware(resellerMux),
+					),
 				),
 			),
 		),

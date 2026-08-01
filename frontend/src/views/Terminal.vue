@@ -85,10 +85,9 @@ function buildTerminalUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const isDevPort = window.location.port === '5173'
   
-  // Use the standard port/gateway URL to bypass CORS and proxy connection resets
-  // Our gateway middleware now properly forwards the upgrade headers.
+  // Auth is handled via HttpOnly cookie (browsers send cookies with WS upgrade).
   const host = isDevPort ? `${window.location.hostname}:8090` : window.location.host
-  return `${protocol}//${host}/api/v1/terminal/ws?token=${encodeURIComponent(authStore.token || '')}`
+  return `${protocol}//${host}/api/v1/terminal/ws`
 }
 
 function clearHeartbeat() {

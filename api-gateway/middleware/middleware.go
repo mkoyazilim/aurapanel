@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -175,7 +177,12 @@ func ResellerAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		expectedToken := ""
-		tokenFile := "data/reseller.token"
+		// Resolve token file relative to AURAPANEL_STATE_DIR or default to /var/lib/aurapanel.
+		stateDir := strings.TrimSpace(os.Getenv("AURAPANEL_STATE_DIR"))
+		if stateDir == "" {
+			stateDir = "/var/lib/aurapanel"
+		}
+		tokenFile := filepath.Join(stateDir, "reseller.token")
 		if b, err := os.ReadFile(tokenFile); err == nil {
 			expectedToken = strings.TrimSpace(string(b))
 		}
@@ -186,7 +193,8 @@ func ResellerAuthMiddleware(next http.Handler) http.Handler {
 			WriteError(w, r, http.StatusUnauthorized, "RESELLER_API_DISABLED", "Reseller API is not enabled on this server")
 			return
 		}
-		if tokenString != expectedToken {
+		// Constant-time comparison to prevent timing attacks on the token.
+		if subtle.ConstantTimeCompare([]byte(tokenString), []byte(expectedToken)) != 1 {
 			WriteError(w, r, http.StatusUnauthorized, "AUTH_INVALID_RESELLER_TOKEN", "Invalid reseller token")
 			return
 		}
@@ -401,7 +409,7 @@ func blockedHosts() map[string]struct{} {
 		cachedBlockedHost = make(map[string]struct{})
 		raw := strings.TrimSpace(os.Getenv("AURAPANEL_BLOCKED_HOSTS"))
 		if raw == "" {
-			raw = "demo.aurapanel.com,demo.aurapanel.info,demo.auraoanel.info"
+			raw = "demo.aurapanel.com,demo.aurapanel.info"
 		}
 		for _, item := range strings.Split(raw, ",") {
 			host := normalizeHostForCompare(item)
@@ -447,6 +455,19 @@ func BlockedHostMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// SecurityHeadersMiddleware adds baseline security headers to every response.
+func SecurityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-XSS-Protection", "0") // Deprecated; rely on CSP instead.
+		// Permissive CSP: allows same-origin resources. Tighten per deployment needs.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self'; frame-ancestors 'none'; form-action 'self'")
 		next.ServeHTTP(w, r)
 	})
 }

@@ -14,6 +14,9 @@ const api = axios.create({
   headers: {
     Accept: 'application/json',
   },
+  // Send HttpOnly auth cookie set by the API gateway on every request.
+  // The token is never stored in JavaScript-accessible storage (no localStorage/sessionStorage).
+  withCredentials: true,
 })
 
 const silentErrorHeader = 'X-Aura-Silent-Error'
@@ -83,16 +86,8 @@ function extractErrorMessage(error) {
 }
 
 api.interceptors.request.use(config => {
-  const authStore = useAuthStore()
-  if (authStore.token && authStore.isTokenExpired(authStore.token)) {
-    authStore.logout()
-    window.location.href = '/login'
-    return Promise.reject(new Error(i18n.global.t('api_messages.session_expired')))
-  }
-  if (authStore.token) {
-    config.headers.Authorization = `Bearer ${authStore.token}`
-  }
-
+  // Auth is handled transparently via the HttpOnly cookie (withCredentials: true).
+  // No Authorization header needed — the gateway reads the cookie automatically.
   const isFormData = typeof FormData !== 'undefined' && config?.data instanceof FormData
   if (isFormData) {
     // Let browser/axios generate multipart boundary automatically.

@@ -18,8 +18,10 @@ app.use(i18n)
 
 async function bootstrap() {
   const authStore = useAuthStore(pinia)
-  if (authStore.token) {
-    await authStore.refreshUserFromServer()
+  // Restore session via HttpOnly cookie — no token stored client-side.
+  // checkSession calls /auth/me which authenticates via the cookie.
+  if (authStore.user) {
+    await authStore.checkSession()
   }
   app.mount('#app')
 }

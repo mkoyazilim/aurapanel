@@ -164,6 +164,10 @@ func inspectBackupArchive(path string) (int, error) {
 	}
 	count := 0
 	for _, entry := range entries {
+		// Reject symlink entries: tar -t lists symlinks as "path -> target"
+		if strings.Contains(entry, " -> ") {
+			return 0, fmt.Errorf("archive contains symlink entry: %s", entry)
+		}
 		normalized := strings.ReplaceAll(entry, "\\", "/")
 		cleaned := strings.ReplaceAll(filepath.Clean(normalized), "\\", "/")
 		if strings.HasPrefix(cleaned, "/") || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.Contains(cleaned, "/../") {
@@ -219,34 +223,67 @@ func streamCommandToGzipFile(path string, command string, args ...string) error 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	cleanup := func() {
+		_ = file.Close()
+		_ = os.Remove(path)
+	}
 
 	gz := gzip.NewWriter(file)
-	defer gz.Close()
 
 	cmd := exec.Command(command, args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		cleanup()
 		return err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		cleanup()
 		return err
 	}
 	if err := cmd.Start(); err != nil {
+		cleanup()
 		return err
 	}
+
+	// Read stderr concurrently to prevent pipe buffer deadlock.
+	// If the command writes >64KB to stderr while stdout is still being
+	// copied, the stderr pipe fills and the command blocks forever.
+	var errOutput []byte
+	stderrDone := make(chan struct{})
+	go func() {
+		errOutput, _ = io.ReadAll(stderr)
+		close(stderrDone)
+	}()
+
+	copyErr := false
 	if _, err := io.Copy(gz, stdout); err != nil {
+		copyErr = true
+	}
+	// Wait for stderr reader to finish before closing gz/file.
+	<-stderrDone
+
+	if copyErr {
 		_ = cmd.Wait()
+		cleanup()
 		return err
 	}
-	errOutput, _ := io.ReadAll(stderr)
 	if err := gz.Close(); err != nil {
 		_ = cmd.Wait()
+		cleanup()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		_ = cmd.Wait()
+		cleanup()
 		return err
 	}
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("%s", strings.TrimSpace(string(errOutput)))
+		cleanup()
+		if len(errOutput) > 0 {
+			return fmt.Errorf("%s", strings.TrimSpace(string(errOutput)))
+		}
+		return err
 	}
 	return nil
 }
@@ -282,7 +319,7 @@ func createRuntimeDBBackup(engine, dbName string) (DBBackupRecord, error) {
 	if err := ensureBackupDirectory(dbBackupDir()); err != nil {
 		return DBBackupRecord{}, err
 	}
-	filename := fmt.Sprintf("%s-%s.sql.gz", dbName, time.Now().UTC().Format("20060102-150405"))
+	filename := fmt.Sprintf("%s-%s-%s.sql.gz", engine, dbName, time.Now().UTC().Format("20060102-150405"))
 	path := filepath.Join(dbBackupDir(), filename)
 	switch engine {
 	case "mariadb":
@@ -373,7 +410,10 @@ func listRuntimeDBBackups(existing []DBBackupRecord) ([]DBBackupRecord, error) {
 				record.Path = stored.Path
 			}
 		}
-		if strings.HasPrefix(record.Filename, "pg_") || strings.Contains(record.Filename, ".postgres.") {
+		// Detect engine from filename: "mariadb-dbname-ts.sql.gz" or "postgresql-dbname-ts.sql.gz"
+		if strings.HasPrefix(record.Filename, "mariadb-") {
+			record.Engine = "mariadb"
+		} else if strings.HasPrefix(record.Filename, "postgresql-") || strings.HasPrefix(record.Filename, "pg_") || strings.Contains(record.Filename, ".postgres.") {
 			record.Engine = "postgresql"
 		}
 		backups = append(backups, record)
@@ -527,11 +567,11 @@ func restoreRuntimeSiteBackup(snapshot BackupSnapshot, domain string) error {
 			return err
 		}
 	case strings.HasSuffix(lower, ".tar"):
-		if _, err := commandOutputTrimmed("tar", "-xf", archivePath, "-C", filepath.Dir(docroot)); err != nil {
+		if _, err := commandOutputTrimmed("tar", "-xf", archivePath, "--no-same-owner", "--no-same-permissions", "-C", filepath.Dir(docroot)); err != nil {
 			return err
 		}
 	default:
-		if _, err := commandOutputTrimmed("tar", "-xzf", archivePath, "-C", filepath.Dir(docroot)); err != nil {
+		if _, err := commandOutputTrimmed("tar", "-xzf", archivePath, "--no-same-owner", "--no-same-permissions", "-C", filepath.Dir(docroot)); err != nil {
 			return err
 		}
 	}

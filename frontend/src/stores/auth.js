@@ -4,40 +4,21 @@ import i18n from '../i18n'
 import { useNotificationStore } from './notifications'
 import { normalizePermissions, normalizeRole } from '../security/rbac'
 
-const TOKEN_KEY = 'aura_token'
 const USER_KEY = 'aura_user'
 const PERSIST_KEY = 'aura_persist'
 
-function decodeJwtPayload(token) {
-  try {
-    const parts = String(token || '').split('.')
-    if (parts.length < 2) return null
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
-  }
-}
-
-function isTokenExpired(token) {
-  const payload = decodeJwtPayload(token)
-  if (!payload?.exp) return false
-  const exp = Number(payload.exp)
-  if (!Number.isFinite(exp)) return false
-  return exp * 1000 <= Date.now()
-}
+// Token is no longer stored in localStorage/sessionStorage.
+// Authentication relies on the HttpOnly cookie set by the API gateway
+// (SameSite=Lax, Secure on HTTPS). This prevents token theft via XSS.
 
 function clearStoredAuth() {
   try {
-    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
     localStorage.removeItem(PERSIST_KEY)
   } catch {
     // no-op
   }
   try {
-    sessionStorage.removeItem(TOKEN_KEY)
     sessionStorage.removeItem(USER_KEY)
   } catch {
     // no-op
@@ -57,56 +38,48 @@ function normalizeUserPayload(raw) {
   }
 }
 
-function getInitialAuth() {
-  let localToken = null
-  let sessionToken = null
+function getInitialUser() {
   let userRaw = null
   let persistent = false
 
   try {
-    localToken = localStorage.getItem(TOKEN_KEY)
-    userRaw = localStorage.getItem(USER_KEY) || userRaw
+    userRaw = localStorage.getItem(USER_KEY)
     persistent = localStorage.getItem(PERSIST_KEY) === '1'
   } catch {
     // no-op
   }
 
   try {
-    sessionToken = sessionStorage.getItem(TOKEN_KEY)
     userRaw = userRaw || sessionStorage.getItem(USER_KEY)
   } catch {
     // no-op
   }
 
-  const token = localToken || sessionToken || null
   let user = null
   if (userRaw) {
     try {
       user = normalizeUserPayload(JSON.parse(userRaw))
     } catch {
       clearStoredAuth()
-      return { token: null, user: null, persistent: false }
+      return { user: null, persistent: false }
     }
   }
 
-  if (token && isTokenExpired(token)) {
-    clearStoredAuth()
-    return { token: null, user: null, persistent: false }
-  }
-
-  return { token, user, persistent }
+  return { user, persistent }
 }
 
-const initialAuth = getInitialAuth()
+const initial = getInitialUser()
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: initialAuth.token,
-    user: initialAuth.user,
-    persistent: initialAuth.persistent,
+    // Session is authenticated when we have a user object (restored from /auth/me via cookie).
+    // No token stored client-side — the HttpOnly cookie handles auth transparently.
+    user: initial.user,
+    persistent: initial.persistent,
+    sessionChecked: false, // true after first /auth/me check on page load
   }),
   getters: {
-    isAuthenticated: (state) => !!state.token,
+    isAuthenticated: (state) => !!state.user,
     role: (state) => normalizeRole(state.user?.role),
     permissions: (state) => normalizePermissions(state.user?.permissions),
     isAdmin: (state) => normalizeRole(state.user?.role) === 'admin',
@@ -114,16 +87,27 @@ export const useAuthStore = defineStore('auth', {
     isUser: (state) => normalizeRole(state.user?.role) === 'user',
   },
   actions: {
-    isTokenExpired(token = this.token) {
-      if (!token) return true
-      return isTokenExpired(token)
-    },
-    ensureValidSession() {
-      if (this.token && this.isTokenExpired(this.token)) {
-        this.logout()
-        return false
+    // Check if we have a valid session via the HttpOnly cookie.
+    // Called once on app mount to restore session from cookie.
+    async checkSession() {
+      if (this.sessionChecked) return !!this.user
+      this.sessionChecked = true
+      try {
+        const response = await api.get('/auth/me', {
+          headers: { 'X-Aura-Silent-Error': '1', 'X-Aura-Silent-Loading': '1' },
+        })
+        const user = normalizeUserPayload(response.data?.data || response.data?.user || response.data || null)
+        if (user) {
+          this.user = user
+          const target = this.persistent ? localStorage : sessionStorage
+          target.setItem(USER_KEY, JSON.stringify(user))
+          return true
+        }
+      } catch {
+        // Cookie invalid or expired — stay logged out
       }
-      return !!this.token
+      this.user = null
+      return false
     },
     async login(email, password, remember = false, totpToken = '') {
       try {
@@ -132,7 +116,21 @@ export const useAuthStore = defineStore('auth', {
           password,
           totp_token: totpToken || undefined,
         })
-        this.setAuth(response.data.token, response.data.user, remember)
+        // Token is now only in the HttpOnly cookie (set by gateway).
+        // We store only user metadata client-side.
+        this.user = normalizeUserPayload(response.data.user)
+        this.persistent = !!remember
+        this.sessionChecked = true
+
+        clearStoredAuth()
+        if (this.user) {
+          const target = this.persistent ? localStorage : sessionStorage
+          target.setItem(USER_KEY, JSON.stringify(this.user))
+          if (this.persistent) {
+            localStorage.setItem(PERSIST_KEY, '1')
+          }
+        }
+
         const notificationStore = useNotificationStore()
         notificationStore.add({
           title: i18n.global.t('auth_messages.welcome_title'),
@@ -149,12 +147,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async refreshUserFromServer() {
-      if (!this.token) return null
+      if (!this.user) return null
       try {
         const response = await api.get('/auth/me', {
           headers: { 'X-Aura-Silent-Error': '1' },
         })
-        // Backward-compatible: support wrapped (`{data:{...}}`) and flat (`{...}`) responses.
         const user = normalizeUserPayload(response.data?.data || response.data?.user || response.data || null)
         if (!user) return null
         this.user = user
@@ -166,24 +163,11 @@ export const useAuthStore = defineStore('auth', {
         return null
       }
     },
-    setAuth(token, user, persistent = false) {
-      this.token = token
-      this.user = normalizeUserPayload(user)
-      this.persistent = !!persistent
-
-      clearStoredAuth()
-      const target = this.persistent ? localStorage : sessionStorage
-      target.setItem(TOKEN_KEY, token)
-      target.setItem(USER_KEY, JSON.stringify(this.user))
-      if (this.persistent) {
-        localStorage.setItem(PERSIST_KEY, '1')
-      }
-    },
     logout() {
-      const hadSession = !!this.token
-      this.token = null
+      const hadSession = !!this.user
       this.user = null
       this.persistent = false
+      this.sessionChecked = true
       clearStoredAuth()
       if (hadSession) {
         const notificationStore = useNotificationStore()
@@ -196,7 +180,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async secureLogout() {
-      if (this.token) {
+      if (this.user) {
         try {
           await api.post('/auth/logout', {}, {
             headers: {
