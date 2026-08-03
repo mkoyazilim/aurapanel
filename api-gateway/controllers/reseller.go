@@ -269,6 +269,9 @@ func normalizeRedirectPath(value string) string {
 	if strings.HasPrefix(strings.ToLower(value), "http://") || strings.HasPrefix(strings.ToLower(value), "https://") {
 		return "/"
 	}
+	if strings.HasPrefix(value, "//") {
+		return "/"
+	}
 	if !strings.HasPrefix(value, "/") {
 		value = "/" + value
 	}

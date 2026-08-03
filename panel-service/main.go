@@ -900,6 +900,7 @@ func (s *service) nonAdminRoutePolicy(w http.ResponseWriter, r *http.Request) bo
 		"/api/v1/db/postgresql/tuning",
 		"/api/v1/mail/tuning",
 		"/api/v1/ftp/tuning",
+		"/api/v1/monitor/cron",
 		"/api/v1/system/reseller-token",
 		"/api/v1/websites/vhost-config",
 		"/api/v1/websites/custom-ssl",
@@ -1774,6 +1775,7 @@ func (s *service) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if matchedUser.TwoFAEnabled && !verifyStoredTOTPSecret(totpSecret, strings.TrimSpace(payload.TOTPToken), time.Now().UTC()) {
+		serviceRecordLoginFailure(attemptKey)
 		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
 			"status":       "error",
 			"message":      "2FA code is required.",
@@ -1844,7 +1846,7 @@ func (s *service) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		Name:     firstNonEmpty(principal.Name, principal.Username),
 		Email:    strings.ToLower(strings.TrimSpace(principal.Email)),
 		Role:     normalizeRole(principal.Role),
-		Active:   true,
+		Active:   false,
 	}
 	writeJSON(w, http.StatusOK, apiResponse{
 		Status: "success",
@@ -2255,6 +2257,40 @@ func (s *service) enforceOwnerEmailsLimitLocked(owner string) error {
 	return nil
 }
 
+func (s *service) findDatabaseRecordLocked(engine, name string) (DatabaseRecord, bool) {
+	if engine == "mariadb" {
+		for _, db := range s.state.MariaDBs {
+			if db.Name == name {
+				return db, true
+			}
+		}
+	} else {
+		for _, db := range s.state.PostgresDBs {
+			if db.Name == name {
+				return db, true
+			}
+		}
+	}
+	return DatabaseRecord{}, false
+}
+
+func (s *service) findDatabaseUserRecordLocked(engine, username string) (DatabaseUser, bool) {
+	if engine == "mariadb" {
+		for _, u := range s.state.MariaUsers {
+			if u.Username == username {
+				return u, true
+			}
+		}
+	} else {
+		for _, u := range s.state.PostgresUsers {
+			if u.Username == username {
+				return u, true
+			}
+		}
+	}
+	return DatabaseUser{}, false
+}
+
 func (s *service) principalCanAccessDatabaseLocked(pr servicePrincipal, item DatabaseRecord) bool {
 	if pr.Role == "admin" {
 		return true
@@ -2597,6 +2633,10 @@ func (s *service) handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Password is required.")
 		return
 	}
+	if err := validatePasswordStrength(rawPassword); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	passwordHash := mustHashPassword(rawPassword)
 	principal, hasPrincipal := principalFromContext(r.Context())
 	role := normalizeRole(payload.Role)
@@ -2925,8 +2965,13 @@ func (s *service) handleUsersChangePassword(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "Invalid password payload.")
 		return
 	}
-	if strings.TrimSpace(payload.NewPassword) == "" {
+	newPassword := strings.TrimSpace(payload.NewPassword)
+	if newPassword == "" {
 		writeError(w, http.StatusBadRequest, "New password is required.")
+		return
+	}
+	if err := validatePasswordStrength(newPassword); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	principal, hasPrincipal := principalFromContext(r.Context())
@@ -3294,6 +3339,16 @@ func (s *service) handleDatabaseDrop(w http.ResponseWriter, r *http.Request, eng
 	}
 
 	target := sanitizeDBName(payload.Name)
+
+	s.mu.RLock()
+	principal, _ := principalFromContext(r.Context())
+	dbRecord, dbFound := s.findDatabaseRecordLocked(engine, target)
+	s.mu.RUnlock()
+	if dbFound && !s.principalCanAccessDatabaseLocked(principal, dbRecord) {
+		writeError(w, http.StatusForbidden, "Access denied for this database.")
+		return
+	}
+
 	if err := dropRuntimeDatabase(engine, target); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -3329,6 +3384,21 @@ func (s *service) handleDatabasePasswordUpdate(w http.ResponseWriter, r *http.Re
 	}
 
 	target := sanitizeDBName(payload.DBUser)
+
+	s.mu.RLock()
+	principal, _ := principalFromContext(r.Context())
+	dbUser, userFound := s.findDatabaseUserRecordLocked(engine, target)
+	var dbRecord DatabaseRecord
+	recordFound := false
+	if userFound && dbUser.LinkedDBName != "" {
+		dbRecord, recordFound = s.findDatabaseRecordLocked(engine, dbUser.LinkedDBName)
+	}
+	s.mu.RUnlock()
+	if recordFound && !s.principalCanAccessDatabaseLocked(principal, dbRecord) {
+		writeError(w, http.StatusForbidden, "Access denied for this database user.")
+		return
+	}
+
 	if err := updateRuntimeDatabasePassword(engine, target, payload.NewPassword); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -3372,6 +3442,16 @@ func (s *service) handleRemoteAccessCreate(w http.ResponseWriter, r *http.Reques
 		Remote:     strings.TrimSpace(payload.RemoteIP),
 		AuthMethod: authMethodForEngine(engine),
 	}
+
+	s.mu.RLock()
+	principal, _ := principalFromContext(r.Context())
+	dbRecord, recordFound := s.findDatabaseRecordLocked(engine, rule.DBName)
+	s.mu.RUnlock()
+	if recordFound && !s.principalCanAccessDatabaseLocked(principal, dbRecord) {
+		writeError(w, http.StatusForbidden, "Access denied for this database.")
+		return
+	}
+
 	if err := grantRuntimeRemoteAccess(engine, rule.DBUser, rule.DBName, rule.Remote); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -5026,6 +5106,27 @@ func sanitizeDBName(value string) string {
 	}, cleaned)
 	cleaned = strings.Trim(cleaned, "_")
 	return firstNonEmpty(cleaned, "database")
+}
+
+func validatePasswordStrength(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	hasLetter := false
+	hasDigit := false
+	for i := 0; i < len(password); i++ {
+		c := password[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			hasLetter = true
+		}
+		if c >= '0' && c <= '9' {
+			hasDigit = true
+		}
+	}
+	if !hasLetter || !hasDigit {
+		return fmt.Errorf("password must contain at least one letter and one digit")
+	}
+	return nil
 }
 
 func normalizeDBHost(value string) string {

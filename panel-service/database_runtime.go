@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -430,6 +431,13 @@ func grantRuntimeRemoteAccess(engine, dbUser, dbName, remoteIP string) error {
 		path := findPostgresHBAPath()
 		if path == "" {
 			return fmt.Errorf("pg_hba.conf not found")
+		}
+		remoteIP = strings.TrimSpace(remoteIP)
+		if net.ParseIP(remoteIP) == nil {
+			return fmt.Errorf("invalid remote IP address")
+		}
+		if strings.ContainsAny(remoteIP, "\n\r") {
+			return fmt.Errorf("remote IP contains invalid characters")
 		}
 		line := fmt.Sprintf("host %s %s %s scram-sha-256", dbName, dbUser, remoteIP)
 		raw, err := os.ReadFile(path)

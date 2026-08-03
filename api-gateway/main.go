@@ -198,7 +198,11 @@ func main() {
 	mainRouter.Handle("/phpmyadmin/", protectedHandler)
 	mainRouter.Handle("/pgadmin4", protectedHandler)
 	mainRouter.Handle("/pgadmin4/", protectedHandler)
-	mainRouter.Handle("/", middleware.Logger(controllers.PanelStaticHandler()))
+	mainRouter.Handle("/", middleware.SecurityHeadersMiddleware(
+		middleware.CorsMiddleware(
+			middleware.Logger(controllers.PanelStaticHandler()),
+		),
+	))
 
 	listenAddr := gatewayAddr()
 	fmt.Printf("API Gateway listening on %s\n", listenAddr)

@@ -1898,7 +1898,8 @@ func (s *service) handleCronJobCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Cron command is required.")
 		return
 	}
-	payload.User = firstNonEmpty(strings.TrimSpace(payload.User), "root")
+	principal, _ := principalFromContext(r.Context())
+	payload.User = firstNonEmpty(strings.TrimSpace(payload.User), principalDefaultOwner(principal))
 	payload.ID = sanitizeName(firstNonEmpty(payload.ID, generateSecret(6)))
 	if err := createRuntimeCronJob(payload); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -2352,6 +2353,13 @@ func (s *service) handleFileRead(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, status, err.Error())
 		return
+	}
+	if principal.Role != "admin" {
+		switch strings.ToLower(filepath.Ext(resolvedPath)) {
+		case ".pem", ".key", ".crt", ".cer", ".der", ".p12", ".pfx":
+			writeError(w, http.StatusForbidden, "Access denied for this file type.")
+			return
+		}
 	}
 	content, err := readManagedFile(resolvedPath)
 	if err != nil {
@@ -3177,10 +3185,14 @@ func (s *service) handleBackupSnapshots(w http.ResponseWriter, r *http.Request) 
 	}
 	_ = decodeJSON(r, &payload)
 	domain := normalizeDomain(payload.Domain)
+	principal, _ := principalFromContext(r.Context())
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	items := make([]BackupSnapshot, 0, len(s.modules.BackupSnapshots))
 	for _, snapshot := range s.modules.BackupSnapshots {
+		if principal.Role != "admin" && !s.canAccessDomainLocked(principal, snapshot.Domain) {
+			continue
+		}
 		if domain == "" || snapshot.Domain == domain {
 			items = append(items, snapshot)
 		}
@@ -3219,6 +3231,10 @@ func (s *service) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "Backup snapshot not found.")
 		return
 	}
+	targetDomain := normalizeDomain(firstNonEmpty(payload.Domain, snapshot.Domain))
+	if !s.requireDomainAccess(w, r, snapshot.Domain) || !s.requireDomainAccess(w, r, targetDomain) {
+		return
+	}
 	destinationHint := BackupDestination{
 		ID:         strings.TrimSpace(firstNonEmpty(payload.DestinationID, snapshot.DestinationID)),
 		RemoteRepo: strings.TrimSpace(payload.RemoteRepo),
@@ -3230,7 +3246,6 @@ func (s *service) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	targetDomain := normalizeDomain(firstNonEmpty(payload.Domain, snapshot.Domain))
 	if payload.DryRun {
 		preview, err := previewRuntimeSiteRestore(snapshot, targetDomain)
 		if err != nil {

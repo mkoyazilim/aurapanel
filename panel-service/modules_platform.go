@@ -742,12 +742,18 @@ func (s *service) handleCMSInstall(w http.ResponseWriter, r *http.Request) {
 
 		// Run wp-cli download & install asynchronously so we don't block the API call for too long
 		go func() {
+			safeDomain := normalizeDomain(domain)
+			safeAdminUser := sanitizeName(firstNonEmpty(payload.AdminUser, "admin"))
+			safeAdminEmail := sanitizeName(strings.TrimSpace(wp.AdminEmail))
+			safeDBName := sanitizeName(wp.DBName)
+			safeDBUser := sanitizeName(wp.DBUser)
+
 			os.MkdirAll(docroot, 0755)
 			exec.Command("wp", "core", "download", "--path="+docroot, "--allow-root").Run()
 
-			exec.Command("wp", "config", "create", "--path="+docroot, "--allow-root", "--dbname="+wp.DBName, "--dbuser="+wp.DBUser, "--dbpass="+dbPass, "--dbhost=127.0.0.1").Run()
+			exec.Command("wp", "config", "create", "--path="+docroot, "--allow-root", "--dbname="+safeDBName, "--dbuser="+safeDBUser, "--dbpass="+dbPass, "--dbhost=127.0.0.1").Run()
 
-			exec.Command("wp", "core", "install", "--path="+docroot, "--allow-root", "--url=https://"+domain, "--title="+domain, "--admin_user="+firstNonEmpty(payload.AdminUser, "admin"), "--admin_password="+adminPass, "--admin_email="+wp.AdminEmail).Run()
+			exec.Command("wp", "core", "install", "--path="+docroot, "--allow-root", "--url=https://"+safeDomain, "--title="+safeDomain, "--admin_user="+safeAdminUser, "--admin_password="+adminPass, "--admin_email="+safeAdminEmail).Run()
 
 			exec.Command("chown", "-R", siteOwner+":"+siteOwner, docroot).Run()
 

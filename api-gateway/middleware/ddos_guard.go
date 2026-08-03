@@ -302,7 +302,7 @@ func normalizeDDoSProfile(value string) string {
 	case "standard":
 		return "standard"
 	default:
-		return "off"
+		return "standard"
 	}
 }
 
