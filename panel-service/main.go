@@ -4152,7 +4152,9 @@ func (s *service) handleSSLIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	domains := []string{domain}
-	if normalizeDomain(domain) != "" {
+	// Only add www. for main domains (e.g. mkoyazilim.com), not subdomains
+	// (e.g. meet.mkoyazilim.com -> www.meet.mkoyazilim.com is nonsensical).
+	if strings.Count(domain, ".") == 1 {
 		domains = append(domains, "www."+domain)
 	}
 
