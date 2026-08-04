@@ -700,18 +700,18 @@ func renderOLSVhostConfig(item olsManagedSite) string {
 	}
 	builder.WriteString("}\n\n")
 	certPath, keyPath := findCertificatePair(item.Site.Domain)
-	// SSL redirect is placed in a context block (higher priority than rewrite/.htaccess)
-	// to prevent conflicts with WordPress and other .htaccess-heavy applications.
+	// Always emit a root context block so OLS can serve the document root.
+	// When an SSL certificate is present the context also handles HTTPS redirect.
+	builder.WriteString("context / {\n")
+	builder.WriteString("  allowBrowse             1\n")
+	builder.WriteString("  rewrite  {\n")
+	builder.WriteString("    enable                1\n")
 	if certPath != "" && keyPath != "" {
-		builder.WriteString("context / {\n")
-		builder.WriteString("  allowBrowse             1\n")
-		builder.WriteString("  rewrite  {\n")
-		builder.WriteString("    enable                1\n")
 		builder.WriteString("    RewriteCond           %{HTTPS} !=on\n")
 		builder.WriteString("    RewriteRule           ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]\n")
-		builder.WriteString("  }\n")
-		builder.WriteString("}\n\n")
 	}
+	builder.WriteString("  }\n")
+	builder.WriteString("}\n\n")
 	builder.WriteString("rewrite  {\n")
 	builder.WriteString("  enable                  1\n")
 	builder.WriteString("  autoLoadHtaccess        1\n")
@@ -1123,13 +1123,23 @@ func waitForOpenLiteSpeedTransition(previousPID string, pidReader func() string,
 
 func configTestOpenLiteSpeedWithHooks(runCommand func(string, ...string) (string, error)) error {
 	output, err := runCommand(olsLSWSBinaryPath, "-t")
+	lowerOutput := strings.ToLower(output)
+	// Warnings (e.g. UID/GID below minimum, missing docroots for non-AuraPanel vhosts)
+	// must not block config sync. Only hard errors (syntax, fatal configuration) should fail.
 	if err != nil {
+		// When the test exits non-zero but only contains warnings, treat as non-fatal.
+		if !strings.Contains(lowerOutput, "error") && !strings.Contains(lowerOutput, "fail") {
+			if strings.Contains(lowerOutput, "warn") {
+				log.Printf("OpenLiteSpeed config test warning (non-fatal): %s", output)
+				return nil
+			}
+		}
 		return fmt.Errorf("openlitespeed config test failed: %v", err)
 	}
-	if strings.Contains(strings.ToLower(output), "error") || strings.Contains(strings.ToLower(output), "fail") {
+	if strings.Contains(lowerOutput, "error") || strings.Contains(lowerOutput, "fail") {
 		return fmt.Errorf("openlitespeed config test failed: %s", output)
 	}
-	if strings.Contains(strings.ToLower(output), "warn") {
+	if strings.Contains(lowerOutput, "warn") {
 		log.Printf("OpenLiteSpeed config test warning: %s", output)
 	}
 	return nil
