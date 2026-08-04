@@ -104,7 +104,7 @@ func panelAdminEmailValue() string {
 }
 
 func issueLetsEncryptCertificate(domains []string, webroot string, dnsChallenge bool) error {
-	args := []string{"certonly", "--non-interactive", "--agree-tos", "--allow-subset-of-names", "-m", panelAdminEmailValue(), "--keep-until-expiring"}
+	args := []string{"certonly", "--non-interactive", "--agree-tos", "--expand", "-m", panelAdminEmailValue(), "--keep-until-expiring"}
 	
 	// Use staging API if AURAPANEL_DEV_SIMULATION is enabled to avoid rate limits
 	if strings.ToLower(strings.TrimSpace(os.Getenv("AURAPANEL_DEV_SIMULATION"))) == "1" || 
@@ -117,8 +117,11 @@ func issueLetsEncryptCertificate(domains []string, webroot string, dnsChallenge 
 		if err := writeCloudflareCertbotCredentials(credentialsPath); err != nil {
 			return err
 		}
-		args = append(args, "--dns-cloudflare", "--dns-cloudflare-credentials", credentialsPath)
+		args = append(args, "--dns-cloudflare", "--dns-cloudflare-credentials", credentialsPath, "--dns-cloudflare-propagation-seconds", "60")
 	} else {
+		// --allow-subset-of-names lets certbot succeed even if www. subdomain lacks DNS.
+		// Not compatible with wildcard (DNS challenge), so only added for webroot mode.
+		args = append(args, "--allow-subset-of-names")
 		// Ensure webroot and well-known directory exists right before execution
 		_ = os.MkdirAll(filepath.Join(webroot, ".well-known", "acme-challenge"), 0o755)
 		

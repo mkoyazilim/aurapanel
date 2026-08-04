@@ -4152,10 +4152,15 @@ func (s *service) handleSSLIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	domains := []string{domain}
-	// Only add www. for main domains (e.g. mkoyazilim.com), not subdomains
-	// (e.g. meet.mkoyazilim.com -> www.meet.mkoyazilim.com is nonsensical).
+	useDNSChallenge := false
 	if strings.Count(domain, ".") == 1 {
-		domains = append(domains, "www."+domain)
+		// Main domain: use wildcard DNS challenge if Cloudflare is configured, otherwise webroot with www.
+		if cloudflareEnvCredentials().valid() {
+			domains = append(domains, "*."+domain)
+			useDNSChallenge = true
+		} else {
+			domains = append(domains, "www."+domain)
+		}
 	}
 
 	// Ensure docroot exists before issuing SSL
@@ -4183,7 +4188,7 @@ func (s *service) handleSSLIssue(w http.ResponseWriter, r *http.Request) {
 	_ = s.syncOLSVhostsLocked()
 	s.mu.Unlock()
 
-	if err := issueLetsEncryptCertificate(domains, docroot, false); err != nil {
+	if err := issueLetsEncryptCertificate(domains, docroot, useDNSChallenge); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
