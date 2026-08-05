@@ -4135,9 +4135,10 @@ func (s *service) handleSiteLogs(w http.ResponseWriter, r *http.Request) {
 
 func (s *service) handleSSLIssue(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Domain  string `json:"domain"`
-		Email   string `json:"email,omitempty"`
-		Webroot string `json:"webroot,omitempty"`
+		Domain   string `json:"domain"`
+		Email    string `json:"email,omitempty"`
+		Webroot  string `json:"webroot,omitempty"`
+		Provider string `json:"provider,omitempty"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid SSL payload.")
