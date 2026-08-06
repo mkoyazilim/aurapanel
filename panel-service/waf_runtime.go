@@ -110,11 +110,15 @@ func setModSecurityState(enabled bool) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(olsHTTPDConfigPath, []byte(updated), 0o640); err != nil {
+	if err := writeOLSFileAtomically(olsHTTPDConfigPath, []byte(updated), 0o640); err != nil {
+		return err
+	}
+	if err := ensureOLSHTTPDConfigOwnership(); err != nil {
 		return err
 	}
 	if err := reloadOpenLiteSpeed(); err != nil {
-		_ = os.WriteFile(olsHTTPDConfigPath, previous, 0o640)
+		_ = writeOLSFileAtomically(olsHTTPDConfigPath, previous, 0o640)
+		_ = ensureOLSHTTPDConfigOwnership()
 		_ = reloadOpenLiteSpeed()
 		return err
 	}

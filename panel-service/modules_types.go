@@ -1022,18 +1022,24 @@ func (s *service) appendActivityLocked(user, action, detail, ip string) {
 	}
 }
 
-func (s *service) recordIssuedCertificateLocked(domain, issuer string, wildcard bool) {
+func (s *service) recordIssuedCertificateLocked(domain, _ string, wildcard bool) {
 	key := normalizeDomain(domain)
 	if key == "" {
 		return
 	}
-	s.modules.SSLCertificates[key] = SSLCertificateDetail{
-		Domain:        key,
-		Status:        "issued",
-		Issuer:        firstNonEmpty(strings.TrimSpace(issuer), "Let's Encrypt"),
-		ExpiryDate:    time.Now().UTC().Add(90 * 24 * time.Hour).Format("2006-01-02"),
-		DaysRemaining: 90,
-		Wildcard:      wildcard,
+	// Gercek sertifika durumunu diskten oku, bulunamazsa "missing" olarak isaretle.
+	// Hard-coded 90 gun varsayimi yerine gercek expiry tarihini kullan.
+	detail := inspectCertificate(key)
+	if detail.Status != "issued" {
+		detail = SSLCertificateDetail{
+			Domain:        key,
+			Status:        "missing",
+			Issuer:        "-",
+			ExpiryDate:    "-",
+			DaysRemaining: 0,
+			Wildcard:      wildcard,
+		}
 	}
+	s.modules.SSLCertificates[key] = detail
 	s.modules.SSLBindings.UpdatedAt = time.Now().UTC().Unix()
 }

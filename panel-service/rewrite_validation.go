@@ -45,7 +45,7 @@ func parseRewriteRuleLine(line string) (string, string, bool) {
 	return strings.TrimSpace(fields[1]), strings.TrimSpace(fields[2]), true
 }
 
-func validateRewriteTarget(docroot, pattern, target string) error {
+func validateRewriteTarget(docroot, _ /* pattern */, target string) error {
 	target = strings.Trim(target, `"'`)
 	if target == "" || target == "-" {
 		return nil
@@ -93,13 +93,12 @@ func validateRewriteTarget(docroot, pattern, target string) error {
 	if !info.IsDir() {
 		return nil
 	}
-	if !isCatchAllRewritePattern(pattern) {
-		return nil
-	}
 	if fileExists(filepath.Join(targetPath, "index.php")) || fileExists(filepath.Join(targetPath, "index.html")) {
 		return nil
 	}
-	return fmt.Errorf("rewrite hedef klasorunde index yok: %s", filepath.ToSlash(clean))
+	// Dizin var ama index yok — catch-all rewrite icin bile izin ver.
+	// Laravel, Symfony gibi framework'lerde public/ dizini sonradan doldurulabilir.
+	return nil
 }
 
 func isCatchAllRewritePattern(pattern string) bool {

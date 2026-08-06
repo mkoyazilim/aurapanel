@@ -17,17 +17,15 @@ func TestValidateRewriteRulesForDocrootAcceptsLaravelFrontController(t *testing.
 	}
 }
 
-func TestValidateRewriteRulesForDocrootRejectsCatchAllToDirWithoutIndex(t *testing.T) {
+func TestValidateRewriteRulesForDocrootAllowsCatchAllToDirWithoutIndex(t *testing.T) {
+	// Dizin var ama index yok — catch-all rewrite icin bile izin veriyoruz.
+	// Laravel, Symfony gibi framework'lerde public/ dizini sonradan doldurulabilir.
 	docroot := t.TempDir()
 	writeTestDir(t, docroot, "core/public")
 
 	rules := "RewriteEngine On\nRewriteRule ^(.*)$ core/public/$1 [L]"
-	err := validateRewriteRulesForDocroot(docroot, rules)
-	if err == nil {
-		t.Fatalf("expected validation error for directory target without index")
-	}
-	if !strings.Contains(err.Error(), "rewrite hedef klasorunde index yok") {
-		t.Fatalf("unexpected error: %v", err)
+	if err := validateRewriteRulesForDocroot(docroot, rules); err != nil {
+		t.Fatalf("expected catch-all rewrite to directory without index to be allowed, got %v", err)
 	}
 }
 

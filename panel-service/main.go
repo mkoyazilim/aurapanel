@@ -4513,7 +4513,8 @@ func (s *service) ensureMailArtifactsLocked(site Website) {
 	}
 
 	_ = provisionMailDomain(normalizedDomain)
-	s.recordIssuedCertificateLocked(fmt.Sprintf("mail.%s", normalizedDomain), "Let's Encrypt", false)
+	// Mail SSL sertifikasi ayri olarak /api/v1/ssl/mail/issue endpoint'i uzerinden verilir.
+	// Burada sadece mail altyapisi hazirlanir, sertifika durumu inspectCertificate ile kontrol edilir.
 }
 
 func transferHomeBelongsToDomain(homeDir, domain string) bool {
@@ -4758,11 +4759,18 @@ func (s *service) removeSiteArtifactsLocked(domain string) error {
 	docroot := domainDocroot(domain)
 	_ = exec.Command("rm", "-rf", docroot).Run()
 
+	// Remove site log directory (access_log, error_log, php error log)
+	logDir := olsSiteLogDir(domain)
+	_ = exec.Command("rm", "-rf", logDir).Run()
+
 	// Ensure we remove the user's home directory if it's completely empty and user only had one site
 	homeDir := fmt.Sprintf("/home/%s", domain)
 	if docroot != homeDir {
 		_ = exec.Command("rm", "-rf", homeDir).Run()
 	}
+
+	// Rebuild logrotate config so stale site entries are cleaned up.
+	_ = ensureOLSLogrotateFromStateLocked(s)
 
 	return s.syncOLSVhostsLocked()
 }

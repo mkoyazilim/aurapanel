@@ -1319,6 +1319,16 @@ func ensureOLSLogrotateConfig(sites []olsManagedSite) error {
 	return writeOLSFileAtomically(olsLogrotateConfigPath, []byte(content), 0o644)
 }
 
+// ensureOLSLogrotateFromStateLocked regenerates the logrotate config from the
+// current in-memory state. Used after site deletion to purge stale entries.
+func ensureOLSLogrotateFromStateLocked(s *service) error {
+	managedSites, err := buildOLSManagedSites(s.state.Websites, s.state.AdvancedConfig, s.state.Aliases)
+	if err != nil {
+		return err
+	}
+	return ensureOLSLogrotateConfig(managedSites)
+}
+
 func runtimeOLSTuningConfig() (OLSTuningConfig, error) {
 	if !fileExists(olsHTTPDConfigPath) {
 		return OLSTuningConfig{}, fmt.Errorf("openlitespeed config bulunamadi")
