@@ -32,7 +32,6 @@ const (
 	permissionCronManage       = "cron.manage"
 	permissionCloudflareManage = "cloudflare.manage"
 	permissionMigrationManage  = "migration.manage"
-	permissionCloudlinuxManage = "cloudlinux.manage"
 	permissionMinioManage      = "minio.manage"
 	permissionActivityRead     = "activity.read"
 	permissionOpsManage        = "ops.manage"
@@ -76,7 +75,6 @@ var permissionRules = []permissionRule{
 	{prefix: "/api/v1/monitor", permissions: []string{permissionMonitoringRead}},
 	{prefix: "/api/v1/cloudflare", permissions: []string{permissionCloudflareManage}},
 	{prefix: "/api/v1/migration", permissions: []string{permissionMigrationManage}},
-	{prefix: "/api/v1/cloudlinux", permissions: []string{permissionCloudlinuxManage}},
 	{prefix: "/api/v1/minio", permissions: []string{permissionMinioManage}},
 	{prefix: "/api/v1/activity", permissions: []string{permissionActivityRead}},
 	{prefix: "/api/v1/ops", permissions: []string{permissionOpsManage}},

@@ -1408,7 +1408,6 @@
     "Docker Installed Apps": "Apps Docker installées",
     "Docker Packages": "Paquets Docker",
     "CloudFlare": "CloudFlare",
-    "CloudLinux": "CloudLinux",
     "MigrationWizard": "Assistant Migration",
     "MailTuning": "Optimisation Mail",
     "OpsCenter": "Centre d'opérations",
@@ -1457,163 +1456,6 @@
     "confirm_delete": "Voulez-vous vraiment supprimer cet élément ?",
     "compress_success": "Archive créée avec succès.",
     "extract_success": "Archive extraite avec succès."
-  },
-  "cloudlinux": {
-    "title": "CloudLinux",
-    "subtitle": "Module optionnel avec opérations sécurisées et mapping de profil",
-    "actions": {
-      "refresh": "Actualiser",
-      "refreshing": "Actualisation...",
-      "dry_run_label": "Mode test (Dry-run)",
-      "run_dry": "Lancer le test",
-      "run_apply": "Lancer l'action",
-      "running": "Exécution..."
-    },
-    "cards": {
-      "availability": "Disponibilité",
-      "runtime": "Runtime",
-      "distro": "Distribution",
-      "kernel": "Kernel"
-    },
-    "values": {
-      "detected": "Détecté",
-      "not_detected": "Non détecté",
-      "enabled": "Activé",
-      "disabled": "Désactivé",
-      "available": "Disponible",
-      "missing": "Manquant"
-    },
-    "sections": {
-      "features": "Fonctionnalités",
-      "commands": "Détection de commandes",
-      "operations": "Opérations contrôlées",
-      "history": "Historique des opérations",
-      "profiles": "Profils de forfaits LVE",
-      "rollout": "Planificateur de déploiement",
-      "execution": "Exécution du déploiement",
-      "signals": "Signaux de détection",
-      "warnings": "Avertissements",
-      "capabilities": "Capacités plateforme"
-    },
-    "labels": {
-      "p0": "Base P0",
-      "p1": "Mapping Forfait P1",
-      "p2": "Plan Déploiement P2",
-      "p3": "Application Contrôlée P3",
-      "read_only": "Lecture seule",
-      "auto_detect": "Auto-détecté",
-      "safe_mode": "Liste blanche + Audit",
-      "history_limit": "100 dernières entrées"
-    },
-    "empty": {
-      "actions": "Aucune opération CloudLinux disponible.",
-      "history": "Aucun historique.",
-      "profiles": "Aucun profil de forfait.",
-      "signals": "Aucun signal de détection.",
-      "warnings": "Aucun avertissement."
-    },
-    "history": {
-      "action": "Action",
-      "status": "État",
-      "requested_by": "Demandé par",
-      "requested_at": "Le",
-      "duration": "Durée"
-    },
-    "status": {
-      "success": "Succès",
-      "failed": "Échec",
-      "dry_run": "Test (Dry-Run)",
-      "blocked": "Bloqué",
-      "unknown": "Inconnu"
-    },
-    "features": {
-      "lve_manager": "LVE Manager",
-      "cagefs": "CageFS",
-      "alt_php_selector": "Sélecteur Alt-PHP",
-      "mysql_governor": "MySQL Governor"
-    },
-    "profiles": {
-      "summary_total": "Forfaits: {count}",
-      "summary_ready": "Prêts: {count}",
-      "summary_defaults": "Valeurs par défaut: {count}",
-      "summary_sites": "Sites liés: {count}",
-      "package": "Forfait",
-      "plan_type": "Type de plan",
-      "sites": "Sites",
-      "users": "Utilisateurs",
-      "cpu": "CPU",
-      "ram": "RAM",
-      "io": "I/O",
-      "ep": "EP",
-      "nproc": "NPROC",
-      "status": "État de préparation",
-      "defaults_used": "Le forfait a des champs illimités ; des valeurs sûres par défaut sont utilisées.",
-      "plan_hosting": "Hébergement",
-      "plan_reseller": "Revendeur",
-      "plan_unknown": "Inconnu",
-      "readiness_ready": "Prêt",
-      "readiness_waiting": "En attente CloudLinux",
-      "readiness_missing_lve": "LVE Manager manquant",
-      "readiness_missing_lvectl": "lvectl manquant",
-      "readiness_missing_profile": "Profil forfait manquant",
-      "readiness_unsupported": "Hôte non supporté"
-    },
-    "rollout": {
-      "package_filter": "Filtre Forfait",
-      "all_packages": "Tous les forfaits",
-      "only_ready": "Uniquement utilisateurs prêts",
-      "refresh_plan": "Actualiser le plan",
-      "summary_scoped": "Utilisateurs ciblés: {count}",
-      "summary_ready": "Utilisateurs prêts: {count}",
-      "summary_blocked": "Utilisateurs bloqués: {count}",
-      "summary_defaults": "Valeurs par défaut: {count}",
-      "apply_mode_enabled": "Application live: activée",
-      "apply_mode_disabled": "Application live: désactivée",
-      "confirm_token": "Jeton de confirmation: {token}",
-      "table_user": "Utilisateur",
-      "table_role": "Rôle",
-      "table_package": "Forfait",
-      "table_limits": "Limites cibles",
-      "table_status": "État",
-      "table_command": "Indice commande",
-      "limits_format": "CPU {cpu}% | RAM {ram} Mo | IO {io} Mo/s | EP {ep}",
-      "preview_title": "Aperçu script (25 premières commandes)",
-      "empty": "Aucune ligne pour ce filtre.",
-      "apply_title": "Lancer le déploiement",
-      "apply_dry_run": "Mode test (sûr)",
-      "max_users": "Max utilisateurs",
-      "confirm_label": "Confirmation application Live",
-      "confirm_placeholder": "Tapez {token} pour appliquer",
-      "apply_running": "Application...",
-      "apply_run_dry": "Lancer le déploiement Test",
-      "apply_run_live": "Lancer le déploiement Live",
-      "apply_done": "Commande de déploiement terminée.",
-      "apply_failed": "Échec du déploiement.",
-      "history_title": "Historiques récents",
-      "history_empty": "Aucun historique.",
-      "history_time": "Date",
-      "history_mode": "Mode",
-      "history_status": "État",
-      "history_stats": "Stats",
-      "history_stats_format": "Tentés {attempted} | OK {ok} | Échecs {failed} | Sautés {skipped}",
-      "mode_dry": "Test",
-      "mode_live": "Live",
-      "audit_success": "Succès",
-      "audit_partial_failed": "Échec partiel",
-      "audit_no_op": "Aucune action",
-      "audit_dry_run": "Test",
-      "results_title": "Résultats derniers",
-      "results_status": "Résultat",
-      "results_message": "Message",
-      "role_user": "Utilisateur",
-      "role_reseller": "Revendeur",
-      "role_unknown": "Inconnu"
-    },
-    "messages": {
-      "load_failed": "Échec du chargement CloudLinux.",
-      "action_done": "Action CloudLinux terminée.",
-      "action_failed": "Échec de l'action CloudLinux."
-    }
   },
   "mail_tuning": {
     "title": "Optimisation Mail",
@@ -3065,9 +2907,6 @@
     },
     "migration": {
       "manage": "Assistant Migration"
-    },
-    "cloudlinux": {
-      "manage": "Gestion CloudLinux"
     },
     "minio": {
       "manage": "Gestion MinIO"

@@ -1,4 +1,4 @@
-.PHONY: all service api frontend build clean package cloudlinux-smoke
+.PHONY: all service api frontend build clean package
 
 SERVICE_DIR = panel-service
 API_DIR = api-gateway
@@ -45,8 +45,3 @@ package: build
 	@echo "Creating deployment tarball..."
 	tar -czvf aurapanel-release.tar.gz -C $(BUILD_DIR) .
 	@echo "aurapanel-release.tar.gz created."
-
-# CloudLinux staging smoke runner
-cloudlinux-smoke:
-	@echo "Running CloudLinux staging smoke..."
-	python scripts/cloudlinux_smoke.py

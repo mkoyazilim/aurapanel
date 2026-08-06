@@ -1446,7 +1446,6 @@
     "Docker Installed Apps": "Yüklü Docker Uygulamaları",
     "Docker Packages": "Docker Paketleri",
     "CloudFlare": "CloudFlare",
-    "CloudLinux": "CloudLinux",
     "MigrationWizard": "Taşıma Sihirbazı",
     "MailTuning": "Posta İnce Ayarı",
     "OpsCenter": "Ops Merkezi",
@@ -1495,163 +1494,6 @@
     "confirm_delete": "Bunu silmek istediğinize emin misiniz?",
     "compress_success": "Arşiv başarıyla oluşturuldu.",
     "extract_success": "Arşiv başarıyla çıkarıldı."
-  },
-  "cloudlinux": {
-    "title": "CloudLinux",
-    "subtitle": "Güvenli işlemler ve paket profil eşlemesi ile isteğe bağlı eklenti modülü",
-    "actions": {
-      "refresh": "Yenile",
-      "refreshing": "Yenileniyor...",
-      "dry_run_label": "Test (dry-run) kullan (sistem değişikliği yok)",
-      "run_dry": "Test Olarak Çalıştır",
-      "run_apply": "İşlemi Çalıştır",
-      "running": "Çalışıyor..."
-    },
-    "cards": {
-      "availability": "Kullanılabilirlik",
-      "runtime": "Çalışma Zamanı",
-      "distro": "Dağıtım",
-      "kernel": "Çekirdek (Kernel)"
-    },
-    "values": {
-      "detected": "Tespit Edildi",
-      "not_detected": "Tespit Edilmedi",
-      "enabled": "Etkin",
-      "disabled": "Devre Dışı",
-      "available": "Mevcut",
-      "missing": "Eksik"
-    },
-    "sections": {
-      "features": "Özellik Hazırlığı",
-      "commands": "Komut Tespiti",
-      "operations": "Kontrollü İşlemler",
-      "history": "İşlem Geçmişi",
-      "profiles": "LVE Paket Profilleri",
-      "rollout": "Dağıtım Planlayıcı",
-      "execution": "Dağıtım Uygulaması",
-      "signals": "Tespit Sinyalleri",
-      "warnings": "Uyarılar",
-      "capabilities": "Platform Yetenekleri"
-    },
-    "labels": {
-      "p0": "P0 Temel",
-      "p1": "P1 Paket Eşleme",
-      "p2": "P2 Dağıtım Planı",
-      "p3": "P3 Kontrollü Uygulama",
-      "read_only": "Salt-okunur",
-      "auto_detect": "Otomatik algılandı",
-      "safe_mode": "İzin Listesi + Denetim",
-      "history_limit": "Son 100 kayıt"
-    },
-    "empty": {
-      "actions": "Şu anda kullanılabilecek hiçbir CloudLinux işlemi yok.",
-      "history": "Henüz işlem geçmişi yok.",
-      "profiles": "Paket profili verisi bulunamadı.",
-      "signals": "Tespit sinyali bulunamadı.",
-      "warnings": "Uyarı yok."
-    },
-    "history": {
-      "action": "İşlem",
-      "status": "Durum",
-      "requested_by": "Talep Eden",
-      "requested_at": "Talep Zamanı",
-      "duration": "Süre"
-    },
-    "status": {
-      "success": "Başarılı",
-      "failed": "Başarısız",
-      "dry_run": "Test (Dry-Run)",
-      "blocked": "Engellendi",
-      "unknown": "Bilinmeyen"
-    },
-    "features": {
-      "lve_manager": "LVE Yöneticisi",
-      "cagefs": "CageFS",
-      "alt_php_selector": "Alt-PHP Seçici",
-      "mysql_governor": "MySQL Governor"
-    },
-    "profiles": {
-      "summary_total": "Paketler: {count}",
-      "summary_ready": "Hazır: {count}",
-      "summary_defaults": "Varsayılanları kullananlar: {count}",
-      "summary_sites": "Bağlı siteler: {count}",
-      "package": "Paket",
-      "plan_type": "Plan Türü",
-      "sites": "Siteler",
-      "users": "Kullanıcılar",
-      "cpu": "CPU",
-      "ram": "RAM",
-      "io": "G/Ç",
-      "ep": "EP",
-      "nproc": "NPROC",
-      "status": "Hazırlık",
-      "defaults_used": "Paketin sınırsız alanları var; güvenli varsayılanlar kullanılır.",
-      "plan_hosting": "Hosting",
-      "plan_reseller": "Bayi",
-      "plan_unknown": "Bilinmeyen",
-      "readiness_ready": "Hazır",
-      "readiness_waiting": "CloudLinux Bekleniyor",
-      "readiness_missing_lve": "LVE Yöneticisi Eksik",
-      "readiness_missing_lvectl": "lvectl Eksik",
-      "readiness_missing_profile": "Paket Profili Eksik",
-      "readiness_unsupported": "Desteklenmeyen Sunucu"
-    },
-    "rollout": {
-      "package_filter": "Paket Filtresi",
-      "all_packages": "Tüm Paketler",
-      "only_ready": "Yalnızca hazır kullanıcıları göster",
-      "refresh_plan": "Planı Yenile",
-      "summary_scoped": "Kapsamdaki kullanıcılar: {count}",
-      "summary_ready": "Hazır kullanıcılar: {count}",
-      "summary_blocked": "Engellenen kullanıcılar: {count}",
-      "summary_defaults": "Varsayılanları kullananlar: {count}",
-      "apply_mode_enabled": "Canlı uygulama: etkin",
-      "apply_mode_disabled": "Canlı uygulama: devre dışı",
-      "confirm_token": "Onay token'ı: {token}",
-      "table_user": "Kullanıcı",
-      "table_role": "Rol",
-      "table_package": "Paket",
-      "table_limits": "Hedef Limitleri",
-      "table_status": "Hazırlık Durumu",
-      "table_command": "Komut İpucu",
-      "limits_format": "CPU {cpu}% | RAM {ram} MB | G/Ç {io} MB/s | EP {ep}",
-      "preview_title": "Komut Önizlemesi (İlk 25 Hazır Komut)",
-      "empty": "Geçerli filtre için dağıtım satırı yok.",
-      "apply_title": "Dağıtımı Çalıştır",
-      "apply_dry_run": "Test modu (güvenli)",
-      "max_users": "Maksimum Kullanıcı",
-      "confirm_label": "Canlı Uygulama Onayı",
-      "confirm_placeholder": "Canlı uygulama için {token} yazın",
-      "apply_running": "Uygulanıyor...",
-      "apply_run_dry": "Test Dağıtımı Çalıştır",
-      "apply_run_live": "Canlı Dağıtımı Çalıştır",
-      "apply_done": "Dağıtım komutu tamamlandı.",
-      "apply_failed": "Dağıtım komutu başarısız oldu.",
-      "history_title": "Son Dağıtım Çalıştırmaları",
-      "history_empty": "Henüz dağıtım geçmişi yok.",
-      "history_time": "Talep Zamanı",
-      "history_mode": "Mod",
-      "history_status": "Durum",
-      "history_stats": "İstatistikler",
-      "history_stats_format": "Denenen {attempted} | Başarılı {ok} | Başarısız {failed} | Atlanan {skipped}",
-      "mode_dry": "Test (Dry-Run)",
-      "mode_live": "Canlı",
-      "audit_success": "Başarılı",
-      "audit_partial_failed": "Kısmen Başarısız",
-      "audit_no_op": "İşlem Yok",
-      "audit_dry_run": "Test",
-      "results_title": "Son Çalıştırma Sonuçları",
-      "results_status": "Sonuç",
-      "results_message": "Mesaj",
-      "role_user": "Kullanıcı",
-      "role_reseller": "Bayi",
-      "role_unknown": "Bilinmeyen"
-    },
-    "messages": {
-      "load_failed": "CloudLinux durumu yüklenemedi.",
-      "action_done": "CloudLinux işlemi tamamlandı.",
-      "action_failed": "CloudLinux işlemi başarısız oldu."
-    }
   },
   "mail_tuning": {
     "title": "Posta İnce Ayarı",
@@ -3108,9 +2950,6 @@
     },
     "migration": {
       "manage": "Taşıma Sihirbazı"
-    },
-    "cloudlinux": {
-      "manage": "CloudLinux Yönetimi"
     },
     "minio": {
       "manage": "MinIO Yönetimi"

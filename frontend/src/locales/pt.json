@@ -1411,7 +1411,6 @@
     "Docker Installed Apps": "Apps Docker Instalados",
     "Docker Packages": "Pacotes Docker",
     "CloudFlare": "CloudFlare",
-    "CloudLinux": "CloudLinux",
     "MigrationWizard": "Assistente de Migração",
     "MailTuning": "Ajuste de E-mail",
     "OpsCenter": "Centro de Ops",
@@ -1460,163 +1459,6 @@
     "confirm_delete": "Tem certeza de que deseja excluir isto?",
     "compress_success": "Arquivo compactado criado com sucesso.",
     "extract_success": "Arquivo extraído com sucesso."
-  },
-  "cloudlinux": {
-    "title": "CloudLinux",
-    "subtitle": "Módulo adicional opcional com operações seguras e mapeamento de perfil",
-    "actions": {
-      "refresh": "Atualizar",
-      "refreshing": "Atualizando...",
-      "dry_run_label": "Usar dry-run (sem alteração no sistema)",
-      "run_dry": "Executar Dry-Run",
-      "run_apply": "Executar Ação",
-      "running": "Executando..."
-    },
-    "cards": {
-      "availability": "Disponibilidade",
-      "runtime": "Runtime",
-      "distro": "Distribuição",
-      "kernel": "Kernel"
-    },
-    "values": {
-      "detected": "Detectado",
-      "not_detected": "Não detectado",
-      "enabled": "Ativado",
-      "disabled": "Desativado",
-      "available": "Disponível",
-      "missing": "Ausente"
-    },
-    "sections": {
-      "features": "Prontidão de Recursos",
-      "commands": "Detecção de Comandos",
-      "operations": "Operações Controladas",
-      "history": "Histórico de Operações",
-      "profiles": "Perfis de Pacote LVE",
-      "rollout": "Planejador de Rollout",
-      "execution": "Execução de Rollout",
-      "signals": "Sinais de Detecção",
-      "warnings": "Avisos",
-      "capabilities": "Capacidades da Plataforma"
-    },
-    "labels": {
-      "p0": "P0 Baseline",
-      "p1": "P1 Mapeamento de Pacote",
-      "p2": "P2 Plano de Rollout",
-      "p3": "P3 Aplicação Controlada",
-      "read_only": "Somente leitura",
-      "auto_detect": "Auto-detectado",
-      "safe_mode": "Lista de permissões + Auditoria",
-      "history_limit": "Últimas 100 entradas"
-    },
-    "empty": {
-      "actions": "Nenhuma operação CloudLinux disponível no momento.",
-      "history": "Nenhum histórico de operações ainda.",
-      "profiles": "Nenhum dado de perfil de pacote encontrado.",
-      "signals": "Nenhum sinal de detecção encontrado.",
-      "warnings": "Nenhum aviso."
-    },
-    "history": {
-      "action": "Ação",
-      "status": "Status",
-      "requested_by": "Solicitado Por",
-      "requested_at": "Solicitado Em",
-      "duration": "Duração"
-    },
-    "status": {
-      "success": "Sucesso",
-      "failed": "Falhou",
-      "dry_run": "Dry-Run",
-      "blocked": "Bloqueado",
-      "unknown": "Desconhecido"
-    },
-    "features": {
-      "lve_manager": "LVE Manager",
-      "cagefs": "CageFS",
-      "alt_php_selector": "Alt-PHP Selector",
-      "mysql_governor": "MySQL Governor"
-    },
-    "profiles": {
-      "summary_total": "Pacotes: {count}",
-      "summary_ready": "Prontos: {count}",
-      "summary_defaults": "Usando padrões: {count}",
-      "summary_sites": "Sites vinculados: {count}",
-      "package": "Pacote",
-      "plan_type": "Tipo de Plano",
-      "sites": "Sites",
-      "users": "Usuários",
-      "cpu": "CPU",
-      "ram": "RAM",
-      "io": "I/O",
-      "ep": "EP",
-      "nproc": "NPROC",
-      "status": "Prontidão",
-      "defaults_used": "O pacote tem campos ilimitados; padrões seguros são usados.",
-      "plan_hosting": "Hospedagem",
-      "plan_reseller": "Revenda",
-      "plan_unknown": "Desconhecido",
-      "readiness_ready": "Pronto",
-      "readiness_waiting": "Aguardando CloudLinux",
-      "readiness_missing_lve": "LVE Manager Ausente",
-      "readiness_missing_lvectl": "lvectl Ausente",
-      "readiness_missing_profile": "Perfil de Pacote Ausente",
-      "readiness_unsupported": "Host não suportado"
-    },
-    "rollout": {
-      "package_filter": "Filtro de Pacote",
-      "all_packages": "Todos os Pacotes",
-      "only_ready": "Mostrar apenas usuários prontos",
-      "refresh_plan": "Atualizar Plano",
-      "summary_scoped": "Usuários no escopo: {count}",
-      "summary_ready": "Usuários prontos: {count}",
-      "summary_blocked": "Usuários bloqueados: {count}",
-      "summary_defaults": "Usando padrões: {count}",
-      "apply_mode_enabled": "Aplicação ao vivo: ativada",
-      "apply_mode_disabled": "Aplicação ao vivo: desativada",
-      "confirm_token": "Token de confirmação: {token}",
-      "table_user": "Usuário",
-      "table_role": "Função",
-      "table_package": "Pacote",
-      "table_limits": "Limites de Destino",
-      "table_status": "Prontidão",
-      "table_command": "Dica de Comando",
-      "limits_format": "CPU {cpu}% | RAM {ram} MB | IO {io} MB/s | EP {ep}",
-      "preview_title": "Pré-visualização do Script (Primeiros 25 comandos prontos)",
-      "empty": "Nenhuma linha de rollout para o filtro atual.",
-      "apply_title": "Executar Rollout",
-      "apply_dry_run": "Modo Dry-run (seguro)",
-      "max_users": "Máx. Usuários",
-      "confirm_label": "Confirmação de Aplicação ao Vivo",
-      "confirm_placeholder": "Digite {token} para aplicação ao vivo",
-      "apply_running": "Aplicando...",
-      "apply_run_dry": "Executar Rollout Dry-Run",
-      "apply_run_live": "Executar Rollout ao Vivo",
-      "apply_done": "Comando de rollout finalizado.",
-      "apply_failed": "Comando de rollout falhou.",
-      "history_title": "Execuções Recentes de Rollout",
-      "history_empty": "Nenhum histórico de rollout ainda.",
-      "history_time": "Solicitado Em",
-      "history_mode": "Modo",
-      "history_status": "Status",
-      "history_stats": "Estatísticas",
-      "history_stats_format": "Tentados {attempted} | OK {ok} | Falhou {failed} | Ignorados {skipped}",
-      "mode_dry": "Dry-Run",
-      "mode_live": "Ao Vivo",
-      "audit_success": "Sucesso",
-      "audit_partial_failed": "Falha Parcial",
-      "audit_no_op": "Sem Operação",
-      "audit_dry_run": "Dry-Run",
-      "results_title": "Resultados da Última Execução",
-      "results_status": "Resultado",
-      "results_message": "Mensagem",
-      "role_user": "Usuário",
-      "role_reseller": "Revendedor",
-      "role_unknown": "Desconhecido"
-    },
-    "messages": {
-      "load_failed": "Não foi possível carregar o status do CloudLinux.",
-      "action_done": "Ação do CloudLinux finalizada.",
-      "action_failed": "Ação do CloudLinux falhou."
-    }
   },
   "mail_tuning": {
     "title": "Ajuste de E-mail",
@@ -3068,9 +2910,6 @@
     },
     "migration": {
       "manage": "Assistente de Migração"
-    },
-    "cloudlinux": {
-      "manage": "Gerenciamento CloudLinux"
     },
     "minio": {
       "manage": "Gerenciamento MinIO"

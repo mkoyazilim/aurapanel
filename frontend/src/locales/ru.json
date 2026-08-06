@@ -1411,7 +1411,6 @@
     "Docker Installed Apps": "Установленные приложения Docker",
     "Docker Packages": "Пакеты Docker",
     "CloudFlare": "CloudFlare",
-    "CloudLinux": "CloudLinux",
     "MigrationWizard": "Мастер миграции",
     "MailTuning": "Настройка почты",
     "OpsCenter": "Центр Ops",
@@ -1460,163 +1459,6 @@
     "confirm_delete": "Вы уверены, что хотите удалить это?",
     "compress_success": "Архив успешно создан.",
     "extract_success": "Архив успешно извлечен."
-  },
-  "cloudlinux": {
-    "title": "CloudLinux",
-    "subtitle": "Опциональный модуль с безопасными операциями и маппингом профилей пакетов",
-    "actions": {
-      "refresh": "Обновить",
-      "refreshing": "Обновление...",
-      "dry_run_label": "Использовать тестовый запуск (dry-run, без изменений системы)",
-      "run_dry": "Запустить тестовый прогон",
-      "run_apply": "Запустить действие",
-      "running": "Выполнение..."
-    },
-    "cards": {
-      "availability": "Доступность",
-      "runtime": "Среда выполнения",
-      "distro": "Дистрибутив",
-      "kernel": "Ядро (Kernel)"
-    },
-    "values": {
-      "detected": "Обнаружено",
-      "not_detected": "Не обнаружено",
-      "enabled": "Включено",
-      "disabled": "Отключено",
-      "available": "Доступно",
-      "missing": "Отсутствует"
-    },
-    "sections": {
-      "features": "Готовность функций",
-      "commands": "Обнаружение команд",
-      "operations": "Контролируемые операции",
-      "history": "История операций",
-      "profiles": "Профили пакетов LVE",
-      "rollout": "Планировщик развертывания",
-      "execution": "Выполнение развертывания",
-      "signals": "Сигналы обнаружения",
-      "warnings": "Предупреждения",
-      "capabilities": "Возможности платформы"
-    },
-    "labels": {
-      "p0": "Базовый уровень P0",
-      "p1": "Маппинг пакетов P1",
-      "p2": "План развертывания P2",
-      "p3": "Контролируемое применение P3",
-      "read_only": "Только чтение",
-      "auto_detect": "Авто-обнаружение",
-      "safe_mode": "Белый список + Аудит",
-      "history_limit": "Последние 100 записей"
-    },
-    "empty": {
-      "actions": "В настоящее время нет доступных операций CloudLinux.",
-      "history": "Истории операций пока нет.",
-      "profiles": "Данные профиля пакета не найдены.",
-      "signals": "Сигнал обнаружения не найден.",
-      "warnings": "Предупреждений нет."
-    },
-    "history": {
-      "action": "Действие",
-      "status": "Статус",
-      "requested_by": "Кем запрошено",
-      "requested_at": "Время запроса",
-      "duration": "Длительность"
-    },
-    "status": {
-      "success": "Успешно",
-      "failed": "Ошибка",
-      "dry_run": "Тестовый прогон (Dry-Run)",
-      "blocked": "Заблокировано",
-      "unknown": "Неизвестно"
-    },
-    "features": {
-      "lve_manager": "Менеджер LVE",
-      "cagefs": "CageFS",
-      "alt_php_selector": "Alt-PHP Selector",
-      "mysql_governor": "MySQL Governor"
-    },
-    "profiles": {
-      "summary_total": "Пакеты: {count}",
-      "summary_ready": "Готово: {count}",
-      "summary_defaults": "Используют по умолчанию: {count}",
-      "summary_sites": "Привязанные сайты: {count}",
-      "package": "Пакет",
-      "plan_type": "Тип плана",
-      "sites": "Сайты",
-      "users": "Пользователи",
-      "cpu": "CPU",
-      "ram": "RAM",
-      "io": "I/O (Ввод/Вывод)",
-      "ep": "EP",
-      "nproc": "NPROC",
-      "status": "Готовность",
-      "defaults_used": "В пакете есть поля без лимитов; используются безопасные настройки по умолчанию.",
-      "plan_hosting": "Хостинг",
-      "plan_reseller": "Реселлер",
-      "plan_unknown": "Неизвестно",
-      "readiness_ready": "Готово",
-      "readiness_waiting": "Ожидание CloudLinux",
-      "readiness_missing_lve": "Менеджер LVE отсутствует",
-      "readiness_missing_lvectl": "lvectl отсутствует",
-      "readiness_missing_profile": "Профиль пакета отсутствует",
-      "readiness_unsupported": "Неподдерживаемый хост"
-    },
-    "rollout": {
-      "package_filter": "Фильтр пакетов",
-      "all_packages": "Все пакеты",
-      "only_ready": "Показать только готовых пользователей",
-      "refresh_plan": "Обновить план",
-      "summary_scoped": "Пользователи в области действия: {count}",
-      "summary_ready": "Готовые пользователи: {count}",
-      "summary_blocked": "Заблокированные пользователи: {count}",
-      "summary_defaults": "Используют по умолчанию: {count}",
-      "apply_mode_enabled": "Применение вживую: включено",
-      "apply_mode_disabled": "Применение вживую: отключено",
-      "confirm_token": "Токен подтверждения: {token}",
-      "table_user": "Пользователь",
-      "table_role": "Роль",
-      "table_package": "Пакет",
-      "table_limits": "Целевые лимиты",
-      "table_status": "Готовность",
-      "table_command": "Подсказка по команде",
-      "limits_format": "CPU {cpu}% | RAM {ram} МБ | I/O {io} МБ/с | EP {ep}",
-      "preview_title": "Предпросмотр скрипта (Первые 25 готовых команд)",
-      "empty": "Нет строк развертывания для текущего фильтра.",
-      "apply_title": "Запустить развертывание",
-      "apply_dry_run": "Тестовый режим (безопасный)",
-      "max_users": "Максимум пользователей",
-      "confirm_label": "Подтверждение применения вживую",
-      "confirm_placeholder": "Введите {token} для применения вживую",
-      "apply_running": "Применение...",
-      "apply_run_dry": "Запустить тестовое развертывание",
-      "apply_run_live": "Запустить живое развертывание",
-      "apply_done": "Команда развертывания завершена.",
-      "apply_failed": "Ошибка выполнения команды развертывания.",
-      "history_title": "Последние запуски развертывания",
-      "history_empty": "Истории запусков развертывания пока нет.",
-      "history_time": "Время запроса",
-      "history_mode": "Режим",
-      "history_status": "Статус",
-      "history_stats": "Статистика",
-      "history_stats_format": "Попыток {attempted} | Успешно {ok} | Ошибок {failed} | Пропущено {skipped}",
-      "mode_dry": "Тест (Dry-Run)",
-      "mode_live": "Вживую",
-      "audit_success": "Успешно",
-      "audit_partial_failed": "Частичная ошибка",
-      "audit_no_op": "Без изменений (No-Op)",
-      "audit_dry_run": "Тест (Dry-Run)",
-      "results_title": "Последние результаты запуска",
-      "results_status": "Результат",
-      "results_message": "Сообщение",
-      "role_user": "Пользователь",
-      "role_reseller": "Реселлер",
-      "role_unknown": "Неизвестно"
-    },
-    "messages": {
-      "load_failed": "Не удалось загрузить статус CloudLinux.",
-      "action_done": "Действие CloudLinux завершено.",
-      "action_failed": "Ошибка действия CloudLinux."
-    }
   },
   "mail_tuning": {
     "title": "Настройка почты",
@@ -3068,9 +2910,6 @@
     },
     "migration": {
       "manage": "Мастер миграции"
-    },
-    "cloudlinux": {
-      "manage": "Управление CloudLinux"
     },
     "minio": {
       "manage": "Управление MinIO"

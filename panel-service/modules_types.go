@@ -62,8 +62,6 @@ type moduleState struct {
 	CloudflareZones     []CloudflareZone
 	CloudflareDNS       map[string][]CloudflareDNSRecord
 	CloudflareSettings  map[string]cloudflareZoneConfig
-	CloudLinuxActions   []cloudLinuxActionAuditEntry
-	CloudLinuxRollouts  []cloudLinuxRolloutAuditEntry
 	WebmailTokens       map[string]WebmailToken
 	DBToolTokens        map[string]DBToolToken
 	WatchdogConfig      WatchdogConfig

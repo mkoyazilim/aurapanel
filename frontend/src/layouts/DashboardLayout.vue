@@ -412,9 +412,6 @@
               <router-link v-if="can('/server-status')" to="/server-status" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('routes.ServerStatus') }}</span>
               </router-link>
-              <router-link v-if="can('/cloudlinux')" to="/cloudlinux" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
-                <span>{{ t('routes.CloudLinux') }}</span>
-              </router-link>
               <router-link v-if="can('/panel-control')" to="/panel-control" class="sidebar-sub-link" active-class="sidebar-sub-link-active">
                 <span>{{ t('layout.links.panel_port') }}</span>
               </router-link>
@@ -721,7 +718,6 @@ const routeTitleKeys = {
   FileManager: 'routes.FileManager',
   PHP: 'routes.PHP',
   ServerStatus: 'routes.ServerStatus',
-  CloudLinux: 'routes.CloudLinux',
   PanelPort: 'routes.PanelPort',
   PanelUpdate: 'panel_update.title',
   AITools: 'routes.AITools',
@@ -783,7 +779,7 @@ const canDevopsGroup = computed(() =>
   ['/docker/images', '/docker/containers', '/docker/create', '/docker/apps', '/cron-jobs', '/federated', '/ops-center'].some((path) => can(path)),
 )
 const canSystemGroup = computed(() =>
-  ['/server-status', '/cloudlinux', '/panel-control', '/panel-update', '/ai-tools'].some((path) => can(path)),
+  ['/server-status', '/panel-control', '/panel-update', '/ai-tools'].some((path) => can(path)),
 )
 
 const commandItems = computed(() => [
@@ -820,7 +816,6 @@ const commandItems = computed(() => [
   { label: t('routes.MailTuning'), path: '/mail-tuning' },
   { label: t('layout.links.reseller_acl'), path: '/reseller' },
   { label: t('routes.ServerStatus'), path: '/server-status' },
-  { label: t('routes.CloudLinux'), path: '/cloudlinux' },
   { label: t('layout.links.panel_port'), path: '/panel-control' },
   { label: t('panel_update.title'), path: '/panel-update' },
   { label: t('routes.AITools'), path: '/ai-tools' },
@@ -868,7 +863,7 @@ const isDevopsRoute = computed(() =>
   ['/docker', '/cron-jobs', '/federated', '/ops-center'].some(prefix => route.path.startsWith(prefix))
 )
 const isSystemRoute = computed(() =>
-  ['/server-status', '/cloudlinux', '/panel-control', '/panel-port', '/panel-update', '/ai-tools'].some(prefix => route.path.startsWith(prefix))
+  ['/server-status', '/panel-control', '/panel-port', '/panel-update', '/ai-tools'].some(prefix => route.path.startsWith(prefix))
 )
 const topLevelMenus = {
   hosting: hostingMenuOpen,

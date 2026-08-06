@@ -37,9 +37,6 @@ type securitySnapshot struct {
 	MailDomainAvailable    bool
 	DetectedMailStack      []string
 	DetectedWebStack       []string
-	CloudLinuxAvailable    bool
-	CloudLinuxEnabled      bool
-	DetectedCloudLinux     []string
 	ServerIP               string
 	WireGuardActive        bool
 	LivePatchingActive     bool
@@ -102,14 +99,6 @@ func collectSecuritySnapshot() securitySnapshot {
 	firewallActive, firewallManager, firewallPorts := detectFirewallStatus()
 	mailStack := detectMailStack()
 	webStack := detectWebStack()
-	cloudLinux := detectCloudLinuxStatus()
-	cloudFeatures := []string{}
-	for name, enabled := range cloudLinux.Features {
-		if enabled {
-			cloudFeatures = append(cloudFeatures, name)
-		}
-	}
-	cloudFeatures = uniqueSortedStrings(cloudFeatures)
 
 	return securitySnapshot{
 		FirewallActive:         firewallActive,
@@ -119,9 +108,6 @@ func collectSecuritySnapshot() securitySnapshot {
 		MailDomainAvailable:    len(mailStack) >= 2,
 		DetectedMailStack:      mailStack,
 		DetectedWebStack:       webStack,
-		CloudLinuxAvailable:    cloudLinux.Available,
-		CloudLinuxEnabled:      cloudLinux.Enabled,
-		DetectedCloudLinux:     cloudFeatures,
 		ServerIP:               detectPrimaryIPv4(),
 		WireGuardActive:        serviceActive("wg-quick@wg0", "wg-quick"),
 		LivePatchingActive:     serviceActive("canonical-livepatch", "kpatch", "kgraft"),
@@ -411,6 +397,23 @@ func detectWebStack() []string {
 	}
 	sort.Strings(stack)
 	return stack
+}
+
+func uniqueSortedStrings(items []string) []string {
+	set := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = struct{}{}
+	}
+	out := make([]string, 0, len(set))
+	for item := range set {
+		out = append(out, item)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func detectFirewallStatus() (bool, string, []string) {

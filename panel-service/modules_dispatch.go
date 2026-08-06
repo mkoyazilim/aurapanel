@@ -30,30 +30,6 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/ai/tools/execute":
 		s.handleAIToolsExecute(w, r)
 		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/platform/capabilities":
-		s.handlePlatformCapabilities(w)
-		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudlinux/status":
-		s.handleCloudLinuxStatus(w)
-		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudlinux/actions":
-		s.handleCloudLinuxActions(w)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/cloudlinux/actions/run":
-		s.handleCloudLinuxActionRun(w, r)
-		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudlinux/profiles":
-		s.handleCloudLinuxProfiles(w)
-		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudlinux/rollout/plan":
-		s.handleCloudLinuxRolloutPlan(w, r)
-		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloudlinux/rollout/history":
-		s.handleCloudLinuxRolloutHistory(w)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/cloudlinux/rollout/apply":
-		s.handleCloudLinuxRolloutApply(w, r)
-		return true
 	case r.URL.Path == "/api/v1/terminal/ws":
 		if !terminalFeatureEnabled() {
 			writeError(w, http.StatusForbidden, "Terminal feature is disabled.")

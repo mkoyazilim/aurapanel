@@ -1446,7 +1446,6 @@
     "Docker Installed Apps": "Installed Docker Apps",
     "Docker Packages": "Docker Packages",
     "CloudFlare": "CloudFlare",
-    "CloudLinux": "CloudLinux",
     "MigrationWizard": "Migration Wizard",
     "MailTuning": "Mail Tuning",
     "OpsCenter": "Ops Center",
@@ -1495,163 +1494,6 @@
     "confirm_delete": "Are you sure you want to delete this?",
     "compress_success": "Archive created successfully.",
     "extract_success": "Archive extracted successfully."
-  },
-  "cloudlinux": {
-    "title": "CloudLinux",
-    "subtitle": "Optional add-on module with safe operations and package profile mapping",
-    "actions": {
-      "refresh": "Refresh",
-      "refreshing": "Refreshing...",
-      "dry_run_label": "Use dry-run (no system change)",
-      "run_dry": "Run Dry-Run",
-      "run_apply": "Run Action",
-      "running": "Running..."
-    },
-    "cards": {
-      "availability": "Availability",
-      "runtime": "Runtime",
-      "distro": "Distribution",
-      "kernel": "Kernel"
-    },
-    "values": {
-      "detected": "Detected",
-      "not_detected": "Not detected",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "available": "Available",
-      "missing": "Missing"
-    },
-    "sections": {
-      "features": "Feature Readiness",
-      "commands": "Command Detection",
-      "operations": "Controlled Operations",
-      "history": "Operation History",
-      "profiles": "LVE Package Profiles",
-      "rollout": "Rollout Planner",
-      "execution": "Rollout Execution",
-      "signals": "Detection Signals",
-      "warnings": "Warnings",
-      "capabilities": "Platform Capabilities"
-    },
-    "labels": {
-      "p0": "P0 Baseline",
-      "p1": "P1 Package Mapping",
-      "p2": "P2 Rollout Plan",
-      "p3": "P3 Controlled Apply",
-      "read_only": "Read-only",
-      "auto_detect": "Auto-detected",
-      "safe_mode": "Allowlist + Audit",
-      "history_limit": "Last 100 entries"
-    },
-    "empty": {
-      "actions": "No CloudLinux operation is currently available.",
-      "history": "No operation history yet.",
-      "profiles": "No package profile data found.",
-      "signals": "No detection signal found.",
-      "warnings": "No warning."
-    },
-    "history": {
-      "action": "Action",
-      "status": "Status",
-      "requested_by": "Requested By",
-      "requested_at": "Requested At",
-      "duration": "Duration"
-    },
-    "status": {
-      "success": "Success",
-      "failed": "Failed",
-      "dry_run": "Dry-Run",
-      "blocked": "Blocked",
-      "unknown": "Unknown"
-    },
-    "features": {
-      "lve_manager": "LVE Manager",
-      "cagefs": "CageFS",
-      "alt_php_selector": "Alt-PHP Selector",
-      "mysql_governor": "MySQL Governor"
-    },
-    "profiles": {
-      "summary_total": "Packages: {count}",
-      "summary_ready": "Ready: {count}",
-      "summary_defaults": "Using defaults: {count}",
-      "summary_sites": "Attached sites: {count}",
-      "package": "Package",
-      "plan_type": "Plan Type",
-      "sites": "Sites",
-      "users": "Users",
-      "cpu": "CPU",
-      "ram": "RAM",
-      "io": "I/O",
-      "ep": "EP",
-      "nproc": "NPROC",
-      "status": "Readiness",
-      "defaults_used": "Package has unlimited fields; safe defaults are used.",
-      "plan_hosting": "Hosting",
-      "plan_reseller": "Reseller",
-      "plan_unknown": "Unknown",
-      "readiness_ready": "Ready",
-      "readiness_waiting": "Waiting CloudLinux",
-      "readiness_missing_lve": "LVE Manager Missing",
-      "readiness_missing_lvectl": "lvectl Missing",
-      "readiness_missing_profile": "Package Profile Missing",
-      "readiness_unsupported": "Unsupported Host"
-    },
-    "rollout": {
-      "package_filter": "Package Filter",
-      "all_packages": "All Packages",
-      "only_ready": "Show ready users only",
-      "refresh_plan": "Refresh Plan",
-      "summary_scoped": "Scoped users: {count}",
-      "summary_ready": "Ready users: {count}",
-      "summary_blocked": "Blocked users: {count}",
-      "summary_defaults": "Using defaults: {count}",
-      "apply_mode_enabled": "Live apply: enabled",
-      "apply_mode_disabled": "Live apply: disabled",
-      "confirm_token": "Confirm token: {token}",
-      "table_user": "User",
-      "table_role": "Role",
-      "table_package": "Package",
-      "table_limits": "Target Limits",
-      "table_status": "Readiness",
-      "table_command": "Command Hint",
-      "limits_format": "CPU {cpu}% | RAM {ram} MB | IO {io} MB/s | EP {ep}",
-      "preview_title": "Script Preview (First 25 Ready Commands)",
-      "empty": "No rollout rows for current filter.",
-      "apply_title": "Run Rollout",
-      "apply_dry_run": "Dry-run mode (safe)",
-      "max_users": "Max Users",
-      "confirm_label": "Live Apply Confirmation",
-      "confirm_placeholder": "Type {token} for live apply",
-      "apply_running": "Applying...",
-      "apply_run_dry": "Run Dry-Run Rollout",
-      "apply_run_live": "Run Live Rollout",
-      "apply_done": "Rollout command finished.",
-      "apply_failed": "Rollout command failed.",
-      "history_title": "Recent Rollout Runs",
-      "history_empty": "No rollout run history yet.",
-      "history_time": "Requested At",
-      "history_mode": "Mode",
-      "history_status": "Status",
-      "history_stats": "Stats",
-      "history_stats_format": "Tried {attempted} | OK {ok} | Failed {failed} | Skipped {skipped}",
-      "mode_dry": "Dry-Run",
-      "mode_live": "Live",
-      "audit_success": "Success",
-      "audit_partial_failed": "Partial Failed",
-      "audit_no_op": "No-Op",
-      "audit_dry_run": "Dry-Run",
-      "results_title": "Latest Run Results",
-      "results_status": "Result",
-      "results_message": "Message",
-      "role_user": "User",
-      "role_reseller": "Reseller",
-      "role_unknown": "Unknown"
-    },
-    "messages": {
-      "load_failed": "CloudLinux status could not be loaded.",
-      "action_done": "CloudLinux action finished.",
-      "action_failed": "CloudLinux action failed."
-    }
   },
   "mail_tuning": {
     "title": "Mail Tuning",
@@ -3108,9 +2950,6 @@
     },
     "migration": {
       "manage": "Migration Wizard"
-    },
-    "cloudlinux": {
-      "manage": "CloudLinux Management"
     },
     "minio": {
       "manage": "MinIO Management"
