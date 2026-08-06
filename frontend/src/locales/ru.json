@@ -600,30 +600,6 @@
     "title": "Среда выполнения (App Runtime)",
     "subtitle": "Управление Node.js, Python и CMS приложениями",
     "wordpress_manager": "Менеджер WordPress",
-    "refresh": "Обновить",
-    "running_apps": "Запущенные приложения",
-    "empty": "Записи о приложениях не найдены.",
-    "tabs": {
-      "nodejs": "Node.js",
-      "python": "Python"
-    },
-    "node": {
-      "dir_placeholder": "Директория проекта",
-      "app_name_placeholder": "Имя приложения",
-      "start_script_placeholder": "npm start",
-      "install_deps": "Установить зависимости",
-      "start": "Запустить",
-      "stop": "Остановить"
-    },
-    "python": {
-      "dir_placeholder": "Директория проекта",
-      "app_name_placeholder": "Имя приложения",
-      "wsgi_placeholder": "app:app",
-      "port_placeholder": "8001",
-      "create_venv": "Создать venv",
-      "install_requirements": "Установить req",
-      "start": "Запустить"
-    },
     "cms": {
       "help_prefix": "После установки управляйте плагинами, темами, резервным копированием и средой разработки (staging) на экране",
       "help_suffix": "."

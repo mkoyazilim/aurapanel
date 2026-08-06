@@ -310,27 +310,6 @@ func (s *service) handleExtendedRoutes(w http.ResponseWriter, r *http.Request) b
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/files/create_dir":
 		s.handleFileCreateDir(w, r)
 		return true
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/apps/runtime/list":
-		s.handleRuntimeAppsList(w)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/runtime/node/install-deps":
-		s.handleRuntimeNodeInstall(w, r)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/runtime/node/start":
-		s.handleRuntimeNodeStart(w, r)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/runtime/node/stop":
-		s.handleRuntimeNodeStop(w, r)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/runtime/python/venv":
-		s.handleRuntimePythonVenv(w, r)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/runtime/python/install":
-		s.handleRuntimePythonInstall(w, r)
-		return true
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/runtime/python/start":
-		s.handleRuntimePythonStart(w, r)
-		return true
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/apps/install":
 		s.handleCMSInstall(w, r)
 		return true

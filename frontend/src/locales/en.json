@@ -635,30 +635,6 @@
     "title": "App Runtime",
     "subtitle": "Node.js, Python and CMS application management",
     "wordpress_manager": "WordPress Manager",
-    "refresh": "Refresh",
-    "running_apps": "Running Applications",
-    "empty": "No application records found.",
-    "tabs": {
-      "nodejs": "Node.js",
-      "python": "Python"
-    },
-    "node": {
-      "dir_placeholder": "Project directory",
-      "app_name_placeholder": "App name",
-      "start_script_placeholder": "npm start",
-      "install_deps": "Install Deps",
-      "start": "Start",
-      "stop": "Stop"
-    },
-    "python": {
-      "dir_placeholder": "Project directory",
-      "app_name_placeholder": "App name",
-      "wsgi_placeholder": "app:app",
-      "port_placeholder": "8001",
-      "create_venv": "Create venv",
-      "install_requirements": "Install req",
-      "start": "Start"
-    },
     "cms": {
       "help_prefix": "After installation, manage plugin, theme, backup and staging operations from the",
       "help_suffix": "screen."

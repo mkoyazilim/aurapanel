@@ -600,30 +600,6 @@
     "title": "অ্যাপ রানটাইম",
     "subtitle": "Node.js, Python এবং CMS অ্যাপ্লিকেশন ব্যবস্থাপনা",
     "wordpress_manager": "ওয়ার্ডপ্রেস ম্যানেজার",
-    "refresh": "রিফ্রেশ করুন",
-    "running_apps": "চলমান অ্যাপ্লিকেশন",
-    "empty": "কোনো অ্যাপ্লিকেশন রেকর্ড পাওয়া যায়নি।",
-    "tabs": {
-      "nodejs": "Node.js",
-      "python": "Python"
-    },
-    "node": {
-      "dir_placeholder": "প্রজেক্ট ডিরেক্টরি",
-      "app_name_placeholder": "অ্যাপের নাম",
-      "start_script_placeholder": "npm start",
-      "install_deps": "ডিপেনডেন্সি ইনস্টল করুন",
-      "start": "শুরু করুন",
-      "stop": "থামান"
-    },
-    "python": {
-      "dir_placeholder": "প্রজেক্ট ডিরেক্টরি",
-      "app_name_placeholder": "অ্যাপের নাম",
-      "wsgi_placeholder": "app:app",
-      "port_placeholder": "8001",
-      "create_venv": "Venv তৈরি করুন",
-      "install_requirements": "প্রয়োজনীয়তা ইনস্টল করুন",
-      "start": "শুরু করুন"
-    },
     "cms": {
       "help_prefix": "ইনস্টলেশনের পরে, প্লাগইন, থিম, ব্যাকআপ এবং স্টেজিং অপারেশনগুলি পরিচালনা করুন",
       "help_suffix": "স্ক্রিন থেকে।"

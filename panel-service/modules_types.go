@@ -36,7 +36,6 @@ type moduleState struct {
 	MinIOS3Config       MinIOS3Config
 	FederatedMode       FederatedMode
 	FederatedNodes      []FederatedNode
-	RuntimeApps         []RuntimeApp
 	WordPressSites      []WordPressSite
 	WordPressPlugins    map[string][]WordPressPlugin
 	WordPressThemes     map[string][]WordPressTheme
@@ -258,13 +257,6 @@ type FederatedNode struct {
 	NodeName  string `json:"node_name"`
 	IPAddress string `json:"ip_address"`
 	PubKey    string `json:"pub_key"`
-}
-
-type RuntimeApp struct {
-	Runtime string `json:"runtime"`
-	Dir     string `json:"dir"`
-	AppName string `json:"app_name"`
-	Status  string `json:"status"`
 }
 
 type WordPressSite struct {

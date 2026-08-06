@@ -635,30 +635,6 @@
     "title": "Uygulama Çalışma Zamanı (Runtime)",
     "subtitle": "Node.js, Python ve CMS uygulama yönetimi",
     "wordpress_manager": "WordPress Yöneticisi",
-    "refresh": "Yenile",
-    "running_apps": "Çalışan Uygulamalar",
-    "empty": "Uygulama kaydı bulunamadı.",
-    "tabs": {
-      "nodejs": "Node.js",
-      "python": "Python"
-    },
-    "node": {
-      "dir_placeholder": "Proje dizini",
-      "app_name_placeholder": "Uygulama adı",
-      "start_script_placeholder": "npm start",
-      "install_deps": "Bağımlılıkları Yükle",
-      "start": "Başlat",
-      "stop": "Durdur"
-    },
-    "python": {
-      "dir_placeholder": "Proje dizini",
-      "app_name_placeholder": "Uygulama adı",
-      "wsgi_placeholder": "app:app",
-      "port_placeholder": "8001",
-      "create_venv": "Venv oluştur",
-      "install_requirements": "Req yükle",
-      "start": "Başlat"
-    },
     "cms": {
       "help_prefix": "Kurulumdan sonra eklenti, tema, yedekleme ve hazırlık ortamı (staging) işlemlerini",
       "help_suffix": "ekranından yönetin."

@@ -600,30 +600,6 @@
     "title": "App-Runtime",
     "subtitle": "Verwaltung von Node.js, Python und CMS-Anwendungen",
     "wordpress_manager": "WordPress-Manager",
-    "refresh": "Aktualisieren",
-    "running_apps": "Laufende Anwendungen",
-    "empty": "Keine Anwendungseinträge gefunden.",
-    "tabs": {
-      "nodejs": "Node.js",
-      "python": "Python"
-    },
-    "node": {
-      "dir_placeholder": "Projektverzeichnis",
-      "app_name_placeholder": "App-Name",
-      "start_script_placeholder": "npm start",
-      "install_deps": "Abhängigkeiten installieren",
-      "start": "Starten",
-      "stop": "Stoppen"
-    },
-    "python": {
-      "dir_placeholder": "Projektverzeichnis",
-      "app_name_placeholder": "App-Name",
-      "wsgi_placeholder": "app:app",
-      "port_placeholder": "8001",
-      "create_venv": "Venv erstellen",
-      "install_requirements": "Req. installieren",
-      "start": "Starten"
-    },
     "cms": {
       "help_prefix": "Nach der Installation verwalten Sie Plugin-, Theme-, Backup- und Staging-Vorgänge über den",
       "help_suffix": "Bildschirm."
