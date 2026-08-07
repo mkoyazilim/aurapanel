@@ -679,7 +679,8 @@
     "lines": "Lines:",
     "auto_refresh": "Auto",
     "refresh": "Refresh",
-    "no_logs": "No logs to display. Select a source from the left panel."
+    "no_logs": "No logs to display. Select a source from the left panel.",
+    "lines_label": "lines"
   },
   "cron_jobs": {
     "title": "Cron Jobs",

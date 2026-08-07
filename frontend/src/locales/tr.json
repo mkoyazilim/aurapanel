@@ -679,7 +679,8 @@
     "lines": "Satır:",
     "auto_refresh": "Otomatik",
     "refresh": "Yenile",
-    "no_logs": "Görüntülenecek log yok. Sol panelden bir kaynak seçin."
+    "no_logs": "Görüntülenecek log yok. Sol panelden bir kaynak seçin.",
+    "lines_label": "satır"
   },
   "cron_jobs": {
     "title": "Cron İşleri (Zamanlanmış Görevler)",
