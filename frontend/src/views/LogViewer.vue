@@ -126,7 +126,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../services/api'
-import { ChevronDown, ChevronRight, Cpu, Globe, HardDrive, Mail, RefreshCw, Server, Shield } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Cpu, Globe, HardDrive, Mail, RefreshCw, Server, Shield, Terminal } from 'lucide-vue-next'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -142,12 +142,12 @@ const expandedSites = ref(new Set())
 const logContainer = ref(null)
 
 const groupIcons = {
-  system: CpuIcon,
+  system: Cpu,
   webserver: Globe,
-  panel: ServerIcon,
-  security: ShieldIcon,
-  database: HardDriveIcon,
-  mail: MailIcon,
+  panel: Server,
+  security: Shield,
+  database: HardDrive,
+  mail: Mail,
 }
 
 const groupOrder = ['system', 'webserver', 'panel', 'security', 'database', 'mail']
