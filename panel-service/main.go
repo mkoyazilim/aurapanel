@@ -1222,6 +1222,10 @@ func (s *service) handleCompat(w http.ResponseWriter, r *http.Request) {
 		s.handleHardeningApply(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/monitor/logs/site":
 		s.handleSiteLogs(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/monitor/logs/catalog":
+		s.handleLogCatalog(w)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/monitor/logs":
+		s.handleLogSource(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/ssl/issue":
 		s.handleSSLIssue(w, r)
 	default:

@@ -628,13 +628,23 @@
     }
   },
   "log_viewer": {
-    "title": "লগ ভিউয়ার",
-    "subtitle": "সাইট-ভিত্তিক অ্যাক্সেস এবং এরর লগ স্ট্রিম।",
-    "refresh": "রিফ্রেশ করুন",
-    "domain_placeholder": "example.com",
-    "lines_placeholder": "50",
-    "fetch": "লগগুলি আনুন",
-    "output": "লগ আউটপুট"
+    "title": "Log Viewer",
+    "subtitle": "Browse system, web server, panel and site logs.",
+    "categories": "Log Categories",
+    "groups": {
+      "system": "System",
+      "webserver": "Web Server",
+      "panel": "Panel",
+      "security": "Security",
+      "database": "Database",
+      "mail": "Mail",
+      "sites": "Site Logs"
+    },
+    "select_source": "Select a log source from the sidebar",
+    "lines": "Lines:",
+    "auto_refresh": "Auto",
+    "refresh": "Refresh",
+    "no_logs": "No logs to display. Select a source from the left panel."
   },
   "cron_jobs": {
     "title": "ক্রন জবস (Cron Jobs)",

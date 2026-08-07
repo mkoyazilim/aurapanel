@@ -664,12 +664,22 @@
   },
   "log_viewer": {
     "title": "Log Görüntüleyici",
-    "subtitle": "Site bazlı erişim ve hata günlüğü akışı.",
+    "subtitle": "Sistem, web sunucu, panel ve site loglarını görüntüleyin.",
+    "categories": "Log Kategorileri",
+    "groups": {
+      "system": "Sistem",
+      "webserver": "Web Sunucu",
+      "panel": "Panel",
+      "security": "Güvenlik",
+      "database": "Veritabanı",
+      "mail": "E-posta",
+      "sites": "Site Logları"
+    },
+    "select_source": "Soldaki menüden bir log kaynağı seçin",
+    "lines": "Satır:",
+    "auto_refresh": "Otomatik",
     "refresh": "Yenile",
-    "domain_placeholder": "ornek.com",
-    "lines_placeholder": "50",
-    "fetch": "Logları Getir",
-    "output": "Log Çıktısı"
+    "no_logs": "Görüntülenecek log yok. Sol panelden bir kaynak seçin."
   },
   "cron_jobs": {
     "title": "Cron İşleri (Zamanlanmış Görevler)",

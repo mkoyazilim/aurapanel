@@ -628,13 +628,23 @@
     }
   },
   "log_viewer": {
-    "title": "Visionneuse de logs",
-    "subtitle": "Flux d'erreurs et d'accès par site.",
-    "refresh": "Actualiser",
-    "domain_placeholder": "exemple.com",
-    "lines_placeholder": "50",
-    "fetch": "Récupérer les logs",
-    "output": "Sortie du journal"
+    "title": "Log Viewer",
+    "subtitle": "Browse system, web server, panel and site logs.",
+    "categories": "Log Categories",
+    "groups": {
+      "system": "System",
+      "webserver": "Web Server",
+      "panel": "Panel",
+      "security": "Security",
+      "database": "Database",
+      "mail": "Mail",
+      "sites": "Site Logs"
+    },
+    "select_source": "Select a log source from the sidebar",
+    "lines": "Lines:",
+    "auto_refresh": "Auto",
+    "refresh": "Refresh",
+    "no_logs": "No logs to display. Select a source from the left panel."
   },
   "cron_jobs": {
     "title": "Tâches Cron",
