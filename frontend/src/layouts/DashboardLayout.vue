@@ -558,7 +558,7 @@
 
       <!-- Page Content -->
       <div class="flex-1 overflow-auto p-8">
-        <div class="max-w-7xl mx-auto">
+        <div :class="route.path === '/log-viewer' ? '' : 'max-w-7xl mx-auto'">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
               <component :is="Component" />
