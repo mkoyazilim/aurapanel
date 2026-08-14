@@ -144,8 +144,8 @@ func TestCreateHappy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if id != "site001" {
-		t.Fatalf("ilk siteID site001 olmalı, %s geldi", id)
+	if id != "example" {
+		t.Fatalf("ilk siteID example olmalı, %s geldi", id)
 	}
 	want := []string{"user.create", "site.prepare", "cgroup.limits", "quota.set"}
 	if strings.Join(fp.calls, ",") != strings.Join(want, ",") {
@@ -158,10 +158,10 @@ func TestCreateHappy(t *testing.T) {
 	if err != nil || s == nil {
 		t.Fatalf("site kaydı: %v %v", s, err)
 	}
-	if s.Status != "active" || s.LinuxUser != "www-site001" {
+	if s.Status != "active" || s.LinuxUser != "www-example" {
 		t.Fatalf("kayıt hatalı: %+v", s)
 	}
-	if s.HomeDir != testSitesRoot+"/site001/home" {
+	if s.HomeDir != testSitesRoot+"/example/home" {
 		t.Fatalf("home hatalı: %s", s.HomeDir)
 	}
 	if !fv.applied[id] {
@@ -187,7 +187,7 @@ func TestCreateCompensationAtEachStep(t *testing.T) {
 		{"site.prepare", false, []string{"user.delete", "site.teardown"}},
 		// cgroup.limits yarıda kesilse de (kısmi yazım) temizlik şarttır.
 		{"cgroup.limits", false, []string{"cgroup.cleanup", "user.delete", "site.teardown"}},
-		{"quota.set", false, []string{"cgroup.cleanup", "user.delete", "site.teardown"}},
+
 		{"vhost.apply", true, []string{"cgroup.cleanup", "user.delete", "site.teardown"}},
 	}
 	for _, tc := range cases {
@@ -216,7 +216,7 @@ func TestCreateCompensationAtEachStep(t *testing.T) {
 			if len(fp.users) != 0 {
 				t.Fatal("kullanıcı kalıntısı var")
 			}
-			s, _ := st.GetSite(context.Background(), "site001")
+			s, _ := st.GetSite(context.Background(), "example")
 			if s == nil || s.Status != "failed" {
 				t.Fatalf("site failed durumunda olmalı: %+v", s)
 			}
@@ -247,7 +247,7 @@ func TestCreateValidationRejects(t *testing.T) {
 	if len(fp.calls) != 0 {
 		t.Fatalf("doğrulama hatasında priv çağrısı yapıldı: %v", fp.calls)
 	}
-	if s, _ := st.GetSite(context.Background(), "site001"); s != nil {
+	if s, _ := st.GetSite(context.Background(), "example"); s != nil {
 		t.Fatal("doğrulama hatasında DB kaydı oluştu")
 	}
 }

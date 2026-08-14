@@ -36,7 +36,7 @@ func desiredFor(st *store.Site, domains []store.Domain, phpVersion, sitesRoot, c
 	if err != nil {
 		return nil, fmt.Errorf("desired vhost: %w", err)
 	}
-	if len(artifacts) != 1 {
+	if len(artifacts) != 2 {
 		return nil, fmt.Errorf("desired vhost: beklenmeyen artifact sayısı %d", len(artifacts))
 	}
 
@@ -59,7 +59,7 @@ func desiredFor(st *store.Site, domains []store.Domain, phpVersion, sitesRoot, c
 	}
 
 	return &desiredState{
-		VhostContent: string(artifacts[0].Content),
+		VhostContent: string(artifacts[1].Content),
 		User:         st.LinuxUser,
 		Cgroup:       cgroup,
 		DiskBlocks:   limits.DiskMB * 1024, // setquota 1 KiB blok birimi

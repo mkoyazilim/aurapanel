@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // Site, sites tablosundaki tek kayıt (şema v1).
@@ -25,16 +26,42 @@ type Site struct {
 const siteColumns = `id, name, linux_user, home_dir, status, feature_flags, limits,
 	php_version_id, security_profile_id, created_at, updated_at`
 
-// NextSiteID, bir sonraki site kimliğini üretir ("site001", "site002", …).
-// SQLite tek yazıcı olduğundan yarış koşulu yoktur.
-func (s *Store) NextSiteID(ctx context.Context) (string, error) {
-	var max int
-	err := s.db.QueryRowContext(ctx,
-		`SELECT COALESCE(MAX(CAST(substr(id, 5) AS INTEGER)), 0) FROM sites`).Scan(&max)
-	if err != nil {
-		return "", fmt.Errorf("next site id: %w", err)
+// GenerateSiteID, domain adına dayalı benzersiz bir site kimliği üretir ("mkoyazilim", "example" gibi).
+func (s *Store) GenerateSiteID(ctx context.Context, domain string) (string, error) {
+	parts := strings.Split(domain, ".")
+	base := parts[0]
+	
+	var clean []rune
+	for _, r := range base {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			clean = append(clean, r)
+		} else if r >= 'A' && r <= 'Z' {
+			clean = append(clean, r + 32)
+		}
 	}
-	return fmt.Sprintf("site%03d", max+1), nil
+	base = string(clean)
+	if base == "" {
+		base = "site"
+	}
+	if len(base) > 15 {
+		base = base[:15]
+	}
+
+	for i := 1; i <= 1000; i++ {
+		candidate := base
+		if i > 1 {
+			candidate = fmt.Sprintf("%s%d", base, i)
+		}
+		var exists int
+		err := s.db.QueryRowContext(ctx, `SELECT 1 FROM sites WHERE id = ?`, candidate).Scan(&exists)
+		if err == sql.ErrNoRows {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("site id sorgusu: %w", err)
+		}
+	}
+	return "", fmt.Errorf("benzersiz site id üretilemedi")
 }
 
 // InsertSite, yeni site kaydı ekler.

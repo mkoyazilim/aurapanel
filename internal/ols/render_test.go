@@ -16,10 +16,10 @@ func TestRenderContainsCore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	if len(artifacts) != 1 || artifacts[0].RelPath != "vhconf.conf" {
-		t.Fatalf("tek vhconf.conf bekleniyordu: %+v", artifacts)
+	if len(artifacts) != 2 || artifacts[0].RelPath != "main.conf" || artifacts[1].RelPath != "vhconf.conf" {
+		t.Fatalf("main.conf ve vhconf.conf bekleniyordu: %+v", artifacts)
 	}
-	c := string(artifacts[0].Content)
+	c := string(artifacts[1].Content)
 
 	checks := []string{
 		"docRoot                   /srv/aurapanel/sites/site001/home/",
@@ -62,7 +62,7 @@ func TestRenderSSLAndFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	c := string(artifacts[0].Content)
+	c := string(artifacts[1].Content)
 	for _, want := range []string{"vhssl", "keyFile", "certFile", "RewriteRule ^(.*)$ https://", "mod_security"} {
 		if !strings.Contains(c, want) {
 			t.Errorf("çıktıda bulunamadı: %q", want)
@@ -99,8 +99,8 @@ func TestRenderPHPVersionSwitch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(a[0].Content), wantSock) {
-			t.Errorf("%s için soket beklenmiyor: %s", ver, wantSock)
+		if !strings.Contains(string(a[1].Content), wantSock) {
+			t.Errorf("%s için soket bulunamadı: %s", ver, wantSock)
 		}
 	}
 }

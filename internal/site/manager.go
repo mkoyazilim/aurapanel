@@ -134,7 +134,7 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 	}
 	limits := req.Limits.withDefaults()
 
-	siteID, err := m.store.NextSiteID(ctx)
+	siteID, err := m.store.GenerateSiteID(ctx, req.Domain)
 	if err != nil {
 		return "", err
 	}
