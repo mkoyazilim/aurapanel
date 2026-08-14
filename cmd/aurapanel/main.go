@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/mkoyazilim/aurapanel/internal/audit"
 	"github.com/mkoyazilim/aurapanel/internal/config"
 	"github.com/mkoyazilim/aurapanel/internal/logger"
+	"github.com/mkoyazilim/aurapanel/internal/priv"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 )
 
@@ -26,6 +28,12 @@ var (
 )
 
 func main() {
+	// Tek binary, iki mod (ARCHITECTURE §3): kurulumda oluşturulan
+	// "aurapanel-priv" symlink'i üzerinden çağrıldığında priv modu çalışır.
+	if filepath.Base(os.Args[0]) == "aurapanel-priv" {
+		os.Exit(priv.Main(os.Args[1:]))
+	}
+
 	cfgPath := flag.String("config", "", "yapılandırma dosyası (varsayılan: /etc/aurapanel/aurapanel.yaml)")
 	check := flag.Bool("check", false, "başlatma kontrolünü yap ve çık (smoke test)")
 	showVersion := flag.Bool("version", false, "sürümü yazdır ve çık")

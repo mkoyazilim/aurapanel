@@ -16,7 +16,7 @@ Her paket kapanırken: threat model güncellemesi + audit log entegrasyonu + tes
 
 | ID | Paket | İçerik | Çıktı (Definition of Done) | Bağlılık | Efor |
 |---|---|---|---|---|---|
-| **W1** | Temel iskelet | Go modül yapısı, config yükleyici, structured logging (slog), audit log altyapısı, SQLite katmanı + migration'lar + tam şema (v1) | Binary ayağa kalkar; DB şema v1 kurulur; audit kaydı yazılıp okunur | — | M |
+| **W1** | Temel iskelet | Go modül yapısı, config yükleyici, structured logging (slog), audit log altyapısı, SQLite katmanı + migration'lar + tam şema (v1) | Binary ayağa kalkar; DB şema v1 kurulur; audit kaydı yazılıp okunur ✅ (2026-08-14) | — | M |
 | **W2** | `aurapanel-priv` | Unix socket + SO_PEERCRED, op allowlist + şema doğrulama, user/cgroup/quota/nftables/sshd/logrotate ops, append-only priv log, systemd socket activation | Helper fuzz testlerini geçer; rastgele JSON hiçbir beklenmeyen komut çalıştıramaz; op listesi dışı çağrı reddedilir | W1 | L |
 | **W3** | OLS renderer + apply pipeline | Desired state → renderer → şema/path/permission validation → OLS config testi → snapshot → atomic apply → graceful reload → health check → rollback | Kasıtlı bozuk config senaryolarında panel ve siteler ayakta kalır; rollback otomatik doğrulanır (testle kanıtlı) | W2 | L |
 | **W4** | Site yaşam döngüsü | Site oluştur/sil (user, home, cgroup, quota, tmp, logs), limit düzenleme, feature toggle'lar, güvenli silme akışı | Yeni site 1 komutla izole biçimde ayağa kalkar; silme tüm runtime kalıntılarını temizler; izolasyon testleri geçer | W2, W3 | L |
