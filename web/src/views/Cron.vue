@@ -143,6 +143,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { api } from '../api'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -164,13 +165,10 @@ const form = ref({
 
 async function fetchSites() {
   try {
-    const res = await fetch('/api/v1/sites')
-    if (res.ok) {
-      sites.value = await res.json()
-      if (sites.value.length > 0) {
-        selectedSite.value = sites.value[0].id
-        loadCrons()
-      }
+    sites.value = await api('/sites')
+    if (sites.value.length > 0) {
+      selectedSite.value = sites.value[0].id
+      await loadCrons()
     }
   } catch (err) {
     console.error('Siteler alınamadı:', err)
@@ -182,10 +180,7 @@ async function loadCrons() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch(`/api/v1/sites/${selectedSite.value}/crons`)
-    if (res.ok) {
-      jobs.value = await res.json() || []
-    }
+    jobs.value = await api(`/sites/${selectedSite.value}/crons`) || []
   } catch (err) {
     error.value = err.message
   } finally {
@@ -203,19 +198,13 @@ async function saveJob() {
   error.value = ''
   notice.value = ''
   try {
-    const res = await fetch(`/api/v1/sites/${selectedSite.value}/crons`, {
+    await api(`/sites/${selectedSite.value}/crons`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
+      body: form.value
     })
-    if (res.ok) {
-      showModal.value = false
-      notice.value = 'Cron görevi başarıyla oluşturuldu.'
-      await loadCrons()
-    } else {
-      const data = await res.json()
-      error.value = data.error || t('cron.create_failed')
-    }
+    showModal.value = false
+    notice.value = 'Cron görevi başarıyla oluşturuldu.'
+    await loadCrons()
   } catch (err) {
     error.value = err.message
   } finally {
@@ -228,16 +217,11 @@ async function deleteJob(id) {
   error.value = ''
   notice.value = ''
   try {
-    const res = await fetch(`/api/v1/sites/${selectedSite.value}/crons/${id}`, {
+    await api(`/sites/${selectedSite.value}/crons/${id}`, {
       method: 'DELETE'
     })
-    if (res.ok) {
-      notice.value = 'Cron görevi silindi.'
-      await loadCrons()
-    } else {
-      const data = await res.json()
-      error.value = data.error || t('cron.delete_failed')
-    }
+    notice.value = 'Cron görevi silindi.'
+    await loadCrons()
   } catch (err) {
     error.value = err.message
   }

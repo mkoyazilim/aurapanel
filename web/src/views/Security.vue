@@ -82,6 +82,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { api } from '../api'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -102,13 +103,10 @@ function getProfileIcon(id) {
 
 async function fetchSites() {
   try {
-    const res = await fetch('/api/v1/sites')
-    if (res.ok) {
-      sites.value = await res.json()
-      if (sites.value.length > 0) {
-        selectedSite.value = sites.value[0].id
-        loadSecurity()
-      }
+    sites.value = await api('/sites')
+    if (sites.value.length > 0) {
+      selectedSite.value = sites.value[0].id
+      await loadSecurity()
     }
   } catch (err) {
     console.error('Siteler alınamadı:', err)
@@ -120,12 +118,9 @@ async function loadSecurity() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch(`/api/v1/sites/${selectedSite.value}/security`)
-    if (res.ok) {
-      const data = await res.json()
-      currentProfile.value = data.profile
-      profiles.value = data.profiles || []
-    }
+    const data = await api(`/sites/${selectedSite.value}/security`)
+    currentProfile.value = data.profile
+    profiles.value = data.profiles || []
   } catch (err) {
     error.value = err.message
   } finally {
@@ -139,18 +134,12 @@ async function applyProfile(profileID) {
   error.value = ''
   notice.value = ''
   try {
-    const res = await fetch(`/api/v1/sites/${selectedSite.value}/security`, {
+    await api(`/sites/${selectedSite.value}/security`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile: profileID })
+      body: { profile: profileID }
     })
-    if (res.ok) {
-      currentProfile.value = profileID
-      notice.value = t('security.apply_success')
-    } else {
-      const data = await res.json()
-      error.value = data.error || t('security.apply_failed')
-    }
+    currentProfile.value = profileID
+    notice.value = t('security.apply_success')
   } catch (err) {
     error.value = err.message
   } finally {
