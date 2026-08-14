@@ -70,7 +70,7 @@ func (s *Service) CreateDatabase(ctx context.Context, siteID, name string) error
 
 // DropDatabase, siteye ait DB'yi siler.
 func (s *Service) DropDatabase(ctx context.Context, siteID, name string) error {
-	d, err := s.store.GetDatabaseByName(ctx, fullName(siteID, name))
+	d, err := s.store.GetDatabaseByName(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (s *Service) CreateUser(ctx context.Context, siteID, username, password str
 
 // DropUser, siteye ait DB kullanıcısını siler.
 func (s *Service) DropUser(ctx context.Context, siteID, username string) error {
-	u, err := s.store.GetDatabaseUserByName(ctx, fullName(siteID, username))
+	u, err := s.store.GetDatabaseUserByName(ctx, username)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (s *Service) DropUser(ctx context.Context, siteID, username string) error {
 
 // ResetPassword, kullanıcının parolasını değiştirir (yeni değer döner).
 func (s *Service) ResetPassword(ctx context.Context, siteID, username, newPassword string) (string, error) {
-	u, err := s.store.GetDatabaseUserByName(ctx, fullName(siteID, username))
+	u, err := s.store.GetDatabaseUserByName(ctx, username)
 	if err != nil {
 		return "", err
 	}
@@ -207,14 +207,14 @@ func (s *Service) ListUsers(ctx context.Context, siteID string) ([]store.Databas
 // Grant, site kullanıcısına site DB'si üzerinde tam yetki verir.
 // İki kayıt da AYNI siteye ait olmak zorundadır.
 func (s *Service) Grant(ctx context.Context, siteID, username, database string) error {
-	u, err := s.store.GetDatabaseUserByName(ctx, fullName(siteID, username))
+	u, err := s.store.GetDatabaseUserByName(ctx, username)
 	if err != nil {
 		return err
 	}
 	if u == nil || u.SiteID != siteID {
 		return fmt.Errorf("kullanıcı yok veya yetkisiz: %s", username)
 	}
-	d, err := s.store.GetDatabaseByName(ctx, fullName(siteID, database))
+	d, err := s.store.GetDatabaseByName(ctx, database)
 	if err != nil {
 		return err
 	}
