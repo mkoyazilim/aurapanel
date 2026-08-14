@@ -31,6 +31,7 @@ func TestRegistryAllowlist(t *testing.T) {
 		"firewall.apply", "sshd.install_config", "logrotate.install_config",
 		"ols.test", "ols.read_bundle", "ols.install_bundle", "ols.remove_bundle", "ols.reload",
 		"site.prepare", "site.teardown", "cgroup.cleanup",
+		"cgroup.read", "site.status", "quota.get",
 	}
 	if len(reg) != len(want) {
 		t.Fatalf("op sayısı beklenmiyor: %d (beklenen %d)", len(reg), len(want))
@@ -320,6 +321,48 @@ func mustJSON(t *testing.T, v any) []byte {
 	return b
 }
 
+// Okuma op'ları (drift): eksik kaynaklar sessizce boş döner, exec üretmez.
+func TestReadOps(t *testing.T) {
+	cfg := testCfg()
+	reg := newRegistry(cfg)
+
+	// cgroup.read: Windows'ta /sys/fs/cgroup yok → values boş; exec yok.
+	p, data, err := reg["cgroup.read"](cfg, mustJSON(t, map[string]any{"site": "site001"}))
+	if err != nil {
+		t.Fatalf("cgroup.read: %v", err)
+	}
+	if len(p.actions) != 0 {
+		t.Fatal("cgroup.read exec üretmemeli")
+	}
+	if len(data.(map[string]any)["values"].(map[string]any)) != 0 {
+		t.Fatalf("eksik dosyalarda values boş olmalı: %v", data)
+	}
+
+	// site.status: dizinler yok → exists:false.
+	_, data, err = reg["site.status"](cfg, mustJSON(t, map[string]any{"site": "site001", "user": "www-site001"}))
+	if err != nil {
+		t.Fatalf("site.status: %v", err)
+	}
+	dirs := data.(map[string]any)["dirs"].(map[string]any)
+	if dirs["home"].(map[string]any)["exists"] != false {
+		t.Fatalf("eksik home exists:true dönmemeli: %v", dirs)
+	}
+
+	// quota.get: Windows'ta readQuota stub hata döner → available:false (hata DEĞİL).
+	_, data, err = reg["quota.get"](cfg, mustJSON(t, map[string]any{"user": "www-site001"}))
+	if err != nil {
+		t.Fatalf("quota.get: %v", err)
+	}
+	if data.(map[string]any)["available"] != false {
+		t.Fatalf("quota kullanılamaz durumda available:false olmalı: %v", data)
+	}
+
+	// site.status user değişmezi.
+	if _, _, err := reg["site.status"](cfg, mustJSON(t, map[string]any{"site": "site001", "user": "www-site999"})); err == nil {
+		t.Fatal("site.status user değişmezi ihlali kabul edildi")
+	}
+}
+
 // Her op'un mutlu-yol planı bin allowlist'ine uygun olmalı.
 func TestAllOpsHappyPathBins(t *testing.T) {
 	cfg := testCfg()
@@ -343,6 +386,9 @@ func TestAllOpsHappyPathBins(t *testing.T) {
 		"site.prepare":              {"site": "site001", "user": "www-site001"},
 		"site.teardown":             {"site": "site001", "user": "www-site001"},
 		"cgroup.cleanup":            {"site": "site001"},
+		"cgroup.read":               {"site": "site001"},
+		"site.status":               {"site": "site001", "user": "www-site001"},
+		"quota.get":                 {"user": "www-site001"},
 	}
 	for op, args := range happy {
 		raw, _ := json.Marshal(args)

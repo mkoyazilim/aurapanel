@@ -192,6 +192,9 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"site.prepare":              opSitePrepare,
 		"site.teardown":             opSiteTeardown,
 		"cgroup.cleanup":            opCgroupCleanup,
+		"cgroup.read":               opCgroupRead,
+		"site.status":               opSiteStatus,
+		"quota.get":                 opQuotaGet,
 	}
 }
 
@@ -243,7 +246,7 @@ func opUserCreate(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	useradd, _ := bin("useradd")
 	chown, _ := bin("chown")
 	p := &plan{}
-	p.mkdir(home)
+	p.mkdirMode(home, 0o750)
 	p.exec(useradd, "-U", "-d", home, "-s", a.Shell, a.Name)
 	p.exec(chown, "-R", a.Name+":"+a.Name, home)
 
@@ -708,4 +711,92 @@ func opCgroupCleanup(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	p := &plan{}
 	p.removeAll(dir)
 	return p, map[string]any{"site": a.Site}, nil
+}
+
+// opCgroupRead, site cgroup limitlerinin GERÇEK değerlerini okur (drift).
+// Eksik dosyalar sessizce atlanır — "limit yok" demektir.
+func opCgroupRead(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("cgroup.read: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("cgroup.read: site kimliği geçersiz")
+	}
+	dir := path.Join(cfg.cgroupBase, "sites", a.Site)
+	values := map[string]any{}
+	for _, f := range []string{"cpu.max", "memory.max", "memory.high", "pids.max"} {
+		b, err := os.ReadFile(path.Join(dir, f))
+		if err != nil {
+			continue // dosya yok → değer yok
+		}
+		values[f] = strings.TrimSpace(string(b))
+	}
+	return &plan{}, map[string]any{"site": a.Site, "values": values}, nil
+}
+
+// opSiteStatus, site dizinlerinin (home/logs/tmp) varlığını ve modunu okur (drift).
+func opSiteStatus(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+		User string `json:"user"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("site.status: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("site.status: site kimliği geçersiz")
+	}
+	if a.User != "www-"+a.Site {
+		return nil, nil, errors.New("site.status: user 'www-<site>' biçiminde olmalı")
+	}
+	root := path.Join(cfg.sitesRoot, a.Site)
+	dirs := map[string]any{}
+	for _, d := range []string{"home", "logs", "tmp"} {
+		st, err := os.Stat(path.Join(root, d))
+		if err != nil {
+			dirs[d] = map[string]any{"exists": false}
+			continue
+		}
+		dirs[d] = map[string]any{"exists": true, "mode": int(st.Mode().Perm())}
+	}
+	return &plan{}, map[string]any{"site": a.Site, "dirs": dirs}, nil
+}
+
+// opQuotaGet, kullanıcının quota hard limitlerini okur (drift).
+// Quota etkin değilse hata değil "available:false" döner — bu bir drift
+// değil kurulum (W13) sorunudur.
+func opQuotaGet(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		User string `json:"user"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("quota.get: %w", err)
+	}
+	if !reUserName.MatchString(a.User) {
+		return nil, nil, errors.New("quota.get: user geçersiz")
+	}
+	u, err := user.Lookup(a.User)
+	if err != nil {
+		if runtime.GOOS != "linux" {
+			// Windows geliştirme ortamında kullanıcı veritabanı farklıdır;
+			// user.exists ile aynı davranış: sorgulanamayan = yok.
+			return &plan{}, map[string]any{"user": a.User, "available": false, "reason": "kullanıcı bulunamadı"}, nil
+		}
+		return nil, nil, fmt.Errorf("quota.get: kullanıcı bulunamadı: %w", err)
+	}
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return nil, nil, fmt.Errorf("quota.get: uid: %w", err)
+	}
+	blocks, inodes, err := readQuota(cfg.quotaFS, uint32(uid))
+	if err != nil {
+		return &plan{}, map[string]any{"user": a.User, "available": false, "reason": err.Error()}, nil
+	}
+	return &plan{}, map[string]any{
+		"user": a.User, "available": true,
+		"disk_blocks": blocks, "inodes": inodes,
+	}, nil
 }

@@ -77,8 +77,13 @@ func (p *Pipeline) Apply(ctx context.Context, v Vhost) error {
 	if err := p.installer.Reload(ctx); err != nil {
 		return composeErr("reload", err, p.rollback(ctx, v.SiteID, snapshot))
 	}
-	if err := p.prober.Probe(ctx, p.probeFor(v)); err != nil {
-		return composeErr("health check", err, p.rollback(ctx, v.SiteID, snapshot))
+	// Prober bağlıysa health check yapılır; bağlı değilse doğrulama
+	// config testi + reload ile sınırlıdır (ör. drift onarımında doğrulama
+	// sonraki taramadaki içerik karşılaştırmasıyla yapılır).
+	if p.prober != nil {
+		if err := p.prober.Probe(ctx, p.probeFor(v)); err != nil {
+			return composeErr("health check", err, p.rollback(ctx, v.SiteID, snapshot))
+		}
 	}
 	return nil
 }
