@@ -107,7 +107,8 @@ func (p *privCollector) SiteStatus(ctx context.Context, siteID, name string) (ma
 
 func (p *privCollector) UserCreate(ctx context.Context, name, shell string) error {
 	siteID := strings.TrimPrefix(name, "www-")
-	home := path.Join(p.sitesRoot, siteID)
+	// ops.go kuralı: home = sitesRoot/<siteID>/home (site dizininin altındaki "home" alt dizini)
+	home := path.Join(p.sitesRoot, siteID, "home")
 	_, err := p.c.Call(ctx, "user.create", map[string]any{"name": name, "shell": shell, "home": home})
 	return err
 }
