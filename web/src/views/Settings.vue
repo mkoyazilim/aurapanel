@@ -39,6 +39,33 @@
       </div>
 
       <div class="card">
+        <h2>Güvenlik (Bot Koruması)</h2>
+        <div class="row">
+          <div style="flex: 1">
+            <label>Sağlayıcı (Provider)</label>
+            <select v-model="captchaProvider">
+              <option value="">Devre Dışı</option>
+              <option value="turnstile">Cloudflare Turnstile</option>
+              <option value="recaptcha">Google reCAPTCHA (v2/v3)</option>
+            </select>
+          </div>
+        </div>
+        <template v-if="captchaProvider">
+          <div class="row" style="margin-top: 10px;">
+            <div style="flex: 1">
+              <label>Site Key (Genel Anahtar)</label>
+              <input v-model="captchaSiteKey" placeholder="e.g. 0x4AAAA..." />
+            </div>
+            <div style="flex: 1">
+              <label>Secret Key (Gizli Anahtar)</label>
+              <input v-model="captchaSecret" type="password" placeholder="Sadece sunucu bilir..." />
+            </div>
+          </div>
+        </template>
+        <button class="btn primary" style="margin-top: 14px" @click="saveCaptchaSettings">Ayarları Kaydet</button>
+      </div>
+
+      <div class="card">
         <h2>Kişisel Erişim Token'ları (CLI/API)</h2>
         <div class="row">
           <input v-model="patName" placeholder="Token adı" style="flex: 1" />
@@ -81,6 +108,10 @@ const pats = ref([])
 const newToken = ref('')
 const error = ref('')
 const notice = ref('')
+
+const captchaProvider = ref('')
+const captchaSiteKey = ref('')
+const captchaSecret = ref('')
 
 async function changePw() {
   error.value = ''
@@ -134,6 +165,24 @@ async function mfaDisable() {
   }
 }
 
+async function saveCaptchaSettings() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await api('/settings', {
+      method: 'POST',
+      body: JSON.stringify({
+        captcha_provider: captchaProvider.value,
+        captcha_sitekey: captchaSiteKey.value,
+        captcha_secret: captchaSecret.value,
+      })
+    })
+    notice.value = 'Bot koruması ayarları başarıyla kaydedildi.'
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
 async function patCreate() {
   try {
     const out = await api('/auth/pat', { method: 'POST', body: { name: patName.value } })
@@ -159,6 +208,14 @@ async function loadPats() {
 
 onMounted(async () => {
   me.value = await api('/auth/me').catch(() => ({}))
+  try {
+    const s = await api('/settings')
+    captchaProvider.value = s.captcha_provider || ''
+    captchaSiteKey.value = s.captcha_sitekey || ''
+    captchaSecret.value = s.captcha_secret || ''
+  } catch (e) {
+    console.error('Ayarlar okunamadı', e)
+  }
   await loadPats()
 })
 </script>

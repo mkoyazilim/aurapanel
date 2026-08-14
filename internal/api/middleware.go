@@ -51,7 +51,8 @@ func (s *Server) recoverMiddleware(next http.Handler) http.Handler {
 
 // publicPaths, oturum gerektirmeyen API uç noktaları.
 var publicPaths = map[string]bool{
-	"POST /api/v1/auth/login": true,
+	"POST /api/v1/auth/login":      true,
+	"GET /api/v1/settings/public":  true,
 }
 
 // mustChangeExempt, zorunlu şifre değişiminden muaf uç noktalar.

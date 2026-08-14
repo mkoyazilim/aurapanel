@@ -45,6 +45,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		TOTP     string `json:"totp"`
+		Captcha  string `json:"captcha"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
@@ -70,6 +71,18 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.deps.Audit.Write(r.Context(), audit.Event{Action: "auth.login", IP: ip, Result: "failed"})
 		writeErr(w, http.StatusUnauthorized, "kullanıcı adı veya şifre hatalı")
 		return
+	}
+
+	// Captcha doğrulaması
+	provider, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_provider")
+	secret, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_secret")
+	if secret != "" {
+		ok, err := verifyCaptcha(provider, secret, req.Captcha, ip)
+		if err != nil || !ok {
+			s.throttle.Record(key)
+			writeErr(w, http.StatusUnauthorized, "Güvenlik doğrulaması (Captcha) başarısız")
+			return
+		}
 	}
 
 	// TOTP zorunluysa doğrula.
@@ -1091,4 +1104,42 @@ func (s *Server) handleSFTPDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// Settings Endpoints
+func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	provider, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_provider")
+	siteKey, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_sitekey")
+	secretKey, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_secret")
+	writeJSON(w, http.StatusOK, map[string]string{
+		"captcha_provider": provider,
+		"captcha_sitekey":  siteKey,
+		"captcha_secret":   secretKey,
+	})
+}
+
+func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	var req map[string]string
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	allowed := []string{"captcha_provider", "captcha_sitekey", "captcha_secret"}
+	for _, k := range allowed {
+		if v, ok := req[k]; ok {
+			s.deps.Store.SetSetting(r.Context(), k, v)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
+	provider, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_provider")
+	siteKey, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_sitekey")
+	writeJSON(w, http.StatusOK, map[string]string{
+		"captcha_provider": provider,
+		"captcha_sitekey":  siteKey,
+	})
 }

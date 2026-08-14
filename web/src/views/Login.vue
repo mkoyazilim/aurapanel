@@ -10,6 +10,12 @@
       <input v-model="password" type="password" autocomplete="current-password" required />
       <label>TOTP kodu (2FA etkinse)</label>
       <input v-model="totp" inputmode="numeric" placeholder="6 haneli kod" />
+      
+      <div v-if="captchaSiteKey" style="margin-top: 16px;">
+        <div v-if="captchaProvider === 'turnstile'" class="cf-turnstile" :data-sitekey="captchaSiteKey"></div>
+        <div v-else-if="captchaProvider === 'recaptcha'" class="g-recaptcha" :data-sitekey="captchaSiteKey"></div>
+      </div>
+
       <button class="btn primary" style="margin-top: 16px; width: 100%" :disabled="busy">
         {{ busy ? 'Giriş yapılıyor…' : 'Giriş Yap' }}
       </button>
@@ -18,9 +24,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../stores/auth'
+import { api } from '../api'
 
 const auth = useAuth()
 const router = useRouter()
@@ -30,14 +37,48 @@ const totp = ref('')
 const error = ref('')
 const busy = ref(false)
 
+const captchaProvider = ref('')
+const captchaSiteKey = ref('')
+
+onMounted(async () => {
+  try {
+    const s = await api('/settings/public')
+    captchaProvider.value = s.captcha_provider || ''
+    captchaSiteKey.value = s.captcha_sitekey || ''
+
+    if (captchaSiteKey.value) {
+      const script = document.createElement('script')
+      script.async = true
+      script.defer = true
+      if (captchaProvider.value === 'turnstile') {
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+      } else if (captchaProvider.value === 'recaptcha') {
+        script.src = 'https://www.google.com/recaptcha/api.js'
+      }
+      document.head.appendChild(script)
+    }
+  } catch (e) {
+    // skip
+  }
+})
+
 async function submit() {
   busy.value = true
   error.value = ''
+  
+  let captcha = ''
+  if (captchaSiteKey.value) {
+    const el = document.querySelector('[name=cf-turnstile-response]') || document.querySelector('[name=g-recaptcha-response]')
+    if (el) captcha = el.value
+  }
+
   try {
-    await auth.login(username.value, password.value, totp.value)
+    await auth.login(username.value, password.value, totp.value, captcha)
     router.push('/')
   } catch (e) {
     error.value = e.message
+    if (window.turnstile) window.turnstile.reset()
+    if (window.grecaptcha) window.grecaptcha.reset()
   } finally {
     busy.value = false
   }

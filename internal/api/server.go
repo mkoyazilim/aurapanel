@@ -108,8 +108,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/v1/auth/pat", s.handlePATList)
 	m.HandleFunc("DELETE /api/v1/auth/pat/{id}", s.handlePATDelete)
 
-	// Durum.
+	// Durum ve Ayarlar.
 	m.HandleFunc("GET /api/v1/status", s.handleStatus)
+	m.HandleFunc("GET /api/v1/settings", s.handleGetSettings)
+	m.HandleFunc("POST /api/v1/settings", s.handleSaveSettings)
+	m.HandleFunc("GET /api/v1/settings/public", s.handlePublicSettings)
 
 	// Siteler.
 	m.HandleFunc("GET /api/v1/sites", s.handleSitesList)

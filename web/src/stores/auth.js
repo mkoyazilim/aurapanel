@@ -7,10 +7,10 @@ export const useAuth = defineStore('auth', {
     csrf: localStorage.getItem('ap_csrf') || '',
   }),
   actions: {
-    async login(username, password, totp) {
+    async login(username, password, totp, captcha) {
       const out = await api('/auth/login', {
         method: 'POST',
-        body: { username, password, totp: totp || '' },
+        body: { username, password, totp: totp || '', captcha: captcha || '' },
       })
       this.csrf = out.csrf_token || ''
       localStorage.setItem('ap_csrf', this.csrf)
