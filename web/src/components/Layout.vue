@@ -1,21 +1,28 @@
 <template>
   <div class="layout">
-    <aside class="sidebar">
-      <div class="brand"><img src="/icon.png" alt="AuraPanel" height="28" style="vertical-align: middle; margin-right: 8px;" />AuraPanel</div>
+    <aside class="sidebar" :class="{ 'is-collapsed': collapsed }">
+      <div class="brand">
+        <img src="/icon.png" alt="AuraPanel" height="28" :style="{ marginRight: collapsed ? '0' : '8px' }" />
+        <span v-if="!collapsed">AuraPanel</span>
+      </div>
       <nav>
         <div class="nav-group" v-for="group in menu" :key="group.title">
-          <div class="nav-title">{{ group.title }}</div>
+          <div class="nav-title" v-if="!collapsed">{{ group.title }}</div>
+          <div class="nav-title collapsed-dots" v-else>•••</div>
           <router-link v-for="item in group.items" :key="item.to" :to="item.to"
-            class="nav-item" active-class="active">
+            class="nav-item" active-class="active" :title="collapsed ? item.label : ''">
             <span class="nav-icon" v-html="item.icon"></span>
-            <span class="nav-label">{{ item.label }}</span>
+            <span class="nav-label" v-if="!collapsed">{{ item.label }}</span>
           </router-link>
         </div>
       </nav>
     </aside>
     <main class="content">
       <header class="topbar">
-        <div class="muted mono">aurapanel</div>
+        <button class="toggle-btn" @click="toggleSidebar" title="Menüyü Daralt/Genişlet">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+        </button>
+        <div class="muted mono" style="margin-left: 12px;">aurapanel</div>
         <div class="spacer"></div>
         <span v-if="auth.user" class="muted">{{ auth.user.username }}</span>
         <button class="btn" @click="logout">Çıkış</button>
@@ -26,11 +33,18 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../stores/auth'
 
 const auth = useAuth()
 const router = useRouter()
+const collapsed = ref(localStorage.getItem('sidebar_collapsed') === '1')
+
+function toggleSidebar() {
+  collapsed.value = !collapsed.value
+  localStorage.setItem('sidebar_collapsed', collapsed.value ? '1' : '0')
+}
 
 const menu = [
   {
@@ -76,15 +90,24 @@ async function logout() {
   top: 0;
   height: 100vh;
   box-shadow: 1px 0 10px rgba(0,0,0,0.02);
+  transition: width 0.3s ease, padding 0.3s ease;
+  overflow-x: hidden;
+  white-space: nowrap;
 }
-.brand { font-weight: 700; font-size: 18px; padding: 4px 8px 24px; color: #0f172a; display: flex; align-items: center; }
+.sidebar.is-collapsed {
+  width: 76px;
+  padding: 24px 12px;
+}
+.brand { font-weight: 700; font-size: 18px; padding: 4px 8px 24px; color: #0f172a; display: flex; align-items: center; justify-content: center; }
 .nav-group { margin-bottom: 24px; }
 .nav-title {
   font-size: 12px;
   font-weight: 600;
   color: #94a3b8;
   padding: 0 12px 10px;
+  transition: opacity 0.2s;
 }
+.nav-title.collapsed-dots { text-align: center; padding: 0 0 10px; letter-spacing: 2px; }
 .nav-item {
   display: flex;
   align-items: center;
@@ -96,10 +119,12 @@ async function logout() {
   font-weight: 500;
   margin-bottom: 4px;
   transition: all 0.2s ease;
+  overflow: hidden;
 }
+.sidebar.is-collapsed .nav-item { padding: 10px; justify-content: center; }
 .nav-item:hover { background: #f1f5f9; color: #0f172a; }
 .nav-item.active { background: #eff6ff; color: var(--primary); font-weight: 600; }
-.nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; opacity: 0.7; }
+.nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; opacity: 0.7; flex-shrink: 0; }
 .nav-item.active .nav-icon { opacity: 1; }
 :deep(.nav-icon svg) { width: 100%; height: 100%; }
 .content { flex: 1; padding: 0; display: flex; flex-direction: column; background: #f8fafc; }
@@ -112,6 +137,13 @@ async function logout() {
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
+  z-index: 10;
 }
-.content :deep(.page) { padding: 20px; }
+.toggle-btn {
+  background: none; border: none; cursor: pointer; color: #64748b; padding: 4px;
+  display: flex; align-items: center; justify-content: center; border-radius: 6px;
+}
+.toggle-btn:hover { background: #f1f5f9; color: #0f172a; }
+.toggle-btn svg { width: 20px; height: 20px; }
+.content :deep(.page) { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
 </style>
