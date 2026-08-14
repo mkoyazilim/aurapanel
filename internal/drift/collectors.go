@@ -3,6 +3,8 @@ package drift
 import (
 	"context"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/mkoyazilim/aurapanel/internal/ols"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
@@ -102,6 +104,13 @@ func (p *privCollector) SiteStatus(ctx context.Context, siteID, name string) (ma
 }
 
 // --- repairOps uygulaması ---
+
+func (p *privCollector) UserCreate(ctx context.Context, name, shell string) error {
+	siteID := strings.TrimPrefix(name, "www-")
+	home := path.Join(p.sitesRoot, siteID)
+	_, err := p.c.Call(ctx, "user.create", map[string]any{"name": name, "shell": shell, "home": home})
+	return err
+}
 
 func (p *privCollector) SitePrepare(ctx context.Context, siteID, user string) error {
 	_, err := p.c.Call(ctx, "site.prepare", map[string]any{"site": siteID, "user": user})

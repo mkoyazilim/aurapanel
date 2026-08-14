@@ -12,6 +12,8 @@ import (
 
 // repairOps, Repair'in ihtiyaç duyduğu yeniden-uygulama işlemleri.
 type repairOps interface {
+	UserExists(ctx context.Context, name string) (bool, error)
+	UserCreate(ctx context.Context, name, shell string) error
 	SitePrepare(ctx context.Context, siteID, user string) error
 	CgroupLimits(ctx context.Context, siteID string, l site.Limits) error
 	QuotaSet(ctx context.Context, user string, diskMB, inodes uint64) error
@@ -72,6 +74,16 @@ func (r *Repairer) Repair(ctx context.Context, siteID string) error {
 		name string
 		fn   func() error
 	}{
+		{"user.create", func() error {
+			exists, err := r.ops.UserExists(ctx, user)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return r.ops.UserCreate(ctx, user, "/usr/sbin/nologin")
+			}
+			return nil
+		}},
 		{"site.prepare", func() error { return r.ops.SitePrepare(ctx, siteID, user) }},
 		{"cgroup.limits", func() error { return r.ops.CgroupLimits(ctx, siteID, limits) }},
 		{"quota.set", func() error { return r.ops.QuotaSet(ctx, user, limits.DiskMB, limits.Inodes) }},

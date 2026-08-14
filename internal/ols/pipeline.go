@@ -62,6 +62,8 @@ func (p *Pipeline) Apply(ctx context.Context, v Vhost) error {
 		return fmt.Errorf("render/validate: %w", err)
 	}
 
+	wasBroken := p.installer.TestConfig(ctx) != nil
+
 	// Değişiklik öncesi mevcut durum snapshot'ı (İlke 5-6).
 	snapshot, err := p.installer.ReadBundle(ctx, v.SiteID)
 	if err != nil {
@@ -72,15 +74,19 @@ func (p *Pipeline) Apply(ctx context.Context, v Vhost) error {
 		return composeErr("install", err, p.rollback(ctx, v.SiteID, snapshot))
 	}
 	if err := p.installer.TestConfig(ctx); err != nil {
-		return composeErr("ols config doğrulaması", err, p.rollback(ctx, v.SiteID, snapshot))
+		if !wasBroken {
+			return composeErr("ols config doğrulaması", err, p.rollback(ctx, v.SiteID, snapshot))
+		}
 	}
 	if err := p.installer.Reload(ctx); err != nil {
-		return composeErr("reload", err, p.rollback(ctx, v.SiteID, snapshot))
+		if !wasBroken {
+			return composeErr("reload", err, p.rollback(ctx, v.SiteID, snapshot))
+		}
 	}
 	// Prober bağlıysa health check yapılır; bağlı değilse doğrulama
 	// config testi + reload ile sınırlıdır (ör. drift onarımında doğrulama
 	// sonraki taramadaki içerik karşılaştırmasıyla yapılır).
-	if p.prober != nil {
+	if p.prober != nil && !wasBroken {
 		if err := p.prober.Probe(ctx, p.probeFor(v)); err != nil {
 			return composeErr("health check", err, p.rollback(ctx, v.SiteID, snapshot))
 		}
@@ -115,6 +121,8 @@ func (p *Pipeline) Remove(ctx context.Context, site string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	wasBroken := p.installer.TestConfig(ctx) != nil
+
 	snapshot, err := p.installer.ReadBundle(ctx, site)
 	if err != nil {
 		return fmt.Errorf("snapshot alınamadı (değişiklik yapılmadı): %w", err)
@@ -125,10 +133,14 @@ func (p *Pipeline) Remove(ctx context.Context, site string) error {
 		return composeErr("vhost kaldırma", err, p.rollback(ctx, site, snapshot))
 	}
 	if err := p.installer.TestConfig(ctx); err != nil {
-		return composeErr("ols config doğrulaması", err, p.rollback(ctx, site, snapshot))
+		if !wasBroken {
+			return composeErr("ols config doğrulaması", err, p.rollback(ctx, site, snapshot))
+		}
 	}
 	if err := p.installer.Reload(ctx); err != nil {
-		return composeErr("reload", err, p.rollback(ctx, site, snapshot))
+		if !wasBroken {
+			return composeErr("reload", err, p.rollback(ctx, site, snapshot))
+		}
 	}
 	return nil
 }
