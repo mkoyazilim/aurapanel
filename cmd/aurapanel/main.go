@@ -169,7 +169,7 @@ func main() {
 	acmeDir := filepath.Join(cfg.Paths.DataDir, "acme")
 	acmeSolver := ssl.NewLocalSolver(acmeDir)
 	// TODO: Config'ten admin e-posta almak iyi olabilir, MVP için admin@ varsayılanı kullanıyoruz.
-	acmeClient := ssl.NewLetsEncryptClient("admin@aurapanel.local", acmeSolver)
+	acmeClient := ssl.NewLetsEncryptClient("admin@mkoyazilim.com", acmeSolver)
 
 	sslSvc := ssl.NewService(st, ssl.NewCertStore(certsRoot), acmeClient, pipeline, au, sitesRoot, certsRoot, 30*24*time.Hour)
 
