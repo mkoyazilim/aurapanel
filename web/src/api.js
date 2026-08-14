@@ -19,6 +19,11 @@ export async function api(path, opts = {}) {
   return data
 }
 
+api.get = (path) => api(path)
+api.post = (path, body) => api(path, { method: 'POST', body })
+api.put = (path, body) => api(path, { method: 'PUT', body })
+api.delete = (path) => api(path, { method: 'DELETE' })
+
 export function b64encode(s) {
   const bytes = new TextEncoder().encode(s)
   let bin = ''

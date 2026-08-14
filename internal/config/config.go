@@ -14,8 +14,17 @@ type Config struct {
 	Listen   Listen   `yaml:"listen"`
 	Database Database `yaml:"database"`
 	MariaDB  MariaDB  `yaml:"mariadb"`
+	PowerDNS PowerDNS `yaml:"powerdns"`
 	Log      Log      `yaml:"log"`
 	Paths    Paths    `yaml:"paths"`
+}
+
+// PowerDNS, PowerDNS API yapılandırması.
+type PowerDNS struct {
+	Enabled  bool   `yaml:"enabled"`
+	Endpoint string `yaml:"endpoint"`
+	APIKey   string `yaml:"api_key"`
+	ServerID string `yaml:"server_id"` // varsayılan "localhost"
 }
 
 // MariaDB, site DB'leri için yönetim bağlantısı (unix socket).

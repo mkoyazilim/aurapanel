@@ -44,6 +44,21 @@
                 <button class="btn btn-sm" @click="openWpModal(s)" title="WordPress Kur">
                   ⚡ {{ $t('sites.install_wp') }}
                 </button>
+                <router-link :to="'/sites/' + s.id + '/git'" class="btn btn-sm" :title="$t('menu.git_deploy', 'Git Webhook')">
+                  🐙 Git
+                </router-link>
+                <router-link :to="'/sites/' + s.id + '/nodejs'" class="btn btn-sm" :title="$t('menu.nodejs', 'Node.js')">
+                  🟢 Node
+                </router-link>
+                <router-link :to="'/sites/' + s.id + '/staging'" class="btn btn-sm" :title="$t('menu.staging', 'Staging')">
+                  🧪 Staging
+                </router-link>
+                <router-link :to="'/sites/' + s.id + '/cloudflare'" class="btn btn-sm" :title="$t('menu.cloudflare', 'Cloudflare')">
+                  ☁️ CF
+                </router-link>
+                <router-link :to="'/sites/' + s.id + '/mail'" class="btn btn-sm" :title="$t('menu.mail', 'Mail Sunucusu')">
+                  📧 Mail
+                </router-link>
                 <button class="btn btn-sm danger" @click="remove(s.id)" title="Siteyi Sil">
                   🗑️ {{ $t('common.delete') }}
                 </button>

@@ -49,6 +49,7 @@ var binPaths = map[string]string{
 	"setquota":  "/usr/sbin/setquota",
 	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
 	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
+	"rsync":     "/usr/bin/rsync",
 }
 
 func bin(name string) (string, error) {
@@ -204,7 +205,67 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"php.read_ini":              opPHPReadIni,
 		"ols.webadmin_credentials":  opOlsWebadminCredentials,
 		"cron.apply":                opCronApply,
+		"node.apply":                opNodeApply,
+		"node.remove":               opNodeRemove,
+		"site.clone_files":          opSiteCloneFiles,
 	}
+}
+
+// opNodeApply creates or updates a systemd service for a Node.js app
+func opNodeApply(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site    string `json:"site"`
+		AppID   string `json:"app_id"`
+		Content string `json:"content"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("node.apply: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("node.apply: site kimliği geçersiz")
+	}
+	if !reSiteID.MatchString(a.AppID) {
+		return nil, nil, errors.New("node.apply: app kimliği geçersiz")
+	}
+	
+	serviceName := fmt.Sprintf("ap-node-%s-%s.service", a.Site, a.AppID)
+	servicePath := "/etc/systemd/system/" + serviceName
+	
+	systemctl, _ := bin("systemctl")
+	p := &plan{}
+	p.write(fileWrite{path: servicePath, content: a.Content, mode: 0o644})
+	p.exec(systemctl, "daemon-reload")
+	p.exec(systemctl, "enable", "--now", serviceName)
+	p.exec(systemctl, "restart", serviceName)
+	return p, map[string]any{"service": serviceName}, nil
+}
+
+// opNodeRemove stops and removes a systemd service for a Node.js app
+func opNodeRemove(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site  string `json:"site"`
+		AppID string `json:"app_id"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("node.remove: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("node.remove: site kimliği geçersiz")
+	}
+	if !reSiteID.MatchString(a.AppID) {
+		return nil, nil, errors.New("node.remove: app kimliği geçersiz")
+	}
+	
+	serviceName := fmt.Sprintf("ap-node-%s-%s.service", a.Site, a.AppID)
+	servicePath := "/etc/systemd/system/" + serviceName
+	
+	systemctl, _ := bin("systemctl")
+	p := &plan{}
+	p.exec(systemctl, "stop", serviceName)
+	p.exec(systemctl, "disable", serviceName)
+	p.remove(servicePath)
+	p.exec(systemctl, "daemon-reload")
+	return p, map[string]any{"service": serviceName}, nil
 }
 
 // opCronApply, site kullanıcısının crontab dosyasını güvenli biçimde yazar.
@@ -766,6 +827,40 @@ func opSiteTeardown(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	p := &plan{}
 	p.removeAll(root)
 	return p, map[string]any{"site": a.Site, "root": root}, nil
+}
+
+// opSiteCloneFiles securely copies files from one site to another (for staging).
+func opSiteCloneFiles(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		SrcSite string `json:"src_site"`
+		DstSite string `json:"dst_site"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("site.clone_files: %w", err)
+	}
+	if !reSiteID.MatchString(a.SrcSite) || !reSiteID.MatchString(a.DstSite) {
+		return nil, nil, errors.New("site.clone_files: site kimliği geçersiz")
+	}
+	
+	srcHome := path.Join(cfg.sitesRoot, a.SrcSite, "home") + "/" // Trailing slash is important for rsync
+	dstHome := path.Join(cfg.sitesRoot, a.DstSite, "home") + "/"
+	
+	dstUser := "www-" + a.DstSite
+	
+	// Ensure we only copy from valid sites
+	// Since we execute this as root, we can use rsync and then chown the dst
+	// Actually, instead of rsync, we can just use cp -a and chown, but rsync is better
+	rsyncPath, _ := bin("rsync")
+	chownPath, _ := bin("chown")
+	
+	p := &plan{}
+	// -a: archive mode (recursive, preserve perms, owner, times)
+	// --delete: delete extraneous files from destination
+	p.exec(rsyncPath, "-a", "--delete", srcHome, dstHome)
+	// chown -R the destination to the new user
+	p.exec(chownPath, "-R", dstUser+":"+dstUser, dstHome)
+	
+	return p, map[string]any{"src": srcHome, "dst": dstHome}, nil
 }
 
 // opCgroupCleanup, site cgroup alt dizinini kaldırır. Cgroup içinde

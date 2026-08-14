@@ -25,6 +25,13 @@ type Vhost struct {
 	EnableGzip  bool
 	WAF         bool
 	SSL         *SSLConfig
+	ProxyApps   []ProxyApp
+}
+
+type ProxyApp struct {
+	Name string
+	Port int
+	Path string
 }
 
 // SSLConfig, vhost için TLS yapılandırması.

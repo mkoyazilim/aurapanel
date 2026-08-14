@@ -151,7 +151,7 @@ func userFromCtx(ctx context.Context) (*store.User, bool) {
 	return u, ok && u != nil
 }
 
-// requireAdmin, ctx'teki kullanıcının admin olmasını zorunlu kılar.
+// requireAdmin, aslında genel erişim kontrolüdür (admin ise her şeye, değilse sadece sahip olduğu sitelere izin verir).
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
 	u, ok := userFromCtx(r.Context())
 	if !ok {
@@ -159,11 +159,47 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (*store.Us
 		return nil, false
 	}
 	role, err := s.deps.Store.GetRoleName(r.Context(), u.RoleID)
-	if err != nil || role != "admin" {
-		writeErr(w, http.StatusForbidden, "yönetici yetkisi gerekli")
-		return nil, false
+	if err != nil {
+		role = "user"
 	}
-	return u, true
+	if role == "admin" {
+		return u, true
+	}
+
+	siteID := r.PathValue("id")
+	if siteID != "" {
+		st, err := s.deps.Store.GetSite(r.Context(), siteID)
+		if err == nil && st != nil && st.UserID.Valid {
+			// Kullanıcı sitenin sahibi mi?
+			if u.ID == st.UserID.Int64 {
+				return u, true
+			}
+			// Bayi ise, alt kullanıcının sitesi mi?
+			if role == "reseller" {
+				owner, _ := s.deps.Store.GetUserByID(r.Context(), st.UserID.Int64)
+				if owner != nil && owner.ParentID.Valid && owner.ParentID.Int64 == u.ID {
+					return u, true
+				}
+			}
+		}
+	}
+
+	writeErr(w, http.StatusForbidden, "erişim reddedildi (yetki yetersiz veya site size ait değil)")
+	return nil, false
+}
+
+// requireAuth, kullanıcının login olmasını sağlar ve rolünü döner.
+func (s *Server) requireAuth(w http.ResponseWriter, r *http.Request) (*store.User, string, bool) {
+	u, ok := userFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "kimlik doğrulaması yok")
+		return nil, "", false
+	}
+	role, err := s.deps.Store.GetRoleName(r.Context(), u.RoleID)
+	if err != nil {
+		role = "user"
+	}
+	return u, role, true
 }
 
 // loginThrottle, per-IP + per-hesap giriş kısıtlaması (ARCHITECTURE §9.3).

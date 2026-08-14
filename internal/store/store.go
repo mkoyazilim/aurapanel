@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 
 	_ "modernc.org/sqlite" // pure-Go sürücü; CGO yasak (ARCHITECTURE §2)
 )
+
+var ErrNotFound = errors.New("kayıt bulunamadı")
 
 //go:embed migrations/*.sql
 var migrationsFS embed.FS

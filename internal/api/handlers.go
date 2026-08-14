@@ -335,10 +335,17 @@ func (s *Server) handlePATDelete(w http.ResponseWriter, r *http.Request) {
 // --- Siteler ---
 
 func (s *Server) handleSitesList(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	u, role, ok := s.requireAuth(w, r)
+	if !ok {
 		return
 	}
-	sites, err := s.deps.Sites.ListSites(r.Context())
+
+	var userID int64
+	if role != "admin" {
+		userID = u.ID
+	}
+
+	sites, err := s.deps.Sites.ListSites(r.Context(), userID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -347,7 +354,8 @@ func (s *Server) handleSitesList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	u, role, ok := s.requireAuth(w, r)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -359,17 +367,26 @@ func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	if req.PHPVersion == "" {
-		req.PHPVersion = "8.3"
+	creq := site.CreateRequest{
+		Domain:       req.Domain,
+		Aliases:      req.Aliases,
+		PHPVersion:   req.PHPVersion,
+		Limits:       req.Limits,
 	}
-	id, err := s.deps.Sites.Create(r.Context(), site.CreateRequest{
-		Domain: req.Domain, Aliases: req.Aliases, PHPVersion: req.PHPVersion, Limits: req.Limits,
-	})
+
+	if role != "admin" {
+		creq.UserID = u.ID
+	}
+
+	id, err := s.deps.Sites.Create(r.Context(), creq)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"site_id": id})
+	s.deps.Audit.Write(r.Context(), audit.Event{
+		Action: "site.create", Target: id, User: u.Username, IP: r.RemoteAddr, Extra: map[string]any{"msg": "Site oluşturuldu"},
+	})
+	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "status": "creating"})
 }
 
 func (s *Server) handleSiteDelete(w http.ResponseWriter, r *http.Request) {

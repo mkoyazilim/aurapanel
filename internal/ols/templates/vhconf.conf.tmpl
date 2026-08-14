@@ -62,6 +62,23 @@ END_rules
 }
 {{- end }}
 
+{{- range .ProxyApps }}
+extprocessor {{ .Name }} {
+  type                    proxy
+  address                 127.0.0.1:{{ .Port }}
+  maxConns                100
+  initTimeout             60
+  retryTimeout            0
+  respBuffer              0
+}
+
+context {{ .Path }} {
+  type                    proxy
+  handler                 {{ .Name }}
+  addDefaultCharset       off
+}
+{{- end }}
+
 context /.well-known/acme-challenge/ {
   type                    NULL
   location                /var/lib/aurapanel/acme/

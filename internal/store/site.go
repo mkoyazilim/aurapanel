@@ -19,12 +19,14 @@ type Site struct {
 	Limits            string        `json:"limits"`
 	PHPVersionID      sql.NullInt64 `json:"php_version_id"`
 	SecurityProfileID sql.NullInt64 `json:"security_profile_id"`
+	UserID            sql.NullInt64 `json:"user_id"`
+	ServerID          sql.NullString `json:"server_id"`
 	CreatedAt         string        `json:"created_at"`
 	UpdatedAt         string        `json:"updated_at"`
 }
 
 const siteColumns = `id, name, linux_user, home_dir, status, feature_flags, limits,
-	php_version_id, security_profile_id, created_at, updated_at`
+	php_version_id, security_profile_id, user_id, server_id, created_at, updated_at`
 
 // GenerateSiteID, domain adına dayalı benzersiz bir site kimliği üretir ("mkoyazilim", "example" gibi).
 func (s *Store) GenerateSiteID(ctx context.Context, domain string) (string, error) {
@@ -68,10 +70,10 @@ func (s *Store) GenerateSiteID(ctx context.Context, domain string) (string, erro
 func (s *Store) InsertSite(ctx context.Context, st Site) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO sites
 		(id, name, linux_user, home_dir, status, feature_flags, limits,
-		 php_version_id, security_profile_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 php_version_id, security_profile_id, user_id, server_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		st.ID, st.Name, st.LinuxUser, st.HomeDir, st.Status, st.FeatureFlags, st.Limits,
-		st.PHPVersionID, st.SecurityProfileID)
+		st.PHPVersionID, st.SecurityProfileID, st.UserID, st.ServerID)
 	if err != nil {
 		return fmt.Errorf("site insert: %w", err)
 	}
@@ -83,7 +85,7 @@ func (s *Store) GetSite(ctx context.Context, id string) (*Site, error) {
 	var st Site
 	err := s.db.QueryRowContext(ctx, `SELECT `+siteColumns+` FROM sites WHERE id = ?`, id).Scan(
 		&st.ID, &st.Name, &st.LinuxUser, &st.HomeDir, &st.Status, &st.FeatureFlags, &st.Limits,
-		&st.PHPVersionID, &st.SecurityProfileID, &st.CreatedAt, &st.UpdatedAt)
+		&st.PHPVersionID, &st.SecurityProfileID, &st.UserID, &st.ServerID, &st.CreatedAt, &st.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -133,7 +135,20 @@ func (s *Store) DeleteSite(ctx context.Context, id string) error {
 
 // ListSites, tüm siteleri döndürür.
 func (s *Store) ListSites(ctx context.Context) ([]Site, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+siteColumns+` FROM sites ORDER BY id`)
+	return s.ListSitesByUserID(ctx, 0)
+}
+
+// ListSitesByUserID, sadece belirli bir kullanıcıya ait siteleri döndürür (userID == 0 ise hepsini)
+func (s *Store) ListSitesByUserID(ctx context.Context, userID int64) ([]Site, error) {
+	query := `SELECT ` + siteColumns + ` FROM sites`
+	var args []any
+	if userID > 0 {
+		query += ` WHERE user_id = ?`
+		args = append(args, userID)
+	}
+	query += ` ORDER BY id`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("site list: %w", err)
 	}
@@ -143,7 +158,7 @@ func (s *Store) ListSites(ctx context.Context) ([]Site, error) {
 	for rows.Next() {
 		var st Site
 		if err := rows.Scan(&st.ID, &st.Name, &st.LinuxUser, &st.HomeDir, &st.Status, &st.FeatureFlags,
-			&st.Limits, &st.PHPVersionID, &st.SecurityProfileID, &st.CreatedAt, &st.UpdatedAt); err != nil {
+			&st.Limits, &st.PHPVersionID, &st.SecurityProfileID, &st.UserID, &st.ServerID, &st.CreatedAt, &st.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, st)

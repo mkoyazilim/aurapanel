@@ -4,6 +4,7 @@ package health
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -108,7 +109,12 @@ func (c *Checker) checkOLS(ctx context.Context) Status {
 	if err != nil {
 		return Status{Name: "ols", OK: false, Message: err.Error()}
 	}
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return Status{Name: "ols", OK: false, Message: err.Error()}
 	}

@@ -44,7 +44,7 @@ func (f *fakeSiteMgr) UpdateLimits(ctx context.Context, id string, l site.Limits
 func (f *fakeSiteMgr) SetFeatureFlags(ctx context.Context, id string, flags map[string]bool) error {
 	return nil
 }
-func (f *fakeSiteMgr) ListSites(ctx context.Context) ([]store.Site, error) {
+func (f *fakeSiteMgr) ListSites(ctx context.Context, userID int64) ([]store.Site, error) {
 	return []store.Site{}, nil
 }
 

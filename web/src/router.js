@@ -15,6 +15,14 @@ const routes = [
   { path: '/backups', component: () => import('./views/Backups.vue') },
   { path: '/drift', component: () => import('./views/Drift.vue') },
   { path: '/settings', component: () => import('./views/Settings.vue') },
+  { path: '/sites/:id/git', component: () => import('./views/GitDeploy.vue') },
+  { path: '/sites/:id/nodejs', component: () => import('./views/Nodejs.vue') },
+  { path: '/sites/:id/staging', component: () => import('./views/Staging.vue') },
+  { path: '/sites/:id/cloudflare', component: () => import('./views/Cloudflare.vue') },
+  { path: '/sites/:id/mail', component: () => import('./views/Mail.vue') },
+  { path: '/users', component: () => import('./views/Users.vue') },
+  { path: '/cluster', component: () => import('./views/Servers.vue') },
+  { path: '/dns', component: () => import('./views/DNS.vue') },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })

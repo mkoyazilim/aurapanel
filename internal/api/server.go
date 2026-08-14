@@ -21,7 +21,12 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/drift"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
 	"github.com/mkoyazilim/aurapanel/internal/health"
+	"github.com/mkoyazilim/aurapanel/internal/nodejs"
+	"github.com/mkoyazilim/aurapanel/internal/staging"
+	"github.com/mkoyazilim/aurapanel/internal/cloudflare"
+	"github.com/mkoyazilim/aurapanel/internal/mail"
 	"github.com/mkoyazilim/aurapanel/internal/php"
+	"github.com/mkoyazilim/aurapanel/internal/git"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
 	"github.com/mkoyazilim/aurapanel/internal/security"
 	"github.com/mkoyazilim/aurapanel/internal/sftp"
@@ -38,7 +43,7 @@ type SiteManager interface {
 	Delete(ctx context.Context, siteID string) error
 	UpdateLimits(ctx context.Context, siteID string, l site.Limits) error
 	SetFeatureFlags(ctx context.Context, siteID string, flags map[string]bool) error
-	ListSites(ctx context.Context) ([]store.Site, error)
+	ListSites(ctx context.Context, userID int64) ([]store.Site, error)
 }
 
 // Deps, sunucunun bağımlılıkları (testlerde sahte uygulamalarla doldurulur).
@@ -58,6 +63,11 @@ type Deps struct {
 	Archive   *fm.ArchiveService
 	Trash     *fm.TrashService
 	PHP       *php.Service
+	Git       *git.Service
+	Nodejs    *nodejs.Service
+	Staging   *staging.Service
+	Cloudflare *cloudflare.Service
+	Mail      *mail.Service
 	SFTP      *sftp.Service
 	DB        *db.Service
 	SSL       *ssl.Service
@@ -149,6 +159,22 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/sites/{id}/archive", s.handleArchive)
 	m.HandleFunc("POST /api/v1/sites/{id}/trash/empty", s.handleTrashEmpty)
 
+	// Kullanıcı yönetimi.
+	m.HandleFunc("GET /api/v1/users", s.handleUsersList)
+	m.HandleFunc("POST /api/v1/users", s.handleUserCreate)
+	m.HandleFunc("DELETE /api/v1/users/{id}", s.handleUserDelete)
+
+	// Cluster yönetimi.
+	m.HandleFunc("GET /api/v1/cluster", s.handleClusterList)
+	m.HandleFunc("POST /api/v1/cluster", s.handleClusterAdd)
+	m.HandleFunc("DELETE /api/v1/cluster/{id}", s.handleClusterDelete)
+	m.HandleFunc("GET /api/v1/cluster/{id}/health", s.handleClusterHealth)
+
+	// DNS yönetimi.
+	m.HandleFunc("GET /api/v1/dns/zones", s.handleDNSZonesList)
+	m.HandleFunc("POST /api/v1/dns/zones", s.handleDNSZoneCreate)
+	m.HandleFunc("DELETE /api/v1/dns/zones/{domain}", s.handleDNSZoneDelete)
+
 	// PHP.
 	m.HandleFunc("GET /api/v1/php/versions", s.handlePHPVersions)
 	m.HandleFunc("POST /api/v1/sites/{id}/php/switch", s.handlePHPSwitch)
@@ -198,12 +224,13 @@ func (s *Server) routes() {
 	// Metrikler.
 	m.HandleFunc("GET /api/v1/sites/{id}/metrics", s.handleMetrics)
 
-	// Güvenlik profili.
-	m.HandleFunc("GET /api/v1/sites/{id}/security", s.handleSecurityGet)
-	m.HandleFunc("PUT /api/v1/sites/{id}/security", s.handleSecuritySet)
+
 
 	// Sağlık kontrolleri.
 	m.HandleFunc("GET /api/v1/health", s.handleHealthCheck)
+
+	// Sistem kaynakları.
+	m.HandleFunc("GET /api/v1/system/stats", s.handleSystemStats)
 
 	// Canlı log (SSE).
 	m.HandleFunc("GET /api/v1/sites/{id}/logs/tail", s.handleLogsTail)
@@ -215,6 +242,45 @@ func (s *Server) routes() {
 
 	// WordPress 1-Click Installer.
 	m.HandleFunc("POST /api/v1/sites/{id}/wordpress/install", s.handleWordpressInstall)
+
+	// Git Deploy.
+	m.HandleFunc("GET /api/v1/sites/{id}/git", s.handleGitGet)
+	m.HandleFunc("POST /api/v1/sites/{id}/git", s.handleGitSetup)
+	m.HandleFunc("POST /api/v1/sites/{id}/git/deploy", s.handleGitDeploy)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/git", s.handleGitDelete)
+
+	// Node.js
+	m.HandleFunc("GET /api/v1/sites/{id}/nodejs", s.handleNodeAppsList)
+	m.HandleFunc("POST /api/v1/sites/{id}/nodejs", s.handleNodeAppCreate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/nodejs/{appId}", s.handleNodeAppDelete)
+	m.HandleFunc("POST /api/v1/sites/{id}/nodejs/{appId}/restart", s.handleNodeAppRestart)
+
+	// Staging
+	m.HandleFunc("GET /api/v1/sites/{id}/staging", s.handleStagingList)
+	m.HandleFunc("POST /api/v1/sites/{id}/staging", s.handleStagingCreate)
+	m.HandleFunc("POST /api/v1/sites/{id}/staging/push", s.handleStagingPush)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/staging/{envId}", s.handleStagingDelete)
+
+	// Cloudflare
+	m.HandleFunc("GET /api/v1/sites/{id}/cloudflare", s.handleCloudflareGet)
+	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare", s.handleCloudflareSave)
+	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare/purge", s.handleCloudflarePurge)
+
+	// Mail
+	m.HandleFunc("GET /api/v1/sites/{id}/mail", s.handleMailList)
+	m.HandleFunc("POST /api/v1/sites/{id}/mail", s.handleMailCreate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/mail/{email}", s.handleMailDelete)
+
+	// Phase 3 (Cluster)
+	m.HandleFunc("GET /api/v1/servers", s.handlePhase3Servers)
+
+	// Security (WAF)
+	m.HandleFunc("GET /api/v1/sites/{id}/security", s.handleSecurityGet)
+	m.HandleFunc("POST /api/v1/sites/{id}/security", s.handleSecuritySet)
+	m.HandleFunc("POST /api/v1/sites/{id}/security/waf", s.handleSecurityWAF)
+	
+	// Webhook (NO AUTH REQUIRED)
+	m.HandleFunc("POST /api/v1/webhooks/git/{secret}", s.handleGitWebhook)
 }
 
 // --- JSON yardımcıları ---

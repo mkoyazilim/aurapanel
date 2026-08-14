@@ -18,7 +18,7 @@ type SecurityProfile struct {
 func (s *Store) GetSecurityProfile(ctx context.Context, siteID string) (string, error) {
 	var profile string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT profile FROM security_profiles WHERE site_id=?`, siteID).Scan(&profile)
+		`SELECT profile FROM site_security WHERE site_id=?`, siteID).Scan(&profile)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "minimal", nil
 	}
@@ -31,7 +31,7 @@ func (s *Store) GetSecurityProfile(ctx context.Context, siteID string) (string, 
 // SetSecurityProfile, sitenin güvenlik profilini ayarlar (upsert).
 func (s *Store) SetSecurityProfile(ctx context.Context, siteID, profile string) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO security_profiles (site_id, profile) VALUES (?, ?)
+		`INSERT INTO site_security (site_id, profile) VALUES (?, ?)
 		 ON CONFLICT(site_id) DO UPDATE SET profile=excluded.profile`,
 		siteID, profile)
 	if err != nil {

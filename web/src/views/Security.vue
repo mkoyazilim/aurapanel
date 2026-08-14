@@ -31,8 +31,21 @@
         <p class="muted">{{ $t('common.loading') }}</p>
       </div>
 
-      <!-- Güvenlik Profilleri Izgarası -->
-      <div v-else class="security-grid">
+      <div v-else>
+        <!-- WAF Toggle -->
+        <div class="card" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <h3 style="margin: 0; font-size: 18px;">ModSecurity (WAF)</h3>
+            <p class="muted text-sm" style="margin: 4px 0 0 0;">Etkinleştirildiğinde OWASP CRS kuralları uygulanır.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" v-model="wafEnabled" @change="toggleWAF" :disabled="saving">
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <!-- Güvenlik Profilleri Izgarası -->
+        <div class="security-grid">
         <div
           v-for="p in profiles"
           :key="p.id"
@@ -74,6 +87,7 @@
             </button>
           </div>
         </div>
+        </div>
       </div>
     </div>
   </Layout>
@@ -90,6 +104,7 @@ const sites = ref([])
 const selectedSite = ref('')
 const currentProfile = ref('minimal')
 const profiles = ref([])
+const wafEnabled = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -121,6 +136,7 @@ async function loadSecurity() {
     const data = await api(`/sites/${selectedSite.value}/security`)
     currentProfile.value = data.profile
     profiles.value = data.profiles || []
+    wafEnabled.value = !!data.waf_enabled
   } catch (err) {
     error.value = err.message
   } finally {
@@ -134,13 +150,29 @@ async function applyProfile(profileID) {
   error.value = ''
   notice.value = ''
   try {
-    await api(`/sites/${selectedSite.value}/security`, {
-      method: 'PUT',
-      body: { profile: profileID }
+    await api.post(`/sites/${selectedSite.value}/security`, {
+      profile: profileID
     })
     currentProfile.value = profileID
     notice.value = t('security.apply_success')
   } catch (err) {
+    error.value = err.message
+  } finally {
+    saving.value = false
+  }
+}
+
+async function toggleWAF() {
+  saving.value = true
+  error.value = ''
+  try {
+    await api.post(`/sites/${selectedSite.value}/security/waf`, {
+      enabled: wafEnabled.value
+    })
+    notice.value = 'WAF durumu güncellendi. OLS ayarları otomatik yenilenecektir.'
+    setTimeout(() => { notice.value = '' }, 3000)
+  } catch (err) {
+    wafEnabled.value = !wafEnabled.value
     error.value = err.message
   } finally {
     saving.value = false

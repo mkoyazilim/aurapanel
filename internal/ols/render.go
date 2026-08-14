@@ -38,6 +38,7 @@ type vhostTemplateData struct {
 	TLSRedirect   bool
 	WAF           bool
 	SSL           *SSLConfig
+	ProxyApps     []ProxyApp
 }
 
 // RenderVhost, desired state'ten OLS native vhost (vhconf.conf) üretir.
@@ -68,6 +69,7 @@ func RenderVhost(sitesRoot, certsRoot string, v Vhost) ([]Artifact, error) {
 		TLSRedirect: v.TLSRedirect,
 		WAF:         v.WAF,
 		SSL:         v.SSL,
+		ProxyApps:   v.ProxyApps,
 	}
 
 	vhTmpl, err := template.New("vhconf").Parse(vhconfTmpl)

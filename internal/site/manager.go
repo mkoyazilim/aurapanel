@@ -7,6 +7,7 @@ package site
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -74,10 +75,12 @@ func (l Limits) validateComplete() error {
 
 // CreateRequest, yeni site isteği.
 type CreateRequest struct {
-	Domain     string
-	Aliases    []string
-	PHPVersion string
-	Limits     Limits
+	Domain       string
+	Aliases      []string
+	PHPVersion   string
+	UserID       int64
+	ServerID     string
+	Limits       Limits
 }
 
 // Manager, site yaşam döngüsünü düzenler. Tüm dış sistemler arayüzler
@@ -113,9 +116,9 @@ func NewManager(st *store.Store, p privOps, v vhostApplier, au *audit.Service, s
 	return &Manager{store: st, priv: p, vhost: v, audit: au, sitesRoot: sitesRoot}
 }
 
-// ListSites, tüm site kayıtlarını döndürür.
-func (m *Manager) ListSites(ctx context.Context) ([]store.Site, error) {
-	return m.store.ListSites(ctx)
+// ListSites, tüm site kayıtlarını döndürür. (userID == 0 ise tümü, aksi halde o kullanıcının)
+func (m *Manager) ListSites(ctx context.Context, userID int64) ([]store.Site, error) {
+	return m.store.ListSitesByUserID(ctx, userID)
 }
 
 // Create, izole bir siteyi uçtan uca kurar. Başarısızlıkta tamamlanan
@@ -145,11 +148,19 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 	if err != nil {
 		return "", err
 	}
-	// DB kaydı önce: süreç izlenebilir olsun (durum makinesi).
-	if err := m.store.InsertSite(ctx, store.Site{
+	st := store.Site{
 		ID: siteID, Name: req.Domain, LinuxUser: user, HomeDir: home,
 		Status: "creating", FeatureFlags: `{}`, Limits: string(limitsJSON),
-	}); err != nil {
+	}
+	if req.UserID > 0 {
+		st.UserID = sql.NullInt64{Valid: true, Int64: req.UserID}
+	}
+	if req.ServerID != "" {
+		st.ServerID = sql.NullString{Valid: true, String: req.ServerID}
+	}
+
+	// DB kaydı önce: süreç izlenebilir olsun (durum makinesi).
+	if err := m.store.InsertSite(ctx, st); err != nil {
 		return "", fmt.Errorf("site kaydı: %w", err)
 	}
 

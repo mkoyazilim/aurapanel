@@ -28,6 +28,40 @@
         </div>
       </div>
 
+      <!-- System Stats Row -->
+      <div v-if="sysStats" class="row stats-row" style="margin-bottom: 20px">
+        <div class="card stat">
+          <div class="muted" style="margin-bottom:8px;">{{ $t('dashboard.cpu_usage', 'CPU Kullanımı') }}</div>
+          <div class="stat-value" :style="{ color: sysStats.cpu.usage > 80 ? '#ef4444' : '#3b82f6' }">
+            {{ sysStats.cpu.usage.toFixed(1) }}%
+          </div>
+          <div class="progress-bar-bg" style="height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-top:8px;">
+            <div class="progress-bar-fill" :style="{ width: sysStats.cpu.usage + '%', background: sysStats.cpu.usage > 80 ? '#ef4444' : '#3b82f6', height:'100%' }"></div>
+          </div>
+          <div class="text-sm muted" style="margin-top:4px;">{{ sysStats.cpu.cores }} Çekirdek</div>
+        </div>
+        <div class="card stat">
+          <div class="muted" style="margin-bottom:8px;">{{ $t('dashboard.ram_usage', 'RAM Kullanımı') }}</div>
+          <div class="stat-value" :style="{ color: sysStats.ram.usage > 80 ? '#ef4444' : '#10b981' }">
+            {{ sysStats.ram.usage.toFixed(1) }}%
+          </div>
+          <div class="progress-bar-bg" style="height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-top:8px;">
+            <div class="progress-bar-fill" :style="{ width: sysStats.ram.usage + '%', background: sysStats.ram.usage > 80 ? '#ef4444' : '#10b981', height:'100%' }"></div>
+          </div>
+          <div class="text-sm muted" style="margin-top:4px;">{{ (sysStats.ram.used / 1024/1024/1024).toFixed(1) }} GB / {{ (sysStats.ram.total / 1024/1024/1024).toFixed(1) }} GB</div>
+        </div>
+        <div class="card stat">
+          <div class="muted" style="margin-bottom:8px;">{{ $t('dashboard.disk_usage', 'Disk Kullanımı') }}</div>
+          <div class="stat-value" :style="{ color: sysStats.disk.usage > 80 ? '#ef4444' : '#8b5cf6' }">
+            {{ sysStats.disk.usage.toFixed(1) }}%
+          </div>
+          <div class="progress-bar-bg" style="height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-top:8px;">
+            <div class="progress-bar-fill" :style="{ width: sysStats.disk.usage + '%', background: sysStats.disk.usage > 80 ? '#ef4444' : '#8b5cf6', height:'100%' }"></div>
+          </div>
+          <div class="text-sm muted" style="margin-top:4px;">{{ (sysStats.disk.used / 1024/1024/1024).toFixed(1) }} GB / {{ (sysStats.disk.total / 1024/1024/1024).toFixed(1) }} GB</div>
+        </div>
+      </div>
+
       <!-- Stat Cards -->
       <div class="row stats-row" style="margin-bottom: 20px">
         <div class="card stat">
@@ -48,6 +82,22 @@
           <div class="stat-value" style="color: #10b981">Ready</div>
           <div class="muted">MariaDB</div>
         </div>
+      </div>
+
+      <!-- Metrics Chart -->
+      <div class="card metrics-card">
+        <div class="metrics-header">
+          <h2 style="margin: 0">📈 Kaynak Kullanımı (Son 24 Saat)</h2>
+          <select v-model="selectedSiteId" @change="loadMetrics" class="site-select">
+            <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
+            <option v-if="!sites.length" value="" disabled>Site bulunamadı</option>
+          </select>
+        </div>
+        <div v-if="loadingMetrics" class="muted text-sm" style="padding: 20px 0;">Yükleniyor...</div>
+        <div v-else-if="chartData.labels && chartData.labels.length" style="position: relative; height: 300px; width: 100%;">
+          <Line :data="chartData" :options="chartOptions" />
+        </div>
+        <div v-else class="muted text-sm" style="padding: 20px 0;">Bu site için henüz yeterli metrik verisi toplanmamış.</div>
       </div>
 
       <!-- Quick Actions -->
@@ -103,13 +153,89 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, shallowRef } from 'vue'
 import Layout from '../components/Layout.vue'
 import { api } from '../api'
 
+// Chart.js imports
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js'
+import { Line } from 'vue-chartjs'
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
+
 const status = ref({})
 const health = ref(null)
+const sysStats = ref(null)
 const error = ref('')
+let statsTimer = null
+
+// Metrics states
+const sites = ref([])
+const selectedSiteId = ref('')
+const loadingMetrics = ref(false)
+const chartData = shallowRef({})
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    mode: 'index',
+    intersect: false,
+  },
+  scales: {
+    y: {
+      type: 'linear',
+      display: true,
+      position: 'left',
+      title: { display: true, text: 'CPU (%)' },
+      min: 0,
+      max: 100
+    },
+    y1: {
+      type: 'linear',
+      display: true,
+      position: 'right',
+      title: { display: true, text: 'RAM (MB)' },
+      min: 0,
+      grid: { drawOnChartArea: false }
+    }
+  },
+  plugins: {
+    legend: { position: 'top' },
+    tooltip: {
+      callbacks: {
+        label: function(context) {
+          let label = context.dataset.label || '';
+          if (label) { label += ': '; }
+          if (context.parsed.y !== null) {
+            label += context.parsed.y.toFixed(2);
+            if (context.dataset.yAxisID === 'y') label += '%';
+            else label += ' MB';
+          }
+          return label;
+        }
+      }
+    }
+  }
+}
 
 function formatCheckName(name) {
   if (name === 'sqlite') return 'SQLite (Metadata)'
@@ -117,6 +243,71 @@ function formatCheckName(name) {
   if (name === 'ols') return 'OpenLiteSpeed Servisi'
   if (name === 'ssl_certs') return 'SSL Sertifikaları'
   return name
+}
+
+async function loadMetrics() {
+  if (!selectedSiteId.value) return
+  loadingMetrics.value = true
+  try {
+    const metrics = await api(`/sites/${selectedSiteId.value}/metrics?hours=24`)
+    if (!metrics || metrics.length === 0) {
+      chartData.value = {}
+      loadingMetrics.value = false
+      return
+    }
+
+    const labels = []
+    const cpuData = []
+    const memData = []
+
+    metrics.forEach(m => {
+      // Parse TS to local time
+      const date = new Date(m.ts)
+      labels.push(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+      cpuData.push(m.cpu_pct)
+      memData.push(m.mem_mb)
+    })
+
+    chartData.value = {
+      labels,
+      datasets: [
+        {
+          label: 'CPU Kullanımı',
+          data: cpuData,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          yAxisID: 'y',
+          tension: 0.4,
+          fill: true,
+          pointRadius: 2,
+          pointHoverRadius: 5
+        },
+        {
+          label: 'RAM Kullanımı',
+          data: memData,
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          yAxisID: 'y1',
+          tension: 0.4,
+          pointRadius: 2,
+          pointHoverRadius: 5
+        }
+      ]
+    }
+  } catch (e) {
+    console.error('Metrikler alınamadı:', e)
+  } finally {
+    loadingMetrics.value = false
+  }
+}
+
+async function loadSysStats() {
+  try {
+    const res = await fetch('/api/v1/system/stats')
+    if (res.ok) sysStats.value = await res.json()
+  } catch (e) {
+    console.error('System stats error:', e)
+  }
 }
 
 async function loadData() {
@@ -135,9 +326,30 @@ async function loadData() {
   } catch (e) {
     console.error('Sağlık kontrolü alınamadı:', e)
   }
+
+  try {
+    sites.value = await api('/sites')
+    if (sites.value.length > 0 && !selectedSiteId.value) {
+      selectedSiteId.value = sites.value[0].id
+      await loadMetrics()
+    } else if (selectedSiteId.value) {
+      await loadMetrics()
+    }
+  } catch (e) {
+    console.error('Siteler alınamadı:', e)
+  }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  loadSysStats()
+  statsTimer = setInterval(loadSysStats, 3000)
+})
+
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (statsTimer) clearInterval(statsTimer)
+})
 </script>
 
 <style scoped>
@@ -154,9 +366,14 @@ onMounted(loadData)
 .pill-warn { background: #fef3c7; color: #92400e; }
 .pill-ok .dot { width: 6px; height: 6px; border-radius: 50%; background: #16a34a; }
 .pill-warn .dot { width: 6px; height: 6px; border-radius: 50%; background: #d97706; }
-.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-.stat { text-align: center; padding: 20px; }
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: stretch; }
+.stat { text-align: center; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
 .stat-value { font-size: 32px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+
+.metrics-card { margin-bottom: 20px; }
+.metrics-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.site-select { max-width: 200px; padding: 6px 10px; }
+
 .actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 16px; }
 .action-btn { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); text-decoration: none; color: inherit; transition: all 0.2s; background: var(--bg-card, #fff); }
 .action-btn:hover { border-color: #3b82f6; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }

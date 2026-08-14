@@ -113,14 +113,22 @@ func (s *Server) handleSecurityGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("id")
+	
+	wafEnabled, err := s.deps.Security.GetWAF(r.Context(), siteID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	
 	profile, err := s.deps.Security.GetProfile(r.Context(), siteID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"profile":  profile,
-		"profiles": security.Profiles,
+		"profile":     profile,
+		"profiles":    security.Profiles,
+		"waf_enabled": wafEnabled,
 	})
 }
 
@@ -140,6 +148,25 @@ func (s *Server) handleSecuritySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleSecurityWAF(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	siteID := r.PathValue("id")
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if err := s.deps.Security.SetWAF(r.Context(), siteID, req.Enabled); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // --- Health ---

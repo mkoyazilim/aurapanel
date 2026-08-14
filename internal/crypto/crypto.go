@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
@@ -72,17 +73,20 @@ func (c *Cipher) Encrypt(plain []byte) (string, error) {
 
 // Decrypt, Encrypt çıktısını çözer.
 func (c *Cipher) Decrypt(encoded string) ([]byte, error) {
-	raw, err := base64.StdEncoding.DecodeString(encoded)
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return nil, errors.New("şifreli veri çözümlenemedi")
 	}
-	if len(raw) < c.nonceSize {
-		return nil, errors.New("şifreli veri çok kısa")
+	if len(decoded) <= c.nonceSize {
+		return nil, errors.New("geçersiz ciphertext")
 	}
-	nonce, ct := raw[:c.nonceSize], raw[c.nonceSize:]
-	plain, err := c.aead.Open(nil, nonce, ct, nil)
-	if err != nil {
-		return nil, errors.New("şifreli veri doğrulanamadı (bozuk/değiştirilmiş)")
-	}
-	return plain, nil
+	nonce := decoded[:c.nonceSize]
+	ciphertext := decoded[c.nonceSize:]
+	return c.aead.Open(nil, nonce, ciphertext, nil)
+}
+
+// HashPassword hashes a password using bcrypt.
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
 }

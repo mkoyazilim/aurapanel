@@ -4,6 +4,7 @@ package security
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
@@ -57,6 +58,39 @@ type Service struct {
 // NewService, Service oluşturur.
 func NewService(st *store.Store, priv *privclient.Client, sitesRoot string) *Service {
 	return &Service{st: st, priv: priv, sitesRoot: sitesRoot}
+}
+
+// GetWAF returns the WAF status of a site.
+func (s *Service) GetWAF(ctx context.Context, siteID string) (bool, error) {
+	st, err := s.st.GetSite(ctx, siteID)
+	if err != nil {
+		return false, err
+	}
+	var flags map[string]any
+	if err := json.Unmarshal([]byte(st.FeatureFlags), &flags); err != nil {
+		return false, nil // Default false
+	}
+	val, _ := flags["waf_enabled"].(bool)
+	return val, nil
+}
+
+// SetWAF enables or disables WAF for a site.
+func (s *Service) SetWAF(ctx context.Context, siteID string, enabled bool) error {
+	st, err := s.st.GetSite(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	var flags map[string]any
+	if err := json.Unmarshal([]byte(st.FeatureFlags), &flags); err != nil {
+		flags = make(map[string]any)
+	}
+	flags["waf_enabled"] = enabled
+	
+	b, _ := json.Marshal(flags)
+	if err := s.st.UpdateSiteFeatureFlags(ctx, siteID, string(b)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetProfile, sitenin mevcut güvenlik profilini döndürür.

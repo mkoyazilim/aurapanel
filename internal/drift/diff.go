@@ -25,12 +25,17 @@ func desiredFor(st *store.Site, domains []store.Domain, phpVersion, sitesRoot, c
 			aliases = append(aliases, d.Domain)
 		}
 	}
+	var flags map[string]any
+	json.Unmarshal([]byte(st.FeatureFlags), &flags)
+	wafEnabled, _ := flags["waf_enabled"].(bool)
+
 	v := ols.Vhost{
 		SiteID:     st.ID,
 		Domain:     st.Name,
 		Aliases:    aliases,
 		PHPVersion: phpVersion,
 		IndexFiles: []string{"index.php", "index.html"},
+		WAF:        wafEnabled,
 	}
 	artifacts, err := ols.RenderVhost(sitesRoot, certsRoot, v)
 	if err != nil {

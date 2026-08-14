@@ -17,8 +17,12 @@ type User struct {
 	MustChangePassword bool
 	Status             string
 	LastLoginAt        sql.NullString
+	ParentID           sql.NullInt64
 	CreatedAt          string
+	UpdatedAt          sql.NullString
 }
+
+var userColumns = "id, username, password_hash, role_id, totp_secret_enc, must_change_password, status, last_login_at, parent_id, created_at, updated_at"
 
 // InsertUser, yeni kullanıcı ekler.
 func (s *Store) InsertUser(ctx context.Context, u User) (int64, error) {
@@ -27,9 +31,9 @@ func (s *Store) InsertUser(ctx context.Context, u User) (int64, error) {
 		must = 1
 	}
 	res, err := s.db.ExecContext(ctx, `INSERT INTO users
-		(username, password_hash, role_id, must_change_password, status)
-		VALUES (?, ?, ?, ?, ?)`,
-		u.Username, u.PasswordHash, u.RoleID, must, u.Status)
+		(username, password_hash, role_id, must_change_password, status, parent_id)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		u.Username, u.PasswordHash, u.RoleID, must, u.Status, u.ParentID)
 	if err != nil {
 		return 0, fmt.Errorf("user insert: %w", err)
 	}
@@ -38,8 +42,7 @@ func (s *Store) InsertUser(ctx context.Context, u User) (int64, error) {
 
 // GetUserByUsername, kullanıcı adına göre kaydı döndürür (yoksa nil).
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	u, err := s.getUser(ctx, `SELECT id, username, password_hash, role_id, totp_secret_enc,
-		must_change_password, status, last_login_at, created_at FROM users WHERE username = ?`, username)
+	u, err := s.getUser(ctx, `SELECT `+userColumns+` FROM users WHERE username = ?`, username)
 	if err != nil {
 		return nil, err
 	}
@@ -50,10 +53,9 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, 
 	return u, nil
 }
 
-// GetUserByID, ID'ye göre kaydı döndürür (yoksa nil).
+// GetUserByID, kullanıcı ID'sine göre kaydı döndürür.
 func (s *Store) GetUserByID(ctx context.Context, id int64) (*User, error) {
-	u, err := s.getUser(ctx, `SELECT id, username, password_hash, role_id, totp_secret_enc,
-		must_change_password, status, last_login_at, created_at FROM users WHERE id = ?`, id)
+	u, err := s.getUser(ctx, `SELECT `+userColumns+` FROM users WHERE id = ?`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -64,12 +66,13 @@ func (s *Store) GetUserByID(ctx context.Context, id int64) (*User, error) {
 	return u, nil
 }
 
-func (s *Store) getUser(ctx context.Context, query string, arg any) (*User, error) {
+func (s *Store) getUser(ctx context.Context, query string, args ...any) (*User, error) {
 	var u User
-	var must int64
-	err := s.db.QueryRowContext(ctx, query, arg).Scan(
+	var must int
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&u.ID, &u.Username, &u.PasswordHash, &u.RoleID, &u.TOTPSecretEnc,
-		&must, &u.Status, &u.LastLoginAt, &u.CreatedAt)
+		&must, &u.Status, &u.LastLoginAt, &u.ParentID, &u.CreatedAt, &u.UpdatedAt,
+	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -87,6 +90,40 @@ func (s *Store) CountUsers(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+// ListUsers, kullanıcıları listeler. parentID > 0 ise sadece o kullanıcının alt kullanıcılarını getirir.
+func (s *Store) ListUsers(ctx context.Context, parentID int64) ([]User, error) {
+	query := `SELECT ` + userColumns + ` FROM users`
+	var args []any
+	if parentID > 0 {
+		query += ` WHERE parent_id = ?`
+		args = append(args, parentID)
+	}
+	query += ` ORDER BY id`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("user list: %w", err)
+	}
+	defer rows.Close()
+
+	var out []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.RoleID, &u.Status,
+			&u.MustChangePassword, &u.TOTPSecretEnc, &u.LastLoginAt, &u.ParentID, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
+// DeleteUser, kullanıcıyı ve bağımlılıklarını (kendi sitesi yoksa) siler.
+func (s *Store) DeleteUser(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	return err
 }
 
 // UpdateUserPassword, parola hash'ini günceller ve zorunlu değişimi kapatır.

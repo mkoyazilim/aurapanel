@@ -36,6 +36,9 @@ func Main(argv []string) int {
 	if os.Getenv("AURAPANEL_FILE_WORKER") == "1" {
 		return fileWorkerMain(argv)
 	}
+	if os.Getenv("AURAPANEL_SCRIPT_WORKER") == "1" {
+		return ScriptWorkerMain(argv)
+	}
 
 	fs := flag.NewFlagSet("aurapanel-priv", flag.ContinueOnError)
 	socketPath := fs.String("socket", "/run/aurapanel/priv.sock", "helper Unix socket yolu")
@@ -205,6 +208,24 @@ func handleConn(cfg *runtimeCfg, reg map[string]opFunc, pl *privLog, conn net.Co
 	if req.Op == "file.op" {
 		opCtx, cancel := context.WithTimeout(context.Background(), cfg.opTimeout)
 		data, err := runFileOp(opCtx, req.Args)
+		cancel()
+		if err != nil {
+			writeResponse(conn, Response{OK: false, Error: err.Error(), RequestID: req.RequestID})
+			entry["result"] = "failed"
+			entry["error"] = err.Error()
+			pl.write(entry)
+			return
+		}
+		writeResponse(conn, Response{OK: true, Data: data, RequestID: req.RequestID})
+		entry["result"] = "success"
+		pl.write(entry)
+		return
+	}
+
+	// script.op: bash betiklerini site kullanıcısı yetkisiyle yürütür.
+	if req.Op == "script.op" {
+		opCtx, cancel := context.WithTimeout(context.Background(), cfg.opTimeout)
+		data, err := runScriptOp(opCtx, req.Args)
 		cancel()
 		if err != nil {
 			writeResponse(conn, Response{OK: false, Error: err.Error(), RequestID: req.RequestID})

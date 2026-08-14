@@ -31,6 +31,9 @@ const messages = {
       backups: 'Yedekler',
       drift: 'Drift İzleme',
       system: 'Sistem',
+      users: 'Kullanıcılar',
+      cluster: 'Küme Yönetimi',
+      dns: 'DNS Yönetimi',
       settings: 'Ayarlar'
     },
     login: {
@@ -312,6 +315,9 @@ const messages = {
       backups: 'Backups',
       drift: 'Drift Monitoring',
       system: 'System',
+      users: 'Users',
+      cluster: 'Cluster',
+      dns: 'DNS',
       settings: 'Settings'
     },
     login: {

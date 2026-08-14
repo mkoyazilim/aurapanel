@@ -21,6 +21,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/audit"
 	"github.com/mkoyazilim/aurapanel/internal/auth"
 	"github.com/mkoyazilim/aurapanel/internal/backup"
+	"github.com/mkoyazilim/aurapanel/internal/cloudflare"
 	"github.com/mkoyazilim/aurapanel/internal/config"
 	"github.com/mkoyazilim/aurapanel/internal/cron"
 	"github.com/mkoyazilim/aurapanel/internal/crypto"
@@ -28,20 +29,24 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/drift"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
 	"github.com/mkoyazilim/aurapanel/internal/health"
+	"github.com/mkoyazilim/aurapanel/internal/mail"
 	"github.com/mkoyazilim/aurapanel/internal/logger"
 	"github.com/mkoyazilim/aurapanel/internal/metrics"
+	"github.com/mkoyazilim/aurapanel/internal/nodejs"
 	"github.com/mkoyazilim/aurapanel/internal/ols"
 	"github.com/mkoyazilim/aurapanel/internal/php"
 	"github.com/mkoyazilim/aurapanel/internal/priv"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
 	"github.com/mkoyazilim/aurapanel/internal/security"
 	"github.com/mkoyazilim/aurapanel/internal/sftp"
+	"github.com/mkoyazilim/aurapanel/internal/staging"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 	"github.com/mkoyazilim/aurapanel/internal/update"
 	"github.com/mkoyazilim/aurapanel/internal/webui"
 	"github.com/mkoyazilim/aurapanel/internal/wordpress"
+	"github.com/mkoyazilim/aurapanel/internal/git"
 )
 
 var (
@@ -58,6 +63,9 @@ func main() {
 	// olduğundan priv dispatch'ine girmez).
 	if os.Getenv("AURAPANEL_FILE_WORKER") == "1" {
 		os.Exit(priv.WorkerMain(os.Args[1:]))
+	}
+	if os.Getenv("AURAPANEL_SCRIPT_WORKER") == "1" {
+		os.Exit(priv.ScriptWorkerMain(os.Args[1:]))
 	}
 
 	// Tek binary, iki mod: "aurapanel-priv" symlink'i → priv helper.
@@ -235,6 +243,32 @@ func main() {
 	metricsCollector := metrics.NewCollector(st, "/sys/fs/cgroup", sitesRoot, 60*time.Second)
 	go metricsCollector.Run(ctx)
 
+	// Git Deploy servisi
+	gitSvc := git.NewService(st, privC, au)
+
+	// Nodejs servisi
+	nodejsSvc := nodejs.NewService(nodejs.Dependencies{
+		Store: st,
+		Priv:  privC,
+	})
+
+	stagingSvc := staging.NewService(staging.Dependencies{
+		Store:   st,
+		Priv:    privC,
+		Audit:   au,
+		SiteMgr: siteMgr,
+	})
+
+	cloudflareSvc := cloudflare.NewService(cloudflare.Dependencies{
+		Store: st,
+		Audit: au,
+	})
+
+	mailSvc := mail.NewService(mail.Dependencies{
+		Store: st,
+		Audit: au,
+	})
+
 	// Güncelleme merkezi: manifest, ikili dağıtım reposundan (pinned).
 	exe, err := os.Executable()
 	if err != nil {
@@ -252,7 +286,8 @@ func main() {
 		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc, SFTP: sftpSvc,
 		DriftScan: scanner, DriftFix: repairer, Updates: upd,
 		Cron: cronSvc, Security: securitySvc, Health: healthChecker,
-		Wordpress: wpSvc,
+		Wordpress: wpSvc, Git: gitSvc, Nodejs: nodejsSvc, Staging: stagingSvc, Cloudflare: cloudflareSvc,
+		Mail: mailSvc,
 	})
 
 	httpSrv := &http.Server{
