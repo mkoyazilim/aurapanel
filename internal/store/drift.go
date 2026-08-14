@@ -8,15 +8,15 @@ import (
 
 // DriftEvent, configuration drift kaydı (ARCHITECTURE §6).
 type DriftEvent struct {
-	ID         int64
-	SiteID     string
-	Resource   string
-	Expected   string
-	Actual     string
-	Severity   string
-	Status     string
-	DetectedAt string
-	ResolvedAt sql.NullString
+	ID         int64          `json:"id"`
+	SiteID     string         `json:"site_id"`
+	Resource   string         `json:"resource"`
+	Expected   string         `json:"expected"`
+	Actual     string         `json:"actual"`
+	Severity   string         `json:"severity"`
+	Status     string         `json:"status"`
+	DetectedAt string         `json:"detected_at"`
+	ResolvedAt sql.NullString `json:"resolved_at,omitempty"`
 }
 
 // InsertDriftEvent, yeni drift kaydı ekler.

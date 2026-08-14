@@ -7,16 +7,16 @@ import (
 
 // Backup, backups kaydı.
 type Backup struct {
-	ID         int64
-	SiteID     string
-	Kind       string
-	Storage    string
-	Location   string
-	Encrypted  int64
-	SizeBytes  int64
-	Status     string
-	CreatedAt  string
-	FinishedAt *string
+	ID         int64   `json:"id"`
+	SiteID     string  `json:"site_id"`
+	Kind       string  `json:"kind"`
+	Storage    string  `json:"storage"`
+	Location   string  `json:"location"`
+	Encrypted  int64   `json:"encrypted"`
+	SizeBytes  int64   `json:"size_bytes"`
+	Status     string  `json:"status"`
+	CreatedAt  string  `json:"created_at"`
+	FinishedAt *string `json:"finished_at,omitempty"`
 }
 
 // InsertBackup, yedek kaydı ekler.

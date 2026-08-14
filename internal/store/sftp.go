@@ -8,12 +8,12 @@ import (
 
 // SFTPAccount, sftp_accounts kaydı.
 type SFTPAccount struct {
-	ID        int64
-	SiteID    string
-	Username  string
-	JailPath  string
-	Status    string
-	CreatedAt string
+	ID        int64  `json:"id"`
+	SiteID    string `json:"site_id"`
+	Username  string `json:"username"`
+	JailPath  string `json:"jail_path"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
 }
 
 // InsertSFTPAccount, yeni hesap ekler.
