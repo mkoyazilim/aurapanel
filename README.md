@@ -2,9 +2,9 @@
 
 **A lightweight, security-first control panel for OpenLiteSpeed.**
 
-AuraPanel is a modern hosting control panel purpose-built for [OpenLiteSpeed](https://openlitespeed.org/). It combines real per-site isolation, a hardened single-binary architecture, and a clean, professional web UI — designed for Ubuntu 24.04 LTS servers.
+AuraPanel is a modern hosting control panel purpose-built for [OpenLiteSpeed](https://openlitespeed.org/). It combines real per-site isolation, a hardened single-binary architecture, and a clean, professional web UI — designed specifically for Ubuntu 24.04 LTS servers.
 
-> ⚠️ **Status:** In active development. The installer goes live with the first tagged release (`v1.0.0`).
+> ⚠️ **Status:** **Phase 3 Completed.** Active development continues. The installer goes live with the first tagged release (`v1.0.0`).
 
 ## Why AuraPanel?
 
@@ -12,25 +12,42 @@ Most control panels are heavy, expose a large attack surface, and treat the web 
 
 - **Built for OpenLiteSpeed** — OLS is the native serving engine, managed through a validated config pipeline with automatic rollback. A failed config change can never take down your sites or the panel.
 - **Real per-site isolation** — every site gets its own Linux UID/GID, LSPHP process identity, cgroup v2 limits (CPU / RAM / PIDs / IO), filesystem quota, private tmp and private logs. One compromised site cannot touch another.
-- **One static binary** — the entire panel (API, scheduler, config renderer, ACME client, backup engine) is a single CGO-free Go binary. The Vue 3 web UI and Monaco editor are embedded inside it.
+- **One static binary** — the entire panel (API, scheduler, config renderer, ACME client, backup engine, external DNS) is a single CGO-free Go binary. The Vue 3 web UI and Monaco editor are embedded inside it.
 - **Security first** — the panel never runs as root; privileged operations go through a tiny allowlist-only helper. Server-side sessions, CSRF protection, TOTP/WebAuthn MFA, rate limiting, fail2ban, optional reCAPTCHA, and append-only audit logs come standard.
 - **Stable installs everywhere** — pinned version manifests guarantee that every install uses the same tested component set, whether it happens today or six months from now.
 
 ## Features
 
-- Domain & site management (main domains, subdomains, aliases)
-- SSL: Let's Encrypt (ACME), custom certificates, automatic renewal, HSTS
-- Multiple PHP versions (LSPHP) with per-site selection and a php.ini editor
-- **File Manager** — secure site-scoped file management with a Monaco code editor, chunked/resumable uploads, ZIP/TAR.GZ support, trash with retention, and strict path-traversal, symlink and archive-bomb protections
-- MariaDB databases & users with gated Adminer access
-- Jailed SFTP accounts (no shell access by default)
-- Scheduled, encrypted backups (local, S3-compatible, MinIO, remote)
-- Per-site resource limits: CPU, RAM, processes, IO, disk & inode quota
-- Live logs, cron management, health checks
-- Security profiles (Compatibility / Balanced / Hardened) and per-feature toggles
-- Configuration drift detection with one-click repair
-- Optional ModSecurity + OWASP CRS WAF per site
-- Update Center with a compatibility matrix and automatic rollback
+- **Core Hosting**
+  - Domain & site management (main domains, subdomains, aliases)
+  - SSL: Let's Encrypt (ACME), custom certificates, automatic renewal, HSTS
+  - Multiple PHP versions (LSPHP) with per-site selection and a php.ini editor
+  - MariaDB databases & users with gated Adminer access
+  - Jailed SFTP accounts (no shell access by default)
+  - Per-site resource limits: CPU, RAM, processes, IO, disk & inode quota
+  - Configuration drift detection with one-click repair
+  - Update Center with a compatibility matrix and automatic rollback
+
+- **File Manager**
+  - Secure site-scoped file management with a Monaco code editor
+  - Chunked/resumable uploads with WebSocket progress tracking
+  - ZIP/TAR.GZ support with archive-bomb protections
+  - Trash system with automatic retention cleanup
+
+- **Advanced Features (Phase 2)**
+  - WordPress 1-Click Installer
+  - Git Deploy (Webhook-driven deployments)
+  - Node.js Application Manager (PM2 integrated)
+  - Staging Environments (Clone & Push to Production)
+  - Isolated Mail Server Integration
+
+- **Enterprise & Scale (Phase 3)**
+  - **Multi-Server Cluster:** Manage multiple AuraPanel nodes from a single dashboard.
+  - **Remote Agents:** Lightweight, secure mTLS agent protocol for deploying sites across servers.
+  - **Reseller System:** Resource quotas, user isolation, and dedicated reseller dashboards.
+  - **External DNS:** Bi-directional sync with Cloudflare and AWS Route53. Full PowerDNS API v1 support with DNSSEC.
+  - **Advanced WAF:** OWASP CRS integration with ModSecurity, custom rule editor, dry-run testing, and request logging.
+  - **CDN Management:** OLS and Cloudflare cache purging, page-rule configuration, and hit/miss statistics.
 
 ## Quick Install
 
@@ -79,7 +96,7 @@ SQLite (panel metadata) ── OpenLiteSpeed (serving engine)
 
 ## License
 
-AuraPanel is distributed **free of charge**. The distribution license is being finalized and will be published with the first release.
+AuraPanel is released under the **MIT License**. See the `LICENSE` file for details.
 
 ## Disclaimer
 
