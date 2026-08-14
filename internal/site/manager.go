@@ -153,6 +153,20 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 		return "", fmt.Errorf("site kaydı: %w", err)
 	}
 
+	// Domain kayıtları
+	if _, err := m.store.InsertDomain(ctx, store.Domain{
+		SiteID: siteID, Domain: req.Domain, Kind: "main",
+	}); err != nil {
+		return "", fmt.Errorf("ana domain kaydı: %w", err)
+	}
+	for _, alias := range req.Aliases {
+		if _, err := m.store.InsertDomain(ctx, store.Domain{
+			SiteID: siteID, Domain: alias, Kind: "alias",
+		}); err != nil {
+			return "", fmt.Errorf("alias domain kaydı: %w", err)
+		}
+	}
+
 	auditSite := func(result string, extra map[string]any) {
 		m.audit.Write(ctx, audit.Event{
 			Action: "site.create", Target: siteID, Result: result,
