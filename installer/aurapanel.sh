@@ -240,6 +240,9 @@ table inet aurapanel {
   }
 }
 EOF
+  # Kalıcılık: reboot'ta nftables.service ruleset'i /etc/nftables.conf'tan yükler.
+  nft list ruleset > /etc/nftables.conf
+  systemctl enable --now nftables >/dev/null 2>&1 || true
 fi
 
 # --- 10) Paket kilitleme (kontrollü güncelleme politikası) ---
