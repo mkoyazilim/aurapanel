@@ -33,12 +33,21 @@ func (p *PrivBackend) split(abs string) (string, string, error) {
 		return "", "", fmt.Errorf("yol sitesRoot dışında: %s", abs)
 	}
 	rest := strings.TrimPrefix(abs, root+"/")
-	parts := strings.SplitN(rest, "/", 2)
-	if len(parts) != 2 {
+	parts := strings.Split(rest, "/")
+	if len(parts) < 1 || parts[0] == "" {
 		return "", "", fmt.Errorf("yol biçimi bozuk: %s", abs)
 	}
-	siteID, rel := parts[0], parts[1]
-	if rel == "" {
+	siteID := parts[0]
+	var rel string
+	if len(parts) > 1 && parts[1] == "home" {
+		if len(parts) == 2 {
+			rel = "."
+		} else {
+			rel = strings.Join(parts[2:], "/")
+		}
+	} else if len(parts) > 1 {
+		rel = strings.Join(parts[1:], "/")
+	} else {
 		rel = "."
 	}
 	return siteID, rel, nil

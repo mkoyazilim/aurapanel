@@ -27,7 +27,7 @@ func (s *Store) ListCronJobs(ctx context.Context, siteID string) ([]CronJob, err
 		return nil, fmt.Errorf("cron list: %w", err)
 	}
 	defer rows.Close()
-	var out []CronJob
+	out := make([]CronJob, 0)
 	for rows.Next() {
 		var j CronJob
 		var enabled int
