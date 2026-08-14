@@ -13,8 +13,16 @@ import (
 type Config struct {
 	Listen   Listen   `yaml:"listen"`
 	Database Database `yaml:"database"`
+	MariaDB  MariaDB  `yaml:"mariadb"`
 	Log      Log      `yaml:"log"`
 	Paths    Paths    `yaml:"paths"`
+}
+
+// MariaDB, site DB'leri için yönetim bağlantısı (unix socket).
+type MariaDB struct {
+	Socket   string `yaml:"socket"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
 
 // Listen, panel API sunucusunun dinleme ayarları (ARCHITECTURE §9.4).
@@ -50,6 +58,7 @@ func Default() *Config {
 	return &Config{
 		Listen:   Listen{Address: "127.0.0.1:8080", Mode: "private"},
 		Database: Database{Path: "/var/lib/aurapanel/aurapanel.db"},
+		MariaDB:  MariaDB{Socket: "/var/run/mysqld/mysqld.sock", User: "aurapanel"},
 		Log:      Log{Level: "info", Format: "json"},
 		Paths: Paths{
 			DataDir:   "/var/lib/aurapanel",

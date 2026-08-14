@@ -114,6 +114,9 @@ func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) 
 	if kind != "full" && kind != "files" && kind != "db" {
 		return "", fmt.Errorf("geçersiz yedek türü: %q", kind)
 	}
+	if (kind == "full" || kind == "db") && s.dumps == nil {
+		return "", fmt.Errorf("db döküm motoru bağlı değil (sunucu fazında bağlanacak)")
+	}
 
 	// Nanosaniye hassasiyeti: aynı saniyedeki ardışık yedekler çakışmaz.
 	name := fmt.Sprintf("%s-%s-%s.apbk", siteID, kind, time.Now().UTC().Format("20060102T150405.000000000Z"))

@@ -113,6 +113,11 @@ func NewManager(st *store.Store, p privOps, v vhostApplier, au *audit.Service, s
 	return &Manager{store: st, priv: p, vhost: v, audit: au, sitesRoot: sitesRoot}
 }
 
+// ListSites, tüm site kayıtlarını döndürür.
+func (m *Manager) ListSites(ctx context.Context) ([]store.Site, error) {
+	return m.store.ListSites(ctx)
+}
+
 // Create, izole bir siteyi uçtan uca kurar. Başarısızlıkta tamamlanan
 // adımlar ters sırada telafi edilir ve site "failed" durumunda kalır.
 func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error) {
