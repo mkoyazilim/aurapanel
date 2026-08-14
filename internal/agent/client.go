@@ -82,3 +82,25 @@ func (c *Client) CreateSiteOnServer(ctx context.Context, srv store.Server, paylo
 func (c *Client) HealthCheck(ctx context.Context, srv store.Server) error {
 	return c.request(ctx, srv, http.MethodGet, "/api/v1/health", nil, nil)
 }
+
+// AgentMetrics, bir agent sunucusundan toplanan metrikler.
+type AgentMetrics struct {
+	CPUPercent float64 `json:"cpu_percent"`
+	RAMPercent float64 `json:"ram_percent"`
+	UptimeSec  uint64  `json:"uptime_sec"`
+}
+
+// GetMetrics, hedef agent'tan CPU/RAM/uptime metriklerini alır.
+func (c *Client) GetMetrics(ctx context.Context, srv store.Server) (*AgentMetrics, error) {
+	var m AgentMetrics
+	if err := c.request(ctx, srv, http.MethodGet, "/api/v1/agent/metrics", nil, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// RotateKey, hedef agent'a yeni API anahtarını bildirir.
+func (c *Client) RotateKey(ctx context.Context, srv store.Server, newKey string) error {
+	body := map[string]string{"api_key": newKey}
+	return c.request(ctx, srv, http.MethodPut, "/api/v1/agent/key", body, nil)
+}

@@ -34,7 +34,11 @@ const messages = {
       users: 'Kullanıcılar',
       cluster: 'Küme Yönetimi',
       dns: 'DNS Yönetimi',
-      settings: 'Ayarlar'
+      settings: 'Ayarlar',
+      toggle: 'Menüyü Aç/Kapat',
+      reseller: 'Reseller',
+      resellers: 'Reseller Yönetimi',
+      reseller_dashboard: 'Dashboard'
     },
     login: {
       subtitle: 'OpenLiteSpeed için hafif, güvenlik öncelikli panel',
@@ -318,7 +322,11 @@ const messages = {
       users: 'Users',
       cluster: 'Cluster',
       dns: 'DNS',
-      settings: 'Settings'
+      settings: 'Settings',
+      toggle: 'Toggle Sidebar',
+      reseller: 'Reseller',
+      resellers: 'Reseller Management',
+      reseller_dashboard: 'Dashboard'
     },
     login: {
       subtitle: 'Lightweight, security-first control panel for OpenLiteSpeed',

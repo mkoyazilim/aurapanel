@@ -59,6 +59,12 @@
                 <router-link :to="'/sites/' + s.id + '/mail'" class="btn btn-sm" :title="$t('menu.mail', 'Mail Sunucusu')">
                   📧 Mail
                 </router-link>
+                <router-link :to="'/sites/' + s.id + '/waf'" class="btn btn-sm" title="Advanced WAF">
+                  🛡️ WAF
+                </router-link>
+                <router-link :to="'/sites/' + s.id + '/cdn'" class="btn btn-sm" title="CDN Management">
+                  ⚡ CDN
+                </router-link>
                 <button class="btn btn-sm danger" @click="remove(s.id)" title="Siteyi Sil">
                   🗑️ {{ $t('common.delete') }}
                 </button>

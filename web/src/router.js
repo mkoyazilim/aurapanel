@@ -22,7 +22,13 @@ const routes = [
   { path: '/sites/:id/mail', component: () => import('./views/Mail.vue') },
   { path: '/users', component: () => import('./views/Users.vue') },
   { path: '/cluster', component: () => import('./views/Servers.vue') },
+  { path: '/cluster/dashboard', component: () => import('./views/ClusterDashboard.vue') },
   { path: '/dns', component: () => import('./views/DNS.vue') },
+  { path: '/resellers', component: () => import('./views/Reseller.vue') },
+  { path: '/extdns', component: () => import('./views/ExternalDNS.vue') },
+  { path: '/sites/:id/waf', component: () => import('./views/WAF.vue') },
+  { path: '/sites/:id/cdn', component: () => import('./views/CDN.vue') },
+  { path: '/reseller/dashboard', component: () => import('./views/ResellerDashboard.vue') },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })

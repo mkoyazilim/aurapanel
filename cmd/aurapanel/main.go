@@ -46,7 +46,10 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/update"
 	"github.com/mkoyazilim/aurapanel/internal/webui"
 	"github.com/mkoyazilim/aurapanel/internal/wordpress"
+	"github.com/mkoyazilim/aurapanel/internal/agent"
+	"github.com/mkoyazilim/aurapanel/internal/extdns"
 	"github.com/mkoyazilim/aurapanel/internal/git"
+	"github.com/mkoyazilim/aurapanel/internal/reseller"
 )
 
 var (
@@ -73,13 +76,32 @@ func main() {
 		os.Exit(priv.Main(os.Args[1:]))
 	}
 
-	cfgPath := flag.String("config", "", "yapılandırma dosyası (varsayılan: /etc/aurapanel/aurapanel.yaml)")
-	check := flag.Bool("check", false, "başlatma kontrolünü yap ve çık")
+	cfgPath     := flag.String("config", "", "yapılandırma dosyası (varsayılan: /etc/aurapanel/aurapanel.yaml)")
+	check       := flag.Bool("check", false, "başlatma kontrolünü yap ve çık")
 	showVersion := flag.Bool("version", false, "sürümü yazdır ve çık")
+	agentMode   := flag.Bool("agent", false, "agent modunda çalış (merkezi panelden yönetilen bağımlı node)")
+	agentKey    := flag.String("agent-key", "", "agent modu Bearer token (--agent ile zorunlu)")
+	agentAddr   := flag.String("agent-addr", ":8080", "agent modu dinleme adresi")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("aurapanel %s (commit=%s built=%s)\n", version, commit, built)
+		return
+	}
+
+	// Agent modu: tam panel yerine yalnızca agent endpoint'lerini ayağa kaldır.
+	if *agentMode {
+		if *agentKey == "" {
+			fmt.Fprintln(os.Stderr, "hata: --agent-key gereklidir")
+			os.Exit(1)
+		}
+		mux := http.NewServeMux()
+		agent.NewAgentServer(*agentKey, version).RegisterRoutes(mux)
+		fmt.Printf("aurapanel agent modu: %s dinleniyor\n", *agentAddr)
+		if err := http.ListenAndServe(*agentAddr, mux); err != nil {
+			fmt.Fprintf(os.Stderr, "agent: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -278,6 +300,9 @@ func main() {
 		"https://github.com/mkoyazilim/downloadaurapanel/releases/latest/download/versions.json",
 		version, exe)
 
+
+	resellerSvc := reseller.New(st)
+	extdnsSvc   := extdns.New(st, cipher)
 	srv := api.New(api.Deps{
 		Store: st, Audit: au, Sessions: sessions, Cipher: cipher, Cfg: cfg, Log: log,
 		Priv:  privC,
@@ -288,6 +313,8 @@ func main() {
 		Cron: cronSvc, Security: securitySvc, Health: healthChecker,
 		Wordpress: wpSvc, Git: gitSvc, Nodejs: nodejsSvc, Staging: stagingSvc, Cloudflare: cloudflareSvc,
 		Mail: mailSvc,
+		Reseller: resellerSvc,
+		ExtDNS:   extdnsSvc,
 	})
 
 	httpSrv := &http.Server{

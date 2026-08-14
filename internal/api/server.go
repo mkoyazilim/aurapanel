@@ -32,6 +32,8 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/sftp"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
+	"github.com/mkoyazilim/aurapanel/internal/extdns"
+	"github.com/mkoyazilim/aurapanel/internal/reseller"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 	"github.com/mkoyazilim/aurapanel/internal/update"
 	"github.com/mkoyazilim/aurapanel/internal/wordpress"
@@ -79,6 +81,8 @@ type Deps struct {
 	Security  *security.Service
 	Health    *health.Checker
 	Wordpress *wordpress.Service
+	Reseller  *reseller.Service
+	ExtDNS    *extdns.Service
 }
 
 // Server, HTTP sunucusu.
@@ -92,6 +96,7 @@ type Server struct {
 func New(deps Deps) *Server {
 	s := &Server{deps: deps, mux: http.NewServeMux(), throttle: newLoginThrottle(5, 15*time.Minute)}
 	s.routes()
+	go s.startHealthPoller()
 	return s
 }
 
@@ -169,11 +174,27 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/cluster", s.handleClusterAdd)
 	m.HandleFunc("DELETE /api/v1/cluster/{id}", s.handleClusterDelete)
 	m.HandleFunc("GET /api/v1/cluster/{id}/health", s.handleClusterHealth)
+	// F3: Multi-server genişletme
+	m.HandleFunc("GET /api/v1/cluster/metrics", s.handleClusterMetrics)
+	m.HandleFunc("GET /api/v1/cluster/events", s.handleClusterEvents)
+	m.HandleFunc("POST /api/v1/servers/{id}/rotate-key", s.handleClusterKeyRotate)
+	m.HandleFunc("POST /api/v1/servers/{id}/sites", s.handleClusterCreateSite)
 
-	// DNS yönetimi.
+	// DNS yönetimi (F4 — PowerDNS tam entegrasyonu).
 	m.HandleFunc("GET /api/v1/dns/zones", s.handleDNSZonesList)
 	m.HandleFunc("POST /api/v1/dns/zones", s.handleDNSZoneCreate)
 	m.HandleFunc("DELETE /api/v1/dns/zones/{domain}", s.handleDNSZoneDelete)
+	m.HandleFunc("GET /api/v1/dns/zones/{domain}/records", s.handleDNSRecordsList)
+	m.HandleFunc("POST /api/v1/dns/zones/{domain}/records", s.handleDNSRecordCreate)
+	m.HandleFunc("DELETE /api/v1/dns/zones/{domain}/records", s.handleDNSRecordDelete)
+	m.HandleFunc("PUT /api/v1/dns/zones/{domain}/soa", s.handleDNSSOAUpdate)
+	m.HandleFunc("GET /api/v1/dns/zones/{domain}/export", s.handleDNSZoneExport)
+	m.HandleFunc("POST /api/v1/dns/zones/{domain}/dnssec", s.handleDNSSECEnable)
+	m.HandleFunc("DELETE /api/v1/dns/zones/{domain}/dnssec", s.handleDNSSECDisable)
+	m.HandleFunc("GET /api/v1/dns/zones/{domain}/cryptokeys", s.handleDNSCryptoKeysList)
+	m.HandleFunc("POST /api/v1/dns/zones/{domain}/cryptokeys", s.handleDNSCryptoKeyAdd)
+	m.HandleFunc("DELETE /api/v1/dns/zones/{domain}/cryptokeys/{keyid}", s.handleDNSCryptoKeyDelete)
+	m.HandleFunc("POST /api/v1/dns/zones/{domain}/rectify", s.handleDNSRectify)
 
 	// PHP.
 	m.HandleFunc("GET /api/v1/php/versions", s.handlePHPVersions)
@@ -281,6 +302,45 @@ func (s *Server) routes() {
 	
 	// Webhook (NO AUTH REQUIRED)
 	m.HandleFunc("POST /api/v1/webhooks/git/{secret}", s.handleGitWebhook)
+
+	// Reseller yönetimi (admin tarafı)
+	m.HandleFunc("GET /api/v1/resellers", s.handleResellerList)
+	m.HandleFunc("POST /api/v1/resellers", s.handleResellerCreate)
+	m.HandleFunc("DELETE /api/v1/resellers/{id}", s.handleResellerDelete)
+	m.HandleFunc("GET /api/v1/resellers/{id}/quota", s.handleResellerGetQuota)
+	m.HandleFunc("PUT /api/v1/resellers/{id}/quota", s.handleResellerSetQuota)
+
+	// Reseller portal (reseller kendi tarafı)
+	m.HandleFunc("GET /api/v1/reseller/me", s.handleResellerMe)
+	m.HandleFunc("GET /api/v1/reseller/my/sites", s.handleResellerSites)
+
+	// External DNS (F5 — Cloudflare çift-yönlü senkron + Route53)
+	m.HandleFunc("GET /api/v1/extdns/providers", s.handleExtDNSList)
+	m.HandleFunc("POST /api/v1/extdns/providers", s.handleExtDNSCreate)
+	m.HandleFunc("DELETE /api/v1/extdns/providers/{id}", s.handleExtDNSDelete)
+	m.HandleFunc("GET /api/v1/extdns/providers/{id}/cf/records", s.handleExtDNSCFRecords)
+	m.HandleFunc("POST /api/v1/extdns/providers/{id}/cf/sync", s.handleExtDNSCFSync)
+	m.HandleFunc("GET /api/v1/extdns/providers/{id}/r53/zones", s.handleExtDNSR53Zones)
+	m.HandleFunc("GET /api/v1/extdns/sync-log", s.handleExtDNSSyncLog)
+
+	// Advanced WAF (F6)
+	m.HandleFunc("GET /api/v1/waf/crs", s.handleWAFCRSGet)
+	m.HandleFunc("PUT /api/v1/waf/crs", s.handleWAFCRSUpdate)
+	m.HandleFunc("GET /api/v1/sites/{id}/waf/rules", s.handleWAFRulesList)
+	m.HandleFunc("POST /api/v1/sites/{id}/waf/rules", s.handleWAFRuleCreate)
+	m.HandleFunc("PUT /api/v1/sites/{id}/waf/rules/{ruleid}", s.handleWAFRuleUpdate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/waf/rules/{ruleid}", s.handleWAFRuleDelete)
+	m.HandleFunc("POST /api/v1/sites/{id}/waf/test", s.handleWAFTest)
+	m.HandleFunc("GET /api/v1/sites/{id}/waf/log", s.handleWAFLog)
+
+	// CDN yönetimi (F7)
+	m.HandleFunc("POST /api/v1/sites/{id}/cdn/purge", s.handleCDNPurge)
+	m.HandleFunc("POST /api/v1/sites/{id}/cdn/cf-purge", s.handleCDNCFPurge)
+	m.HandleFunc("GET /api/v1/sites/{id}/cdn/rules", s.handleCDNRulesList)
+	m.HandleFunc("POST /api/v1/sites/{id}/cdn/rules", s.handleCDNRuleCreate)
+	m.HandleFunc("PUT /api/v1/sites/{id}/cdn/rules/{ruleid}", s.handleCDNRuleUpdate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/cdn/rules/{ruleid}", s.handleCDNRuleDelete)
+	m.HandleFunc("GET /api/v1/sites/{id}/cdn/stats", s.handleCDNStats)
 }
 
 // --- JSON yardımcıları ---
