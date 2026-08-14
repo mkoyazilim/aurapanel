@@ -14,6 +14,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // Engine, veritabanı sunucusu işlemleri.
@@ -33,6 +34,9 @@ var validIdent = regexp.MustCompile(`^[a-z0-9_]{1,64}$`)
 // quoteIdent, doğrulanmış identifier'ı backtick ile sarar.
 // Backtick içeremeyen girdi (regex sayesinde) kaçışa ihtiyaç duymaz.
 func quoteIdent(s string) string { return "`" + s + "`" }
+
+// quoteString, parolayı SQL string olarak (tek tırnak içinde) güvenle sarar.
+func quoteString(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 
 // sqlExec, MariaDBEngine'in kullandığı dar SQL arayüzü (testte kaydedici).
 type sqlExec interface {
@@ -81,8 +85,7 @@ func (e *MariaDBEngine) CreateUser(ctx context.Context, username, host, password
 		return err
 	}
 	_, err := e.db.ExecContext(ctx,
-		fmt.Sprintf("CREATE USER %s@%s IDENTIFIED BY ?", quoteIdent(username), quoteIdent(host)),
-		password)
+		fmt.Sprintf("CREATE USER %s@%s IDENTIFIED BY %s", quoteIdent(username), quoteIdent(host), quoteString(password)))
 	return err
 }
 
@@ -106,8 +109,7 @@ func (e *MariaDBEngine) SetUserPassword(ctx context.Context, username, host, pas
 		return err
 	}
 	_, err := e.db.ExecContext(ctx,
-		fmt.Sprintf("ALTER USER %s@%s IDENTIFIED BY ?", quoteIdent(username), quoteIdent(host)),
-		password)
+		fmt.Sprintf("ALTER USER %s@%s IDENTIFIED BY %s", quoteIdent(username), quoteIdent(host), quoteString(password)))
 	return err
 }
 
