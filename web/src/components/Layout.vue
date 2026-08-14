@@ -2,8 +2,10 @@
   <div class="layout">
     <aside class="sidebar" :class="{ 'is-collapsed': collapsed }">
       <div class="brand">
-        <img src="/icon.png" alt="AuraPanel" height="28" :style="{ marginRight: collapsed ? '0' : '8px' }" />
-        <span v-if="!collapsed">AuraPanel</span>
+        <router-link to="/" class="brand-link">
+          <img v-if="!collapsed" src="/logo.png" alt="AuraPanel" class="brand-logo" />
+          <img v-else src="/icon.png" alt="AuraPanel" class="brand-icon" />
+        </router-link>
       </div>
       <nav>
         <div class="nav-group" v-for="group in menu" :key="group.title">
@@ -113,7 +115,10 @@ async function logout() {
   width: 76px;
   padding: 24px 12px;
 }
-.brand { font-weight: 700; font-size: 18px; padding: 4px 8px 24px; color: #0f172a; display: flex; align-items: center; justify-content: center; }
+.brand { padding: 4px 6px 20px; display: flex; align-items: center; justify-content: center; }
+.brand-link { display: flex; align-items: center; justify-content: center; width: 100%; text-decoration: none; }
+.brand-logo { width: 100%; max-width: 210px; height: auto; max-height: 48px; object-fit: contain; }
+.brand-icon { width: 34px; height: 34px; object-fit: contain; }
 .nav-group { margin-bottom: 24px; }
 .nav-title {
   font-size: 12px;
