@@ -23,6 +23,7 @@ var vhconfTmpl string
 type vhostTemplateData struct {
 	Docroot       string
 	LogDir        string
+	IniPath       string
 	Domain        string
 	AliasesLine   string
 	IndexFiles    string
@@ -51,6 +52,7 @@ func RenderVhost(sitesRoot, certsRoot string, v Vhost) ([]Artifact, error) {
 	data := vhostTemplateData{
 		Docroot:     path.Join(sitesRoot, v.SiteID, "home"),
 		LogDir:      path.Join(sitesRoot, v.SiteID, "logs"),
+		IniPath:     path.Join(sitesRoot, v.SiteID, "conf", "php.ini"),
 		Domain:      v.Domain,
 		AliasesLine: strings.Join(v.Aliases, ", "),
 		IndexFiles:  strings.Join(v.IndexFiles, ", "),

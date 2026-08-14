@@ -195,6 +195,9 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"cgroup.read":               opCgroupRead,
 		"site.status":               opSiteStatus,
 		"quota.get":                 opQuotaGet,
+		"php.detect":                opPHPDetect,
+		"php.install_ini":           opPHPInstallIni,
+		"php.read_ini":              opPHPReadIni,
 	}
 }
 
@@ -799,4 +802,108 @@ func opQuotaGet(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 		"user": a.User, "available": true,
 		"disk_blocks": blocks, "inodes": inodes,
 	}, nil
+}
+
+// --- PHP operasyonları (W6) ---
+
+var reLSPhpDir = regexp.MustCompile(`^lsphp[0-9]{2}$`)
+
+const phpIniLimit = 64 << 10 // 64 KiB
+
+// opPHPDetect, kurulu LSPHP sürümlerini /usr/local/lsws altından tarar
+// (lsphpNN/bin/lsphp var mı). Hiçbir kullanıcı girdisi yoktur.
+func opPHPDetect(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct{}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("php.detect: %w", err)
+	}
+	versions := map[string]any{}
+	entries, err := os.ReadDir("/usr/local/lsws")
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() || !reLSPhpDir.MatchString(e.Name()) {
+				continue
+			}
+			if _, err := os.Stat(path.Join("/usr/local/lsws", e.Name(), "bin", "lsphp")); err == nil {
+				versions[e.Name()[5:6] + "." + e.Name()[6:]] = true
+			}
+		}
+	}
+	return &plan{}, map[string]any{"versions": versions}, nil
+}
+
+// reIniLine, php.ini satırlarının izin verilen biçimi:
+//   yönerge[boşluk]=[boşluk]değer
+// Değer karakter kümesi DAR tutulur (harf/rakam/./ /:+_- ve boşluk):
+// allowlist anahtarlarımızın (boyutlar, tam sayılar, On/Off, zaman dilimi)
+// ihtiyaç duyduğu küme budur; `;`, tırnak, parantez vb. YASAKTIR.
+var reIniLine = regexp.MustCompile(`^[a-zA-Z0-9_.\[\]-]+\s*=\s*[a-zA-Z0-9./:+_\- ]{0,255}$`)
+
+// validateIniContent, php.ini içeriğini satır satır denetler. Yorum (#)
+// ve boş satırlar serbesttir; diğer her satır reIniLine'a uymalıdır.
+func validateIniContent(content string) error {
+	if len(content) > phpIniLimit {
+		return errors.New("php.ini boyutu 64 KiB sınırını aşıyor")
+	}
+	for i, line := range strings.Split(content, "\n") {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "#") || strings.HasPrefix(t, ";") {
+			continue
+		}
+		if !reIniLine.MatchString(t) {
+			return fmt.Errorf("php.ini satır %d geçersiz", i+1)
+		}
+	}
+	return nil
+}
+
+func iniPathFor(cfg *runtimeCfg, siteID string) string {
+	return path.Join(cfg.sitesRoot, siteID, "conf", "php.ini")
+}
+
+// opPHPInstallIni, site php.ini dosyasını doğrulayıp yazar (site conf dizininde,
+// site kullanıcısına ait).
+func opPHPInstallIni(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site    string `json:"site"`
+		Content string `json:"content"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("php.install_ini: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("php.install_ini: site kimliği geçersiz")
+	}
+	if err := validateIniContent(a.Content); err != nil {
+		return nil, nil, fmt.Errorf("php.install_ini: %w", err)
+	}
+	target := iniPathFor(cfg, a.Site)
+	user := "www-" + a.Site
+	chown, _ := bin("chown")
+	p := &plan{}
+	p.mkdirMode(path.Dir(target), 0o750)
+	p.write(fileWrite{path: target, content: a.Content, mode: 0o644})
+	p.exec(chown, "-R", user+":"+user, path.Dir(target))
+	return p, map[string]any{"site": a.Site, "path": target}, nil
+}
+
+// opPHPReadIni, site php.ini içeriğini okur (editör için).
+func opPHPReadIni(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("php.read_ini: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("php.read_ini: site kimliği geçersiz")
+	}
+	b, err := os.ReadFile(iniPathFor(cfg, a.Site))
+	if errors.Is(err, os.ErrNotExist) {
+		return &plan{}, map[string]any{"site": a.Site, "content": ""}, nil
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("php.read_ini: %w", err)
+	}
+	return &plan{}, map[string]any{"site": a.Site, "content": string(b)}, nil
 }

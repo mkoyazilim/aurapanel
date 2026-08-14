@@ -154,6 +154,27 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 			Extra: extra,
 		})
 	}
+
+	// PHP sürüm + pool kaydı (W6): desired state'in parçası. Runtime'a
+	// henüz dokunulmadığı için başarısızlıkta telafi gerekmez — site
+	// "failed" işaretlenir, drift onarımıyla yinelenebilir.
+	phpID, err := m.store.GetPHPVersionID(ctx, req.PHPVersion)
+	if err != nil {
+		m.store.SetSiteStatus(ctx, siteID, "failed")
+		auditSite("failed", map[string]any{"step": "php.bind", "error": err.Error()})
+		return "", fmt.Errorf("php sürüm bağlama: %w", err)
+	}
+	if err := m.store.SetSitePHPVersion(ctx, siteID, phpID); err != nil {
+		m.store.SetSiteStatus(ctx, siteID, "failed")
+		auditSite("failed", map[string]any{"step": "php.bind", "error": err.Error()})
+		return "", fmt.Errorf("php sürüm bağlama: %w", err)
+	}
+	if err := m.store.UpsertPHPool(ctx, siteID, phpID, `{}`); err != nil {
+		m.store.SetSiteStatus(ctx, siteID, "failed")
+		auditSite("failed", map[string]any{"step": "php.pool", "error": err.Error()})
+		return "", fmt.Errorf("php pool kaydı: %w", err)
+	}
+
 	auditSite("", map[string]any{"domain": req.Domain})
 
 	steps := []struct {

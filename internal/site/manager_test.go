@@ -117,6 +117,13 @@ func testManager(t *testing.T) (*Manager, *store.Store, *fakePriv, *fakeVhost) {
 	if err := st.Migrate(); err != nil {
 		t.Fatal(err)
 	}
+	// PHP sürüm envanteri (W6: Create artık PHP sürümünü bağlar).
+	ctx := context.Background()
+	for _, v := range []string{"8.2", "8.3", "8.4"} {
+		if _, err := st.InsertPHPVersion(ctx, v, "/usr/local/lsws/lsphp"+strings.ReplaceAll(v, ".", "")+"/bin/lsphp"); err != nil {
+			t.Fatal(err)
+		}
+	}
 	fp := newFakePriv()
 	fv := newFakeVhost()
 	m := NewManager(st, fp, fv, audit.New(st), testSitesRoot)
@@ -159,6 +166,13 @@ func TestCreateHappy(t *testing.T) {
 	}
 	if !fv.applied[id] {
 		t.Fatal("vhost uygulanmadı")
+	}
+	// W6: PHP sürüm + pool kaydı oluşturulmuş olmalı.
+	if !s.PHPVersionID.Valid {
+		t.Fatal("php sürümü bağlanmadı")
+	}
+	if _, _, ok, err := st.GetPHPool(ctx, id); err != nil || !ok {
+		t.Fatalf("php pool kaydı yok: ok=%v err=%v", ok, err)
 	}
 }
 

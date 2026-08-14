@@ -31,6 +31,7 @@ func TestRenderContainsCore(t *testing.T) {
 		"path                    /usr/local/lsws/lsphp83/bin/lsphp",
 		"indexFiles              index.php, index.html",
 		"errorlog /srv/aurapanel/sites/site001/logs/error.log",
+		"phpIniOverride          /srv/aurapanel/sites/site001/conf/php.ini",
 	}
 	for _, want := range checks {
 		if !strings.Contains(c, want) {

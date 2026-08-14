@@ -48,6 +48,7 @@ extprocessor {{ .LSAPIName }} {
   memHardLimit            2047M
   procSoftLimit           400
   procHardLimit           500
+  phpIniOverride          {{ .IniPath }}
 }
 
 {{- if .TLSRedirect }}

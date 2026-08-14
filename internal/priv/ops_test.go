@@ -32,6 +32,7 @@ func TestRegistryAllowlist(t *testing.T) {
 		"ols.test", "ols.read_bundle", "ols.install_bundle", "ols.remove_bundle", "ols.reload",
 		"site.prepare", "site.teardown", "cgroup.cleanup",
 		"cgroup.read", "site.status", "quota.get",
+		"php.detect", "php.install_ini", "php.read_ini",
 	}
 	if len(reg) != len(want) {
 		t.Fatalf("op sayısı beklenmiyor: %d (beklenen %d)", len(reg), len(want))
@@ -363,6 +364,38 @@ func TestReadOps(t *testing.T) {
 	}
 }
 
+// php.install_ini: satır biçimi sıkı doğrulamalı; şüpheli içerik reddedilmeli.
+func TestPHPIniValidation(t *testing.T) {
+	cfg := testCfg()
+	fn := newRegistry(cfg)["php.install_ini"]
+
+	good := "# yorum\nmemory_limit = 256M\nsession.gc_maxlifetime = 1440\n"
+	p, _, err := fn(cfg, mustJSON(t, map[string]any{"site": "site001", "content": good}))
+	if err != nil {
+		t.Fatalf("geçerli ini reddedildi: %v", err)
+	}
+	if p.actions[0].kind != actMkdir || p.actions[0].mkdir != "/srv/aurapanel/sites/site001/conf" {
+		t.Fatal("ilk eylem mkdir(conf) olmalı")
+	}
+	if p.actions[1].write.path != "/srv/aurapanel/sites/site001/conf/php.ini" {
+		t.Fatalf("hedef yanlış: %s", p.actions[1].write.path)
+	}
+
+	bad := []string{
+		"rm -rf /tmp\n",
+		"system('id')\n",
+		"memory_limit = 256M; rm -rf /\n",
+		"memory_limit=256M\n\x00",
+		"key\n",
+		strings.Repeat("#", phpIniLimit+1),
+	}
+	for i, c := range bad {
+		if _, _, err := fn(cfg, mustJSON(t, map[string]any{"site": "site001", "content": c})); err == nil {
+			t.Errorf("şüpheli ini içeriği %d kabul edildi: %q", i, c)
+		}
+	}
+}
+
 // Her op'un mutlu-yol planı bin allowlist'ine uygun olmalı.
 func TestAllOpsHappyPathBins(t *testing.T) {
 	cfg := testCfg()
@@ -389,6 +422,9 @@ func TestAllOpsHappyPathBins(t *testing.T) {
 		"cgroup.read":               {"site": "site001"},
 		"site.status":               {"site": "site001", "user": "www-site001"},
 		"quota.get":                 {"user": "www-site001"},
+		"php.detect":                {},
+		"php.install_ini":           {"site": "site001", "content": "memory_limit = 256M\n"},
+		"php.read_ini":              {"site": "site001"},
 	}
 	for op, args := range happy {
 		raw, _ := json.Marshal(args)
