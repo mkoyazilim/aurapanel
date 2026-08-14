@@ -49,7 +49,6 @@ var binPaths = map[string]string{
 	"setquota":  "/usr/sbin/setquota",
 	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
 	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
-	"ols_htpasswd": "/usr/local/lsws/admin/misc/htpasswd",
 }
 
 func bin(name string) (string, error) {
@@ -206,7 +205,9 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 
 // opOlsWebadminCredentials, OLS WebAdmin kimlik bilgilerini senkronlar
 // (ARCHITECTURE §9.10: panel admin şifresiyle tek giriş çifti).
-// htpasswd, stdin üzerinden parola alır (-i) — parola argv'de GÖRÜNMEZ.
+// apr1-MD5 hash'i SÜREÇ İÇİNDE hesaplanır ve htpasswd dosyasına yazılır —
+// dış htpasswd binary'si YOKTUR (OLS yalnızca htpasswd.php taşır), parola
+// hiçbir komut satırında görünmez.
 func opOlsWebadminCredentials(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	var a struct {
 		Username string `json:"username"`
@@ -221,10 +222,9 @@ func opOlsWebadminCredentials(cfg *runtimeCfg, raw json.RawMessage) (*plan, any,
 	if len(a.Password) < 12 || len(a.Password) > 128 {
 		return nil, nil, errors.New("ols.webadmin_credentials: parola 12..128 karakter olmalı")
 	}
-	htpasswd, _ := bin("ols_htpasswd")
+	line := a.Username + ":" + apr1Crypt(a.Password, apr1Salt()) + "\n"
 	p := &plan{}
-	p.exec(htpasswd, "-i", "-b", "/usr/local/lsws/admin/conf/htpasswd", a.Username)
-	p.actions[len(p.actions)-1].exec.stdin = a.Password + "\n"
+	p.write(fileWrite{path: "/usr/local/lsws/admin/conf/htpasswd", content: line, mode: 0o600})
 	return p, map[string]any{"username": a.Username}, nil
 }
 
