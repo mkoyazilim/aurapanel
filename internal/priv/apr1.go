@@ -61,23 +61,27 @@ func apr1Crypt(password, salt string) string {
 	return "$apr1$" + salt + "$" + apr1Encode(final)
 }
 
-// apr1Encode, özel alfabeyle kodlama (4 bayt → 4×6 bit).
+// apr1Encode, Apache to64 kodlaması — bayt sırası SIRALI DEĞİL,
+// permütasyonludur: (0,6,12) (1,7,13) (2,8,14) (3,9,15) (4,10,5) + (11).
 func apr1Encode(b []byte) string {
-	out := ""
-	for i := 0; i < 16; i += 3 {
-		chunk := uint32(b[i])<<16
-		if i+1 < len(b) {
-			chunk |= uint32(b[i+1]) << 8
+	to64 := func(v uint32, n int) string {
+		s := ""
+		for i := 0; i < n; i++ {
+			s += string(apr1Alphabet[v&0x3f])
+			v >>= 6
 		}
-		if i+2 < len(b) {
-			chunk |= uint32(b[i+2])
-		}
-		for j := 0; j < 4; j++ {
-			out += string(apr1Alphabet[chunk&0x3f])
-			chunk >>= 6
-		}
+		return s
 	}
-	return out[:22] // 64+1 bit → 22 karakter
+	group := func(i, j, k int) uint32 {
+		return uint32(b[i])<<16 | uint32(b[j])<<8 | uint32(b[k])
+	}
+	out := to64(group(0, 6, 12), 4)
+	out += to64(group(1, 7, 13), 4)
+	out += to64(group(2, 8, 14), 4)
+	out += to64(group(3, 9, 15), 4)
+	out += to64(group(4, 10, 5), 4)
+	out += to64(uint32(b[11]), 2)
+	return out
 }
 
 // apr1Salt, 8 karakterlik rastgele salt üretir.
