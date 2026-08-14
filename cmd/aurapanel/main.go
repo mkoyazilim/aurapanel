@@ -47,6 +47,13 @@ var (
 const privSocket = "/run/aurapanel/priv.sock"
 
 func main() {
+	// file.op worker modu: helper, kendini site UID'siyle yeniden başlatır;
+	// env yalnızca helper TARAFINDAN konur (argv[0] burada "aurapanel"
+	// olduğundan priv dispatch'ine girmez).
+	if os.Getenv("AURAPANEL_FILE_WORKER") == "1" {
+		os.Exit(priv.WorkerMain(os.Args[1:]))
+	}
+
 	// Tek binary, iki mod: "aurapanel-priv" symlink'i → priv helper.
 	if filepath.Base(os.Args[0]) == "aurapanel-priv" {
 		os.Exit(priv.Main(os.Args[1:]))
