@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 )
 
@@ -23,6 +24,36 @@ func (s *Store) InsertDomain(ctx context.Context, d Domain) (int64, error) {
 		return 0, fmt.Errorf("domain insert: %w", err)
 	}
 	return res.LastInsertId()
+}
+
+// GetDomainByID, ID'ye göre kaydı döndürür (yoksa nil).
+func (s *Store) GetDomainByID(ctx context.Context, id int64) (*Domain, error) {
+	var d Domain
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, site_id, domain, kind, ssl_enabled FROM domains WHERE id = ?`, id).
+		Scan(&d.ID, &d.SiteID, &d.Domain, &d.Kind, &d.SSLenabled)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("domain get by id: %w", err)
+	}
+	return &d, nil
+}
+
+// GetDomainByName, domain adına göre kaydı döndürür (yoksa nil).
+func (s *Store) GetDomainByName(ctx context.Context, domain string) (*Domain, error) {
+	var d Domain
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, site_id, domain, kind, ssl_enabled FROM domains WHERE domain = ?`, domain).
+		Scan(&d.ID, &d.SiteID, &d.Domain, &d.Kind, &d.SSLenabled)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("domain get: %w", err)
+	}
+	return &d, nil
 }
 
 // ListDomainsBySite, bir sitenin tüm domain kayıtlarını döndürür.
