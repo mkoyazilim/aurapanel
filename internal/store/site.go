@@ -9,17 +9,17 @@ import (
 // Site, sites tablosundaki tek kayıt (şema v1).
 // FeatureFlags ve Limits JSON metin tutulur; panel tarafı yapılandırır.
 type Site struct {
-	ID                string
-	Name              string
-	LinuxUser         string
-	HomeDir           string
-	Status            string
-	FeatureFlags      string
-	Limits            string
-	PHPVersionID      sql.NullInt64
-	SecurityProfileID sql.NullInt64
-	CreatedAt         string
-	UpdatedAt         string
+	ID                string        `json:"id"`
+	Name              string        `json:"name"`
+	LinuxUser         string        `json:"linux_user"`
+	HomeDir           string        `json:"home_dir"`
+	Status            string        `json:"status"`
+	FeatureFlags      string        `json:"feature_flags"`
+	Limits            string        `json:"limits"`
+	PHPVersionID      sql.NullInt64 `json:"php_version_id"`
+	SecurityProfileID sql.NullInt64 `json:"security_profile_id"`
+	CreatedAt         string        `json:"created_at"`
+	UpdatedAt         string        `json:"updated_at"`
 }
 
 const siteColumns = `id, name, linux_user, home_dir, status, feature_flags, limits,

@@ -67,6 +67,6 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .badge.warn { background: #fef3c7; color: var(--warn); }
 .badge.err { background: #fee2e2; color: var(--danger); }
 .muted { color: var(--muted); }
-.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .spacer { flex: 1; }
 .mono { font-family: 'Cascadia Code', Consolas, monospace; font-size: 12px; }
