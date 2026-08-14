@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <aside class="sidebar">
-      <div class="brand">🟣 AuraPanel</div>
+      <div class="brand"><img src="/icon.png" alt="AuraPanel" height="28" style="vertical-align: middle; margin-right: 8px;" />AuraPanel</div>
       <nav>
         <div class="nav-group" v-for="group in menu" :key="group.title">
           <div class="nav-title">{{ group.title }}</div>

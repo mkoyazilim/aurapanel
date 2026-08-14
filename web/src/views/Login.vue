@@ -1,7 +1,7 @@
 <template>
   <div class="login-wrap">
     <form class="card login-card" @submit.prevent="submit">
-      <div class="brand">🟣 AuraPanel</div>
+      <div class="brand"><img src="/logo.png" alt="AuraPanel" height="40" /></div>
       <p class="muted">OpenLiteSpeed için hafif, güvenlik öncelikli panel</p>
       <div v-if="error" class="alert error">{{ error }}</div>
       <label>Kullanıcı adı</label>
