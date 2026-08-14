@@ -42,7 +42,8 @@ func runFileOp(ctx context.Context, raw json.RawMessage) (map[string]any, error)
 	if err != nil {
 		return nil, err
 	}
-	argv := append([]string{"-file-worker", args.Verb, args.Site}, args.Paths...)
+	// Worker modu ENV ile tetiklenir — argv[0] fiildir.
+	argv := append([]string{args.Verb, args.Site}, args.Paths...)
 	cmd := exec.CommandContext(ctx, self, argv...)
 	cmd.Env = append(os.Environ(), "AURAPANEL_FILE_WORKER=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
