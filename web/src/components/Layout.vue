@@ -6,6 +6,9 @@
           <img v-if="!collapsed" src="/logo.png" alt="AuraPanel" class="brand-logo" />
           <img v-else src="/icon.png" alt="AuraPanel" class="brand-icon" />
         </router-link>
+        <div v-if="!collapsed" class="server-address">
+          IP: {{ hostAddress }}
+        </div>
       </div>
       <nav>
         <div class="nav-group" v-for="group in menu" :key="group.title">
@@ -46,6 +49,7 @@ import { useI18n } from 'vue-i18n'
 const auth = useAuth()
 const router = useRouter()
 const { locale, t } = useI18n()
+const hostAddress = window.location.host
 
 function changeLang(e) {
   localStorage.setItem('ap_lang', e.target.value)
@@ -117,7 +121,8 @@ async function logout() {
   width: 76px;
   padding: 24px 12px;
 }
-.brand { padding: 4px 6px 20px; display: flex; align-items: center; justify-content: center; }
+.brand { padding: 4px 6px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.server-address { font-size: 11px; color: #64748b; font-weight: 600; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0; letter-spacing: 0.5px; }
 .brand-link { display: flex; align-items: center; justify-content: center; width: 100%; text-decoration: none; }
 .brand-logo { width: 100%; max-width: 210px; height: auto; max-height: 48px; object-fit: contain; }
 .brand-icon { width: 34px; height: 34px; object-fit: contain; }
