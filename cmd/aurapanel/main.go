@@ -22,15 +22,19 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/auth"
 	"github.com/mkoyazilim/aurapanel/internal/backup"
 	"github.com/mkoyazilim/aurapanel/internal/config"
+	"github.com/mkoyazilim/aurapanel/internal/cron"
 	"github.com/mkoyazilim/aurapanel/internal/crypto"
 	"github.com/mkoyazilim/aurapanel/internal/db"
 	"github.com/mkoyazilim/aurapanel/internal/drift"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
+	"github.com/mkoyazilim/aurapanel/internal/health"
 	"github.com/mkoyazilim/aurapanel/internal/logger"
+	"github.com/mkoyazilim/aurapanel/internal/metrics"
 	"github.com/mkoyazilim/aurapanel/internal/ols"
 	"github.com/mkoyazilim/aurapanel/internal/php"
 	"github.com/mkoyazilim/aurapanel/internal/priv"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
+	"github.com/mkoyazilim/aurapanel/internal/security"
 	"github.com/mkoyazilim/aurapanel/internal/sftp"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
@@ -194,6 +198,19 @@ func main() {
 	repairer := drift.NewRepairer(st, dc, sitesRoot, certsRoot)
 	scanner := drift.NewScanner(st, dc, sitesRoot, certsRoot, au, repairer)
 
+	// Cron servisi
+	cronSvc := cron.NewService(st, privC)
+
+	// Güvenlik profili servisi
+	securitySvc := security.NewService(st, privC, sitesRoot)
+
+	// Sağlık kontrolcüsü
+	healthChecker := health.NewChecker(st, mysqlDB, "http://127.0.0.1:7080")
+
+	// Metrik toplayıcı (arka planda periyodik)
+	metricsCollector := metrics.NewCollector(st, "/sys/fs/cgroup", sitesRoot, 60*time.Second)
+	go metricsCollector.Run(ctx)
+
 	// Güncelleme merkezi: manifest, ikili dağıtım reposundan (pinned).
 	exe, err := os.Executable()
 	if err != nil {
@@ -210,6 +227,7 @@ func main() {
 		Sites: siteMgr, Files: files, Uploads: uploads, Archive: archives, Trash: trash,
 		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc, SFTP: sftpSvc,
 		DriftScan: scanner, DriftFix: repairer, Updates: upd,
+		Cron: cronSvc, Security: securitySvc, Health: healthChecker,
 	})
 
 	httpSrv := &http.Server{

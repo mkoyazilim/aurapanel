@@ -36,6 +36,14 @@ func (s *Scanner) Scan(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
+	// Silinen sitelerden arta kalan drift kayıtlarını temizle.
+	if err := s.store.CleanOrphanedEvents(ctx); err != nil {
+		s.audit.Write(ctx, audit.Event{
+			Action: "drift.cleanup", Target: "system", Result: "failed",
+			Extra: map[string]any{"error": err.Error()},
+		})
+	}
+
 	total := 0
 	for _, st := range sites {
 		if st.Status != "active" {

@@ -1,28 +1,28 @@
 <template>
   <Layout>
     <div class="page">
-      <h1>Dosya Yöneticisi</h1>
+      <h1>{{ $t('menu.files') }}</h1>
       <div v-if="error" class="alert error">{{ error }}</div>
 
       <div class="card">
         <div class="row">
           <div style="flex: 1">
-            <label>Site</label>
+            <label>{{ $t('files.site') }}</label>
             <select v-model="siteId" @change="loadDir">
               <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
           <div class="muted mono" style="margin-top: 18px">/{{ path }}</div>
           <div class="spacer"></div>
-          <button class="btn" @click="mkdir">📂 Klasör</button>
-          <button class="btn" @click="uploadInput.click()">⬆️ Yükle</button>
+          <button class="btn" @click="mkdir">📁 {{ $t('files.folder') }}</button>
+          <button class="btn" @click="uploadInput.click()">⬆️ {{ $t('files.upload') }}</button>
           <input ref="uploadInput" type="file" style="display: none" @change="upload" />
         </div>
       </div>
 
       <div class="card">
         <table>
-          <thead><tr><th>Ad</th><th>Boyut</th><th>Değişiklik</th><th></th></tr></thead>
+          <thead><tr><th>{{ $t('files.name') }}</th><th>{{ $t('files.size') }}</th><th>{{ $t('files.perms') }}</th><th></th></tr></thead>
           <tbody>
             <tr v-for="e in entries" :key="e.path">
               <td>
@@ -32,11 +32,11 @@
               <td class="mono">{{ e.IsDir ? '—' : humanSize(e.size) }}</td>
               <td class="muted">{{ new Date(e.mod_time || e.ModTime).toLocaleString() }}</td>
               <td>
-                <button class="btn" v-if="!e.IsDir" @click="openEditor(e.path)">✏️ Düzenle</button>
-                <button class="btn danger" @click="remove(e.path)">Sil</button>
+                <button class="btn" v-if="!e.IsDir" @click="openEditor(e.path)">✏️ {{ $t('files.edit') }}</button>
+                <button class="btn danger" @click="remove(e.path)">{{ $t('files.delete') }}</button>
               </td>
             </tr>
-            <tr v-if="!entries.length"><td colspan="4" class="muted">Dizin boş.</td></tr>
+            <tr v-if="!entries.length"><td colspan="4" class="muted">{{ $t('files.empty') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -45,8 +45,8 @@
         <div class="row">
           <h2 style="margin: 0">{{ editing }}</h2>
           <div class="spacer"></div>
-          <button class="btn danger" @click="editing = null">Kapat</button>
-          <button class="btn primary" @click="save">💾 Kaydet</button>
+          <button class="btn danger" @click="editing = null">{{ $t('files.cancel') }}</button>
+          <button class="btn primary" @click="save">💾 {{ $t('files.save') }}</button>
         </div>
         <div ref="editorEl" style="height: 420px; border: 1px solid var(--border); border-radius: 8px; margin-top: 12px"></div>
       </div>
@@ -58,6 +58,9 @@
 import { nextTick, onMounted, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { api, b64decode, b64encode } from '../api'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const sites = ref([])
 const siteId = ref('')
@@ -110,13 +113,10 @@ function enter(e) {
 }
 
 async function mkdir() {
-  const name = prompt('Klasör adı:')
-  if (!name) return
+  const n = prompt(t('files.new_folder_prompt'))
+  if (!n) return
   try {
-    await api(`/sites/${siteId.value}/files/mkdir`, {
-      method: 'POST',
-      body: { path: path.value ? path.value + '/' + name : name },
-    })
+    await api(`/fm/${siteId.value}/mkdir`, { method: 'POST', body: { path: (path.value ? path.value + '/' : '') + n } })
     await loadDir()
   } catch (e) {
     error.value = e.message
@@ -191,14 +191,14 @@ async function save() {
     fileHash = out.sha256
     fileMtime = out.modified_at
     error.value = ''
-    alert('Kaydedildi.')
+    alert(t('files.saved'))
   } catch (e) {
     error.value = e.message
   }
 }
 
 async function remove(relPath) {
-  if (!confirm(`${relPath} silinsin mi? (Geri dönüşüm kutusuna taşınır)`)) return
+  if (!confirm(t('files.delete_confirm', { name: relPath }))) return
   try {
     await api(`/sites/${siteId.value}/files/delete`, { method: 'POST', body: { path: relPath } })
     await loadDir()

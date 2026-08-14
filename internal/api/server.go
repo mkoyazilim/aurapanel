@@ -15,12 +15,15 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/auth"
 	"github.com/mkoyazilim/aurapanel/internal/backup"
 	"github.com/mkoyazilim/aurapanel/internal/config"
+	"github.com/mkoyazilim/aurapanel/internal/cron"
 	"github.com/mkoyazilim/aurapanel/internal/crypto"
 	"github.com/mkoyazilim/aurapanel/internal/db"
 	"github.com/mkoyazilim/aurapanel/internal/drift"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
+	"github.com/mkoyazilim/aurapanel/internal/health"
 	"github.com/mkoyazilim/aurapanel/internal/php"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
+	"github.com/mkoyazilim/aurapanel/internal/security"
 	"github.com/mkoyazilim/aurapanel/internal/sftp"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
@@ -61,6 +64,9 @@ type Deps struct {
 	DriftScan *drift.Scanner
 	DriftFix  *drift.Repairer
 	Updates   *update.Service
+	Cron      *cron.Service
+	Security  *security.Service
+	Health    *health.Checker
 }
 
 // Server, HTTP sunucusu.
@@ -180,6 +186,25 @@ func (s *Server) routes() {
 	// Güncelleme merkezi (W14).
 	m.HandleFunc("GET /api/v1/update/check", s.handleUpdateCheck)
 	m.HandleFunc("POST /api/v1/update/self", s.handleUpdateSelf)
+
+	// Cron yönetimi.
+	m.HandleFunc("GET /api/v1/sites/{id}/crons", s.handleCronList)
+	m.HandleFunc("POST /api/v1/sites/{id}/crons", s.handleCronCreate)
+	m.HandleFunc("PUT /api/v1/sites/{id}/crons/{jobid}", s.handleCronUpdate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/crons/{jobid}", s.handleCronDelete)
+
+	// Metrikler.
+	m.HandleFunc("GET /api/v1/sites/{id}/metrics", s.handleMetrics)
+
+	// Güvenlik profili.
+	m.HandleFunc("GET /api/v1/sites/{id}/security", s.handleSecurityGet)
+	m.HandleFunc("PUT /api/v1/sites/{id}/security", s.handleSecuritySet)
+
+	// Sağlık kontrolleri.
+	m.HandleFunc("GET /api/v1/health", s.handleHealthCheck)
+
+	// Canlı log (SSE).
+	m.HandleFunc("GET /api/v1/sites/{id}/logs/tail", s.handleLogsTail)
 }
 
 // --- JSON yardımcıları ---

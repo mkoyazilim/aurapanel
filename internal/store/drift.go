@@ -62,3 +62,13 @@ func (s *Store) ResolveDriftEvents(ctx context.Context, siteID string) error {
 	}
 	return nil
 }
+
+// CleanOrphanedEvents, artık veritabanında olmayan sitelere ait yetim
+// drift kayıtlarını siler.
+func (s *Store) CleanOrphanedEvents(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM drift_events
+		WHERE site_id NOT IN (SELECT id FROM sites)`); err != nil {
+		return fmt.Errorf("drift cleanup: %w", err)
+	}
+	return nil
+}

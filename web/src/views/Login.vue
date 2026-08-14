@@ -2,14 +2,14 @@
   <div class="login-wrap">
     <form class="card login-card" @submit.prevent="submit">
       <div class="brand"><img src="/logo.png" alt="AuraPanel" height="40" /></div>
-      <p class="muted">OpenLiteSpeed için hafif, güvenlik öncelikli panel</p>
+      <p class="muted">{{ $t('login.subtitle') }}</p>
       <div v-if="error" class="alert error">{{ error }}</div>
-      <label>Kullanıcı adı</label>
+      <label>{{ $t('login.username') }}</label>
       <input v-model="username" autocomplete="username" required />
-      <label>Şifre</label>
+      <label>{{ $t('login.password') }}</label>
       <input v-model="password" type="password" autocomplete="current-password" required />
-      <label>TOTP kodu (2FA etkinse)</label>
-      <input v-model="totp" inputmode="numeric" placeholder="6 haneli kod" />
+      <label>{{ $t('login.totp') }}</label>
+      <input v-model="totp" inputmode="numeric" :placeholder="$t('login.totp_placeholder')" />
       
       <div v-if="captchaSiteKey" style="margin-top: 16px;">
         <div v-if="captchaProvider === 'turnstile'" class="cf-turnstile" :data-sitekey="captchaSiteKey"></div>
@@ -17,7 +17,7 @@
       </div>
 
       <button class="btn primary" style="margin-top: 16px; width: 100%" :disabled="busy">
-        {{ busy ? 'Giriş yapılıyor…' : 'Giriş Yap' }}
+        {{ busy ? $t('login.submitting') : $t('login.submit') }}
       </button>
     </form>
   </div>

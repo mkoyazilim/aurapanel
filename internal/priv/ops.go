@@ -203,7 +203,32 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"php.install_ini":           opPHPInstallIni,
 		"php.read_ini":              opPHPReadIni,
 		"ols.webadmin_credentials":  opOlsWebadminCredentials,
+		"cron.apply":                opCronApply,
 	}
+}
+
+// opCronApply, site kullanıcısının crontab dosyasını güvenli biçimde yazar.
+// İçerik panel tarafından hazırlanır (job'lar DB'den okunur); priv yalnızca
+// doğrulama + yazma işlemi yapar.
+func opCronApply(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site    string `json:"site"`
+		Content string `json:"content"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("cron.apply: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("cron.apply: site kimliği geçersiz")
+	}
+	if len(a.Content) > 64<<10 {
+		return nil, nil, errors.New("cron.apply: içerik 64 KiB sınırını aşıyor")
+	}
+	user := "www-" + a.Site
+	crontabPath := "/var/spool/cron/crontabs/" + user
+	p := &plan{}
+	p.write(fileWrite{path: crontabPath, content: a.Content, mode: 0o600})
+	return p, map[string]any{"site": a.Site, "user": user}, nil
 }
 
 // opOlsWebadminCredentials, OLS WebAdmin kimlik bilgilerini senkronlar

@@ -1,50 +1,50 @@
 <template>
   <Layout>
     <div class="page">
-      <h1>Ayarlar</h1>
+      <h1>{{ $t('menu.settings') }}</h1>
       <div v-if="error" class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
       <div class="card">
-        <h2>Şifre Değiştir</h2>
+        <h2>{{ $t('settings.change_password') }}</h2>
         <div v-if="auth.user?.must_change_password" class="alert warn">
-          ⚠️ İlk kurulum şifresi kullanılıyor — değiştirmek ZORUNLU.
+          ⚠️ {{ $t('settings.must_change_pw') }}
         </div>
-        <label>Mevcut Şifre</label>
+        <label>{{ $t('settings.current_pw') }}</label>
         <input v-model="oldPw" type="password" />
-        <label>Yeni Şifre (en az 12 karakter)</label>
+        <label>{{ $t('settings.new_pw') }}</label>
         <input v-model="newPw" type="password" />
-        <button class="btn primary" style="margin-top: 10px" @click="changePw">Değiştir</button>
+        <button class="btn primary" style="margin-top: 10px" @click="changePw">{{ $t('settings.change') }}</button>
       </div>
 
       <div class="card">
-        <h2>İki Faktörlü Kimlik Doğrulama (TOTP)</h2>
+        <h2>{{ $t('settings.two_factor') }}</h2>
         <template v-if="!me.totp_enabled">
-          <button class="btn" @click="mfaStart">TOTP Kurulumunu Başlat</button>
+          <button class="btn" @click="mfaStart">{{ $t('settings.setup_totp') }}</button>
           <div v-if="mfaSecret">
-            <div class="alert warn">Aşağıdaki sırrı kimlik doğrulayıcına ekle (Google Authenticator, Aegis vb.):</div>
+            <div class="alert warn">{{ $t('settings.totp_secret_desc') }}</div>
             <div class="mono" style="padding: 8px; background: #f8fafc; border-radius: 8px; word-break: break-all">
               {{ mfaSecret }}
             </div>
             <div class="muted" style="margin: 8px 0">otpauth URL: <span class="mono">{{ mfaUrl }}</span></div>
-            <label>Doğrulama Kodu</label>
+            <label>{{ $t('settings.verify_code') }}</label>
             <input v-model="mfaCode" inputmode="numeric" maxlength="6" />
-            <button class="btn primary" style="margin-top: 10px" @click="mfaEnable">Doğrula ve Etkinleştir</button>
+            <button class="btn primary" style="margin-top: 10px" @click="mfaEnable">{{ $t('settings.verify_enable') }}</button>
           </div>
         </template>
         <template v-else>
-          <span class="badge ok">TOTP etkin</span>
-          <button class="btn danger" style="margin-left: 10px" @click="mfaDisable">Kapat</button>
+          <span class="badge ok">{{ $t('settings.totp_enabled') }}</span>
+          <button class="btn danger" style="margin-left: 10px" @click="mfaDisable">{{ $t('settings.turn_off') }}</button>
         </template>
       </div>
 
       <div class="card">
-        <h2>Güvenlik (Bot Koruması)</h2>
+        <h2>{{ $t('settings.security') }}</h2>
         <div class="row">
           <div style="flex: 1">
-            <label>Sağlayıcı (Provider)</label>
+            <label>{{ $t('settings.provider') }}</label>
             <select v-model="captchaProvider">
-              <option value="">Devre Dışı</option>
+              <option value="">{{ $t('settings.provider_disabled') }}</option>
               <option value="turnstile">Cloudflare Turnstile</option>
               <option value="recaptcha">Google reCAPTCHA (v2/v3)</option>
             </select>
@@ -53,35 +53,35 @@
         <template v-if="captchaProvider">
           <div class="row" style="margin-top: 10px;">
             <div style="flex: 1">
-              <label>Site Key (Genel Anahtar)</label>
+              <label>{{ $t('settings.site_key') }}</label>
               <input v-model="captchaSiteKey" placeholder="e.g. 0x4AAAA..." />
             </div>
             <div style="flex: 1">
-              <label>Secret Key (Gizli Anahtar)</label>
-              <input v-model="captchaSecret" type="password" placeholder="Sadece sunucu bilir..." />
+              <label>{{ $t('settings.secret_key') }}</label>
+              <input v-model="captchaSecret" type="password" :placeholder="$t('settings.secret_placeholder')" />
             </div>
           </div>
         </template>
-        <button class="btn primary" style="margin-top: 14px" @click="saveCaptchaSettings">Ayarları Kaydet</button>
+        <button class="btn primary" style="margin-top: 14px" @click="saveCaptchaSettings">{{ $t('settings.save_settings') }}</button>
       </div>
 
       <div class="card">
-        <h2>Kişisel Erişim Token'ları (CLI/API)</h2>
+        <h2>{{ $t('settings.pat') }}</h2>
         <div class="row">
-          <input v-model="patName" placeholder="Token adı" style="flex: 1" />
-          <button class="btn primary" @click="patCreate">Oluştur</button>
+          <input v-model="patName" :placeholder="$t('settings.token_name')" style="flex: 1" />
+          <button class="btn primary" @click="patCreate">{{ $t('settings.create') }}</button>
         </div>
         <div v-if="newToken" class="alert warn mono">
-          YENİ TOKEN (yalnızca bir kez gösterilir): {{ newToken }}
+          {{ $t('settings.new_token_warning') }} {{ newToken }}
         </div>
         <table style="margin-top: 12px">
-          <thead><tr><th>Ad</th><th>Oluşturma</th><th>Son Kullanım</th><th></th></tr></thead>
+          <thead><tr><th>{{ $t('settings.name') }}</th><th>{{ $t('settings.created_at') }}</th><th>{{ $t('settings.last_used') }}</th><th></th></tr></thead>
           <tbody>
             <tr v-for="p in pats" :key="p.id">
               <td>{{ p.name }}</td>
               <td class="muted">{{ p.created_at }}</td>
               <td class="muted">{{ p.last_used_at || '—' }}</td>
-              <td><button class="btn danger" @click="patDelete(p.id)">Sil</button></td>
+              <td><button class="btn danger" @click="patDelete(p.id)">{{ $t('common.delete') }}</button></td>
             </tr>
           </tbody>
         </table>
@@ -95,7 +95,9 @@ import { onMounted, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { api } from '../api'
 import { useAuth } from '../stores/auth'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const auth = useAuth()
 const me = ref({})
 const oldPw = ref('')
@@ -121,7 +123,7 @@ async function changePw() {
       method: 'POST',
       body: { old_password: oldPw.value, new_password: newPw.value },
     })
-    notice.value = 'Şifre değiştirildi.'
+    notice.value = t('settings.pw_changed')
     oldPw.value = ''
     newPw.value = ''
     await auth.me()
@@ -146,7 +148,7 @@ async function mfaEnable() {
       method: 'POST',
       body: { secret: mfaSecret.value, code: mfaCode.value },
     })
-    notice.value = 'TOTP etkinleştirildi.'
+    notice.value = t('settings.totp_setup_success')
     mfaSecret.value = ''
     await auth.me()
     me.value = await api('/auth/me')
@@ -158,7 +160,7 @@ async function mfaEnable() {
 async function mfaDisable() {
   try {
     await api('/auth/mfa/disable', { method: 'POST', body: {} })
-    notice.value = 'TOTP kapatıldı.'
+    notice.value = t('settings.totp_disabled')
     me.value = await api('/auth/me')
   } catch (e) {
     error.value = e.message
@@ -177,7 +179,7 @@ async function saveCaptchaSettings() {
         captcha_secret: captchaSecret.value,
       },
     })
-    notice.value = 'Bot koruması ayarları başarıyla kaydedildi.'
+    notice.value = t('settings.settings_saved')
   } catch (e) {
     error.value = e.message
   }

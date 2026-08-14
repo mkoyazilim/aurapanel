@@ -1,49 +1,49 @@
 <template>
   <Layout>
     <div class="page">
-      <h1>SSL Sertifikaları</h1>
+      <h1>{{ $t('menu.ssl') }}</h1>
       <div v-if="error" class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
       <div class="card">
         <div class="row">
           <div style="flex: 1">
-            <label>Site</label>
+            <label>{{ $t('ssl.site') }}</label>
             <select v-model="siteId" @change="loadInfo">
               <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
           <button class="btn primary" style="margin-top: 18px" @click="enableLE">
-            🔒 Let's Encrypt Kur
+            🔒 {{ $t('ssl.install_le') }}
           </button>
           <button class="btn danger" style="margin-top: 18px" @click="disable">
-            🔓 SSL'i Kapat
+            🔓 {{ $t('ssl.disable_ssl') }}
           </button>
         </div>
       </div>
 
       <div class="card" v-if="info && info.enabled">
-        <h2>Aktif Sertifika Bilgileri</h2>
+        <h2>{{ $t('ssl.active_cert') }}</h2>
         <div style="background: var(--bg-body); padding: 16px; border-radius: var(--radius); font-size: 14px;">
-          <p><strong>Domain:</strong> <span class="mono">{{ info.domain }}</span></p>
-          <p><strong>Sağlayıcı (Issuer):</strong> {{ info.issuer }}</p>
-          <p><strong>Başlangıç:</strong> {{ new Date(info.not_before).toLocaleString() }}</p>
-          <p><strong>Bitiş (Geçerlilik):</strong> {{ new Date(info.not_after).toLocaleString() }}</p>
-          <p><strong>Otomatik Yenileme:</strong>
+          <p><strong>{{ $t('ssl.domain') }}:</strong> <span class="mono">{{ info.domain }}</span></p>
+          <p><strong>{{ $t('ssl.issuer') }}:</strong> {{ info.issuer }}</p>
+          <p><strong>{{ $t('ssl.valid_from') }}:</strong> {{ new Date(info.not_before).toLocaleString() }}</p>
+          <p><strong>{{ $t('ssl.valid_to') }}:</strong> {{ new Date(info.not_after).toLocaleString() }}</p>
+          <p><strong>{{ $t('ssl.auto_renew') }}:</strong>
             <span :class="info.auto_renew ? 'badge ok' : 'badge err'">
-              {{ info.auto_renew ? 'Açık' : 'Kapalı' }}
+              {{ info.auto_renew ? $t('ssl.on') : $t('ssl.off') }}
             </span>
           </p>
         </div>
       </div>
 
       <div class="card">
-        <h2>Custom Sertifika</h2>
-        <label>Sertifika (PEM)</label>
+        <h2>{{ $t('ssl.custom_cert') }}</h2>
+        <label>{{ $t('ssl.cert_pem') }}</label>
         <textarea v-model="certPem" rows="6" class="mono" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
-        <label>Özel Anahtar (PEM)</label>
+        <label>{{ $t('ssl.key_pem') }}</label>
         <textarea v-model="keyPem" rows="6" class="mono" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
-        <button class="btn primary" style="margin-top: 10px" @click="installCustom">Kur</button>
+        <button class="btn primary" style="margin-top: 10px" @click="installCustom">{{ $t('ssl.install') }}</button>
       </div>
     </div>
   </Layout>
@@ -53,6 +53,9 @@
 import { onMounted, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { api } from '../api'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const sites = ref([])
 const siteId = ref('')
@@ -80,7 +83,7 @@ async function enableLE() {
   notice.value = ''
   try {
     await api(`/sites/${siteId.value}/ssl/letsencrypt`, { method: 'POST', body: {} })
-    notice.value = 'Let\'s Encrypt sertifikası kuruldu.'
+    notice.value = t('ssl.le_success')
     await loadInfo()
   } catch (e) {
     error.value = e.message
@@ -88,10 +91,10 @@ async function enableLE() {
 }
 
 async function disable() {
-  if (!siteId.value || !confirm('SSL kapatılsın mı?')) return
+  if (!siteId.value || !confirm(t('ssl.disable_confirm'))) return
   try {
     await api(`/sites/${siteId.value}/ssl/disable`, { method: 'POST', body: {} })
-    notice.value = 'SSL kapatıldı.'
+    notice.value = t('ssl.disable_success')
     await loadInfo()
   } catch (e) {
     error.value = e.message
