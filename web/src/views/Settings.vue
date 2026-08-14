@@ -1,138 +1,158 @@
 <template>
   <Layout>
     <div class="page">
-      <h1>{{ $t('menu.settings') }}</h1>
+      <div style="margin-bottom: 20px">
+        <h1 style="margin: 0">{{ $t('menu.settings') }}</h1>
+      </div>
+
       <div v-if="error" class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
-      <div class="card">
-        <h2>{{ $t('settings.change_password') }}</h2>
-        <div v-if="auth.user?.must_change_password" class="alert warn">
-          ⚠️ {{ $t('settings.must_change_pw') }}
-        </div>
-        <label>{{ $t('settings.current_pw') }}</label>
-        <input v-model="oldPw" type="password" />
-        <label>{{ $t('settings.new_pw') }}</label>
-        <input v-model="newPw" type="password" />
-        <button class="btn primary" style="margin-top: 10px" @click="changePw">{{ $t('settings.change') }}</button>
-      </div>
-
-      <div class="card">
-        <h2>{{ $t('settings.two_factor') }}</h2>
-        <template v-if="!me.totp_enabled">
-          <button class="btn" @click="mfaStart">{{ $t('settings.setup_totp') }}</button>
-          <div v-if="mfaSecret">
-            <div class="alert warn">{{ $t('settings.totp_secret_desc') }}</div>
-            <div class="mono" style="padding: 8px; background: #f8fafc; border-radius: 8px; word-break: break-all">
-              {{ mfaSecret }}
+      <div class="settings-grid">
+        <!-- Sol Sütun: Güvenlik & Hesap -->
+        <div class="settings-col">
+          <!-- Şifre Değiştir -->
+          <div class="card">
+            <h2>🔑 {{ $t('settings.change_password') }}</h2>
+            <div v-if="auth.user?.must_change_password" class="alert warn">
+              ⚠️ {{ $t('settings.must_change_pw') }}
             </div>
-            <div class="muted" style="margin: 8px 0">otpauth URL: <span class="mono">{{ mfaUrl }}</span></div>
-            <label>{{ $t('settings.verify_code') }}</label>
-            <input v-model="mfaCode" inputmode="numeric" maxlength="6" />
-            <button class="btn primary" style="margin-top: 10px" @click="mfaEnable">{{ $t('settings.verify_enable') }}</button>
-          </div>
-        </template>
-        <template v-else>
-          <span class="badge ok">{{ $t('settings.totp_enabled') }}</span>
-          <button class="btn danger" style="margin-left: 10px" @click="mfaDisable">{{ $t('settings.turn_off') }}</button>
-        </template>
-      </div>
-
-      <div class="card">
-        <h2>{{ $t('settings.security') }}</h2>
-        <div class="row">
-          <div style="flex: 1">
-            <label>{{ $t('settings.provider') }}</label>
-            <select v-model="captchaProvider">
-              <option value="">{{ $t('settings.provider_disabled') }}</option>
-              <option value="turnstile">Cloudflare Turnstile</option>
-              <option value="recaptcha">Google reCAPTCHA (v2/v3)</option>
-            </select>
-          </div>
-        </div>
-        <template v-if="captchaProvider">
-          <div class="row" style="margin-top: 10px;">
-            <div style="flex: 1">
-              <label>{{ $t('settings.site_key') }}</label>
-              <input v-model="captchaSiteKey" placeholder="e.g. 0x4AAAA..." />
+            <div style="margin-top: 10px">
+              <label>{{ $t('settings.current_pw') }}</label>
+              <input v-model="oldPw" type="password" />
             </div>
-            <div style="flex: 1">
-              <label>{{ $t('settings.secret_key') }}</label>
-              <input v-model="captchaSecret" type="password" :placeholder="$t('settings.secret_placeholder')" />
+            <div style="margin-top: 10px">
+              <label>{{ $t('settings.new_pw') }}</label>
+              <input v-model="newPw" type="password" />
             </div>
-          </div>
-        </template>
-        <button class="btn primary" style="margin-top: 14px" @click="saveCaptchaSettings">{{ $t('settings.save_settings') }}</button>
-      </div>
-
-      <div class="card">
-        <h2>{{ $t('settings.s3_title') }}</h2>
-        <p class="muted text-sm" style="margin-bottom: 12px">{{ $t('settings.s3_subtitle') }}</p>
-        
-        <div class="row" style="align-items: center; margin-bottom: 12px">
-          <label style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer">
-            <input type="checkbox" v-model="s3Form.enabled" style="width: auto" />
-            <strong>{{ $t('settings.s3_enabled_label') }}</strong>
-          </label>
-        </div>
-
-        <template v-if="s3Form.enabled">
-          <div class="row">
-            <div style="flex: 2">
-              <label>{{ $t('settings.s3_endpoint') }}</label>
-              <input v-model="s3Form.endpoint" placeholder="https://<account_id>.r2.cloudflarestorage.com" />
-              <small class="muted">Cloudflare R2, AWS S3, Wasabi, MinIO endpoint</small>
-            </div>
-            <div style="flex: 1">
-              <label>{{ $t('settings.s3_bucket') }}</label>
-              <input v-model="s3Form.bucket" placeholder="my-backups" />
-            </div>
-            <div style="flex: 1">
-              <label>{{ $t('settings.s3_region') }}</label>
-              <input v-model="s3Form.region" placeholder="auto (R2) veya eu-central-1" />
-            </div>
+            <button class="btn primary" style="margin-top: 14px" @click="changePw">{{ $t('settings.change') }}</button>
           </div>
 
-          <div class="row" style="margin-top: 10px">
-            <div style="flex: 1">
-              <label>{{ $t('settings.s3_access_key') }}</label>
-              <input v-model="s3Form.access_key" placeholder="Access Key ID" />
+          <!-- TOTP 2FA -->
+          <div class="card">
+            <h2>🛡️ {{ $t('settings.two_factor') }}</h2>
+            <template v-if="!me.totp_enabled">
+              <p class="muted text-sm" style="margin-bottom: 12px">Google Authenticator veya Aegis ile hesabınızı çift aşamalı doğrulayın.</p>
+              <button class="btn" @click="mfaStart">{{ $t('settings.setup_totp') }}</button>
+              <div v-if="mfaSecret" style="margin-top: 12px">
+                <div class="alert warn">{{ $t('settings.totp_secret_desc') }}</div>
+                <div class="mono" style="padding: 8px; background: rgba(0,0,0,0.04); border-radius: 8px; word-break: break-all">
+                  {{ mfaSecret }}
+                </div>
+                <div class="muted text-sm" style="margin: 8px 0">otpauth URL: <span class="mono">{{ mfaUrl }}</span></div>
+                <label>{{ $t('settings.verify_code') }}</label>
+                <input v-model="mfaCode" inputmode="numeric" maxlength="6" />
+                <button class="btn primary" style="margin-top: 10px" @click="mfaEnable">{{ $t('settings.verify_enable') }}</button>
+              </div>
+            </template>
+            <template v-else>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px">
+                <span class="badge ok">✓ {{ $t('settings.totp_enabled') }}</span>
+                <button class="btn danger btn-sm" @click="mfaDisable">{{ $t('settings.turn_off') }}</button>
+              </div>
+            </template>
+          </div>
+
+          <!-- Bot Koruması -->
+          <div class="card">
+            <h2>🤖 {{ $t('settings.security') }}</h2>
+            <div>
+              <label>{{ $t('settings.provider') }}</label>
+              <select v-model="captchaProvider">
+                <option value="">{{ $t('settings.provider_disabled') }}</option>
+                <option value="turnstile">Cloudflare Turnstile</option>
+                <option value="recaptcha">Google reCAPTCHA (v2/v3)</option>
+              </select>
             </div>
-            <div style="flex: 1">
-              <label>{{ $t('settings.s3_secret_key') }}</label>
-              <input v-model="s3Form.secret_key" type="password" :placeholder="s3Form.has_secret ? '•••••••• (Mevcut şifre kayıtlı)' : 'Secret Access Key'" />
+            <template v-if="captchaProvider">
+              <div style="margin-top: 10px">
+                <label>{{ $t('settings.site_key') }}</label>
+                <input v-model="captchaSiteKey" placeholder="e.g. 0x4AAAA..." />
+              </div>
+              <div style="margin-top: 10px">
+                <label>{{ $t('settings.secret_key') }}</label>
+                <input v-model="captchaSecret" type="password" :placeholder="$t('settings.secret_placeholder')" />
+              </div>
+            </template>
+            <button class="btn primary" style="margin-top: 14px" @click="saveCaptchaSettings">{{ $t('settings.save_settings') }}</button>
+          </div>
+        </div>
+
+        <!-- Sağ Sütun: Uzak Depolama & API -->
+        <div class="settings-col">
+          <!-- S3 / Cloudflare R2 -->
+          <div class="card">
+            <h2>☁️ {{ $t('settings.s3_title') }}</h2>
+            <p class="muted text-sm" style="margin-bottom: 12px">{{ $t('settings.s3_subtitle') }}</p>
+            
+            <div style="margin-bottom: 12px">
+              <label style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer">
+                <input type="checkbox" v-model="s3Form.enabled" style="width: auto" />
+                <strong>{{ $t('settings.s3_enabled_label') }}</strong>
+              </label>
+            </div>
+
+            <template v-if="s3Form.enabled">
+              <div style="margin-top: 10px">
+                <label>{{ $t('settings.s3_endpoint') }}</label>
+                <input v-model="s3Form.endpoint" placeholder="https://<account_id>.r2.cloudflarestorage.com" />
+                <small class="muted" style="display: block; margin-top: 2px">Cloudflare R2, AWS S3, Wasabi, MinIO</small>
+              </div>
+
+              <div class="row" style="margin-top: 10px">
+                <div style="flex: 1">
+                  <label>{{ $t('settings.s3_bucket') }}</label>
+                  <input v-model="s3Form.bucket" placeholder="my-backups" />
+                </div>
+                <div style="flex: 1">
+                  <label>{{ $t('settings.s3_region') }}</label>
+                  <input v-model="s3Form.region" placeholder="auto (R2) veya eu-central-1" />
+                </div>
+              </div>
+
+              <div style="margin-top: 10px">
+                <label>{{ $t('settings.s3_access_key') }}</label>
+                <input v-model="s3Form.access_key" placeholder="Access Key ID" />
+              </div>
+
+              <div style="margin-top: 10px">
+                <label>{{ $t('settings.s3_secret_key') }}</label>
+                <input v-model="s3Form.secret_key" type="password" :placeholder="s3Form.has_secret ? '•••••••• (Mevcut şifre kayıtlı)' : 'Secret Access Key'" />
+              </div>
+            </template>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px">
+              <button class="btn primary" @click="saveS3Settings">{{ $t('settings.save_settings') }}</button>
+              <button v-if="s3Form.enabled" class="btn" @click="testS3Connection" :disabled="testingS3">
+                {{ testingS3 ? 'Test ediliyor...' : '🔌 ' + $t('settings.s3_test_btn') }}
+              </button>
             </div>
           </div>
-        </template>
 
-        <div style="display: flex; gap: 10px; margin-top: 14px">
-          <button class="btn primary" @click="saveS3Settings">{{ $t('settings.save_settings') }}</button>
-          <button v-if="s3Form.enabled" class="btn" @click="testS3Connection" :disabled="testingS3">
-            {{ testingS3 ? 'Test ediliyor...' : '🔌 ' + $t('settings.s3_test_btn') }}
-          </button>
+          <!-- Personal Access Tokens (PAT) -->
+          <div class="card">
+            <h2>🔑 {{ $t('settings.pat') }}</h2>
+            <div class="row">
+              <input v-model="patName" :placeholder="$t('settings.token_name')" style="flex: 1" />
+              <button class="btn primary" @click="patCreate">{{ $t('settings.create') }}</button>
+            </div>
+            <div v-if="newToken" class="alert warn mono" style="margin-top: 10px">
+              {{ $t('settings.new_token_warning') }} {{ newToken }}
+            </div>
+            <table style="margin-top: 12px">
+              <thead><tr><th>{{ $t('settings.name') }}</th><th>{{ $t('settings.created_at') }}</th><th>{{ $t('settings.last_used') }}</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="p in pats" :key="p.id">
+                  <td><strong>{{ p.name }}</strong></td>
+                  <td class="muted">{{ p.created_at }}</td>
+                  <td class="muted">{{ p.last_used_at || '—' }}</td>
+                  <td style="text-align: right"><button class="btn danger btn-sm" @click="patDelete(p.id)">{{ $t('common.delete') }}</button></td>
+                </tr>
+                <tr v-if="!pats.length"><td colspan="4" class="muted">{{ $t('settings.no_pats') || 'Henüz token yok.' }}</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>{{ $t('settings.pat') }}</h2>
-        <div class="row">
-          <input v-model="patName" :placeholder="$t('settings.token_name')" style="flex: 1" />
-          <button class="btn primary" @click="patCreate">{{ $t('settings.create') }}</button>
-        </div>
-        <div v-if="newToken" class="alert warn mono">
-          {{ $t('settings.new_token_warning') }} {{ newToken }}
-        </div>
-        <table style="margin-top: 12px">
-          <thead><tr><th>{{ $t('settings.name') }}</th><th>{{ $t('settings.created_at') }}</th><th>{{ $t('settings.last_used') }}</th><th></th></tr></thead>
-          <tbody>
-            <tr v-for="p in pats" :key="p.id">
-              <td>{{ p.name }}</td>
-              <td class="muted">{{ p.created_at }}</td>
-              <td class="muted">{{ p.last_used_at || '—' }}</td>
-              <td><button class="btn danger" @click="patDelete(p.id)">{{ $t('common.delete') }}</button></td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   </Layout>
@@ -345,3 +365,28 @@ onMounted(async () => {
   await loadPats()
 })
 </script>
+
+<style scoped>
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-col .card {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1024px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
