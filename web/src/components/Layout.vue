@@ -24,14 +24,13 @@
         <button class="toggle-btn" @click="toggleSidebar" :title="$t('menu.toggle')">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" /></svg>
         </button>
-        <div class="muted mono" style="margin-left: 12px;">aurapanel</div>
         <div class="spacer"></div>
         <select v-model="locale" @change="changeLang" class="lang-select">
           <option value="tr">🇹🇷 TR</option>
           <option value="en">🇬🇧 EN</option>
         </select>
-        <span v-if="auth.user" class="muted">{{ auth.user.username }}</span>
-        <button class="btn" @click="logout">{{ $t('common.logout') }}</button>
+        <span v-if="auth.user" class="muted user-pill">{{ auth.user.username }}</span>
+        <button class="btn btn-sm" @click="logout">{{ $t('common.logout') }}</button>
       </header>
       <slot />
     </main>
@@ -151,7 +150,7 @@ async function logout() {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 10px 20px;
   background: #fff;
   border-bottom: 1px solid var(--border);
@@ -159,6 +158,20 @@ async function logout() {
   top: 0;
   z-index: 10;
 }
+.spacer { flex: 1; }
+.lang-select {
+  width: auto !important;
+  min-width: 90px;
+  max-width: 96px;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: #fff;
+  border: 1px solid var(--border);
+}
+.user-pill { font-size: 13px; font-weight: 500; }
 .toggle-btn {
   background: none; border: none; cursor: pointer; color: #64748b; padding: 4px;
   display: flex; align-items: center; justify-content: center; border-radius: 6px;
