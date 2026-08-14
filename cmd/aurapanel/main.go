@@ -41,6 +41,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/store"
 	"github.com/mkoyazilim/aurapanel/internal/update"
 	"github.com/mkoyazilim/aurapanel/internal/webui"
+	"github.com/mkoyazilim/aurapanel/internal/wordpress"
 )
 
 var (
@@ -194,6 +195,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// S3 / Cloudflare R2 uzak depolama aktifse bağla
+	s3Enabled, _, _ := st.GetSetting(ctx, "s3_enabled")
+	if s3Enabled == "1" {
+		endpoint, _, _ := st.GetSetting(ctx, "s3_endpoint")
+		bucket, _, _ := st.GetSetting(ctx, "s3_bucket")
+		region, _, _ := st.GetSetting(ctx, "s3_region")
+		accessKey, _, _ := st.GetSetting(ctx, "s3_access_key")
+		secretKey, _, _ := st.GetSetting(ctx, "s3_secret_key")
+		if endpoint != "" && bucket != "" && accessKey != "" {
+			bkSvc.SetS3Storage(backup.NewS3Storage(backup.S3Config{
+				Endpoint:  endpoint,
+				Bucket:    bucket,
+				Region:    region,
+				AccessKey: accessKey,
+				SecretKey: secretKey,
+			}))
+			log.Info("s3 uzak depolama aktif", "endpoint", endpoint, "bucket", bucket)
+		}
+	}
+
 	dc := drift.NewPrivCollector(privC, sitesRoot, certsRoot)
 	repairer := drift.NewRepairer(st, dc, sitesRoot, certsRoot)
 	scanner := drift.NewScanner(st, dc, sitesRoot, certsRoot, au, repairer)
@@ -206,6 +227,9 @@ func main() {
 
 	// Sağlık kontrolcüsü
 	healthChecker := health.NewChecker(st, mysqlDB, "http://127.0.0.1:7080")
+
+	// WordPress 1-Click Installer
+	wpSvc := wordpress.NewService(st, dbSvc, privC, sitesRoot, au)
 
 	// Metrik toplayıcı (arka planda periyodik)
 	metricsCollector := metrics.NewCollector(st, "/sys/fs/cgroup", sitesRoot, 60*time.Second)
@@ -228,6 +252,7 @@ func main() {
 		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc, SFTP: sftpSvc,
 		DriftScan: scanner, DriftFix: repairer, Updates: upd,
 		Cron: cronSvc, Security: securitySvc, Health: healthChecker,
+		Wordpress: wpSvc,
 	})
 
 	httpSrv := &http.Server{

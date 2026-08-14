@@ -21,6 +21,13 @@
               <option value="db">{{ $t('backups.kind_db') }}</option>
             </select>
           </div>
+          <div style="flex: 1">
+            <label>{{ $t('backups.destination') }}</label>
+            <select v-model="storage">
+              <option value="local">📁 {{ $t('backups.local_storage') }}</option>
+              <option value="s3">☁️ S3 / Cloudflare R2</option>
+            </select>
+          </div>
           <button class="btn primary" style="margin-top: 18px" :disabled="busy" @click="run">
             {{ busy ? $t('backups.taking') : '💾 ' + $t('backups.take_backup') }}
           </button>
@@ -30,15 +37,20 @@
       <div class="card">
         <h2>{{ $t('backups.history') }}</h2>
         <table>
-          <thead><tr><th>{{ $t('backups.name') }}</th><th>{{ $t('backups.kind') }}</th><th>{{ $t('backups.status') }}</th><th>{{ $t('backups.date') }}</th></tr></thead>
+          <thead><tr><th>{{ $t('backups.name') }}</th><th>{{ $t('backups.kind') }}</th><th>{{ $t('backups.storage_col') }}</th><th>{{ $t('backups.status') }}</th><th>{{ $t('backups.date') }}</th></tr></thead>
           <tbody>
             <tr v-for="b in backups" :key="b.id">
               <td class="mono">{{ b.location }}</td>
               <td>{{ b.kind }}</td>
+              <td>
+                <span class="badge" :class="b.storage === 's3' ? 'badge-primary' : 'badge-secondary'">
+                  {{ b.storage === 's3' ? '☁️ S3/R2' : '📁 Local' }}
+                </span>
+              </td>
               <td><span class="badge" :class="b.status === 'success' ? 'ok' : 'err'">{{ b.status }}</span></td>
               <td class="muted">{{ b.created_at }}</td>
             </tr>
-            <tr v-if="!backups.length"><td colspan="4" class="muted">{{ $t('backups.empty') }}</td></tr>
+            <tr v-if="!backups.length"><td colspan="5" class="muted">{{ $t('backups.empty') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -57,6 +69,7 @@ const { t } = useI18n()
 const sites = ref([])
 const siteId = ref('')
 const kind = ref('files')
+const storage = ref('local')
 const backups = ref([])
 const error = ref('')
 const notice = ref('')
@@ -79,7 +92,7 @@ async function run() {
   try {
     const out = await api(`/sites/${siteId.value}/backups/run`, {
       method: 'POST',
-      body: { kind: kind.value },
+      body: { kind: kind.value, storage: storage.value },
     })
     notice.value = t('backups.success', { name: out.name })
     await load()

@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/mkoyazilim/aurapanel/internal/backup"
 	"github.com/mkoyazilim/aurapanel/internal/cron"
 	"github.com/mkoyazilim/aurapanel/internal/logger"
 	"github.com/mkoyazilim/aurapanel/internal/security"
+	"github.com/mkoyazilim/aurapanel/internal/wordpress"
 )
 
 // Deps'e yeni servisler eklendi — server.go'daki Deps struct'ı güncellenmeli.
@@ -205,3 +207,128 @@ func (s *Server) handleLogsTail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// --- S3 & Cloudflare R2 Remote Storage ---
+
+func (s *Server) handleS3SettingsGet(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	endpoint, _, _ := s.deps.Store.GetSetting(r.Context(), "s3_endpoint")
+	bucket, _, _ := s.deps.Store.GetSetting(r.Context(), "s3_bucket")
+	region, _, _ := s.deps.Store.GetSetting(r.Context(), "s3_region")
+	accessKey, _, _ := s.deps.Store.GetSetting(r.Context(), "s3_access_key")
+	secretKey, _, _ := s.deps.Store.GetSetting(r.Context(), "s3_secret_key")
+	enabled, _, _ := s.deps.Store.GetSetting(r.Context(), "s3_enabled")
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"endpoint":   endpoint,
+		"bucket":     bucket,
+		"region":     region,
+		"access_key": accessKey,
+		"enabled":    enabled == "1",
+		"has_secret": secretKey != "",
+	})
+}
+
+func (s *Server) handleS3SettingsSave(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	var req struct {
+		Endpoint  string `json:"endpoint"`
+		Bucket    string `json:"bucket"`
+		Region    string `json:"region"`
+		AccessKey string `json:"access_key"`
+		SecretKey string `json:"secret_key"`
+		Enabled   bool   `json:"enabled"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	_ = s.deps.Store.SetSetting(r.Context(), "s3_endpoint", req.Endpoint)
+	_ = s.deps.Store.SetSetting(r.Context(), "s3_bucket", req.Bucket)
+	_ = s.deps.Store.SetSetting(r.Context(), "s3_region", req.Region)
+	_ = s.deps.Store.SetSetting(r.Context(), "s3_access_key", req.AccessKey)
+	if req.SecretKey != "" {
+		_ = s.deps.Store.SetSetting(r.Context(), "s3_secret_key", req.SecretKey)
+	}
+	en := "0"
+	if req.Enabled {
+		en = "1"
+	}
+	_ = s.deps.Store.SetSetting(r.Context(), "s3_enabled", en)
+
+	// S3 motorunu canlı güncelle
+	if req.Enabled && req.Endpoint != "" && req.Bucket != "" && req.AccessKey != "" {
+		sec := req.SecretKey
+		if sec == "" {
+			sec, _, _ = s.deps.Store.GetSetting(r.Context(), "s3_secret_key")
+		}
+		s3Storage := backup.NewS3Storage(backup.S3Config{
+			Endpoint:  req.Endpoint,
+			Bucket:    req.Bucket,
+			Region:    req.Region,
+			AccessKey: req.AccessKey,
+			SecretKey: sec,
+		})
+		s.deps.Backups.SetS3Storage(s3Storage)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleS3Test(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	var req struct {
+		Endpoint  string `json:"endpoint"`
+		Bucket    string `json:"bucket"`
+		Region    string `json:"region"`
+		AccessKey string `json:"access_key"`
+		SecretKey string `json:"secret_key"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.SecretKey == "" {
+		req.SecretKey, _, _ = s.deps.Store.GetSetting(r.Context(), "s3_secret_key")
+	}
+
+	s3Storage := backup.NewS3Storage(backup.S3Config{
+		Endpoint:  req.Endpoint,
+		Bucket:    req.Bucket,
+		Region:    req.Region,
+		AccessKey: req.AccessKey,
+		SecretKey: req.SecretKey,
+	})
+
+	if err := s3Storage.TestConnection(r.Context()); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// --- WordPress 1-Click Installer ---
+
+func (s *Server) handleWordpressInstall(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	siteID := r.PathValue("id")
+	var req wordpress.InstallRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	res, err := s.deps.Wordpress.Install(r.Context(), siteID, req)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+

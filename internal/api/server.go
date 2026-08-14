@@ -29,6 +29,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 	"github.com/mkoyazilim/aurapanel/internal/update"
+	"github.com/mkoyazilim/aurapanel/internal/wordpress"
 )
 
 // SiteManager, site yaşam döngüsü arayüzü (site.Manager bunu sağlar).
@@ -67,6 +68,7 @@ type Deps struct {
 	Cron      *cron.Service
 	Security  *security.Service
 	Health    *health.Checker
+	Wordpress *wordpress.Service
 }
 
 // Server, HTTP sunucusu.
@@ -205,6 +207,14 @@ func (s *Server) routes() {
 
 	// Canlı log (SSE).
 	m.HandleFunc("GET /api/v1/sites/{id}/logs/tail", s.handleLogsTail)
+
+	// S3 & Cloudflare R2 Remote Storage.
+	m.HandleFunc("GET /api/v1/settings/s3", s.handleS3SettingsGet)
+	m.HandleFunc("POST /api/v1/settings/s3", s.handleS3SettingsSave)
+	m.HandleFunc("POST /api/v1/backups/s3/test", s.handleS3Test)
+
+	// WordPress 1-Click Installer.
+	m.HandleFunc("POST /api/v1/sites/{id}/wordpress/install", s.handleWordpressInstall)
 }
 
 // --- JSON yardımcıları ---

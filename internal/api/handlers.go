@@ -952,12 +952,16 @@ func (s *Server) handleBackupRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Kind string `json:"kind"`
+		Kind    string `json:"kind"`
+		Storage string `json:"storage"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	name, err := s.deps.Backups.Run(r.Context(), r.PathValue("id"), req.Kind)
+	if req.Storage == "" {
+		req.Storage = "local"
+	}
+	name, err := s.deps.Backups.RunWithStorage(r.Context(), r.PathValue("id"), req.Kind, req.Storage)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return

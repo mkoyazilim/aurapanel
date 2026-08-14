@@ -3,6 +3,7 @@
     <div class="page">
       <h1>{{ $t('menu.sites') }}</h1>
       <div v-if="error" class="alert error">{{ error }}</div>
+      <div v-if="notice" class="alert ok">{{ notice }}</div>
 
       <div class="card">
         <h2>{{ $t('sites.new_site') }}</h2>
@@ -24,18 +25,85 @@
       <div class="card">
         <h2>{{ $t('sites.existing_sites') }}</h2>
         <table>
-          <thead><tr><th>ID</th><th>{{ $t('sites.domain') }}</th><th>{{ $t('sites.linux_user') }}</th><th>{{ $t('sites.status') }}</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{{ $t('sites.domain') }}</th>
+              <th>{{ $t('sites.linux_user') }}</th>
+              <th>{{ $t('sites.status') }}</th>
+              <th style="text-align: right">{{ $t('common.actions') }}</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="s in sites" :key="s.id">
               <td class="mono">{{ s.id }}</td>
-              <td>{{ s.name }}</td>
+              <td><strong>{{ s.name }}</strong></td>
               <td class="mono">{{ s.linux_user }}</td>
               <td><span class="badge" :class="s.status === 'active' ? 'ok' : 'warn'">{{ s.status }}</span></td>
-              <td><button class="btn danger" @click="remove(s.id)">{{ $t('common.delete') }}</button></td>
+              <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end">
+                <button class="btn btn-sm" @click="openWpModal(s)" title="WordPress Kur">
+                  ⚡ {{ $t('sites.install_wp') }}
+                </button>
+                <button class="btn btn-sm danger" @click="remove(s.id)" title="Siteyi Sil">
+                  🗑️ {{ $t('common.delete') }}
+                </button>
+              </td>
             </tr>
             <tr v-if="!sites.length"><td colspan="5" class="muted">{{ $t('sites.no_sites') }}</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- WordPress Installer Modal -->
+      <div v-if="wpModal.open" class="modal-backdrop">
+        <div class="modal-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px">
+            <h2 style="margin: 0">⚡ {{ $t('wp.modal_title') }} ({{ wpModal.site?.name }})</h2>
+            <button class="btn btn-sm" @click="wpModal.open = false">✕</button>
+          </div>
+
+          <div v-if="wpModal.result" class="alert ok">
+            <h4>🎉 {{ $t('wp.install_success') }}</h4>
+            <p style="margin: 6px 0 0 0">{{ $t('wp.install_success_desc') }}</p>
+            <div class="mono" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-top: 8px">
+              <div><strong>DB Adı:</strong> {{ wpModal.result.db_name }}</div>
+              <div><strong>DB Kullanıcısı:</strong> {{ wpModal.result.db_user }}</div>
+            </div>
+            <div style="margin-top: 10px">
+              <a :href="'http://' + wpModal.site.name" target="_blank" class="btn primary btn-sm">
+                🌐 {{ $t('wp.open_site') }}
+              </a>
+            </div>
+          </div>
+
+          <template v-else>
+            <p class="muted text-sm">{{ $t('wp.modal_desc') }}</p>
+
+            <div style="margin: 14px 0">
+              <label>{{ $t('wp.language') }}</label>
+              <select v-model="wpModal.language">
+                <option value="tr">🇹🇷 Türkçe (tr.wordpress.org)</option>
+                <option value="en">🇺🇸 English (wordpress.org)</option>
+              </select>
+            </div>
+
+            <div style="margin: 14px 0">
+              <label>{{ $t('wp.table_prefix') }}</label>
+              <input v-model="wpModal.tablePrefix" placeholder="wp_" />
+            </div>
+
+            <div class="alert warn text-sm">
+              ℹ️ {{ $t('wp.modal_note') }}
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px">
+              <button class="btn" @click="wpModal.open = false" :disabled="wpModal.busy">{{ $t('common.cancel') }}</button>
+              <button class="btn primary" @click="installWordpress" :disabled="wpModal.busy">
+                {{ wpModal.busy ? $t('wp.installing') : '⚡ ' + $t('wp.start_install') }}
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
   </Layout>
@@ -51,8 +119,53 @@ const { t } = useI18n()
 
 const sites = ref([])
 const error = ref('')
+const notice = ref('')
 const busy = ref(false)
 const newSite = reactive({ domain: '', php: '8.3' })
+
+const wpModal = reactive({
+  open: false,
+  site: null,
+  language: 'tr',
+  tablePrefix: 'wp_',
+  busy: false,
+  result: null
+})
+
+function openWpModal(site) {
+  wpModal.site = site
+  wpModal.language = 'tr'
+  wpModal.tablePrefix = 'wp_'
+  wpModal.busy = false
+  wpModal.result = null
+  wpModal.open = true
+}
+
+async function installWordpress() {
+  if (!wpModal.site) return
+  wpModal.busy = true
+  error.value = ''
+  try {
+    const res = await fetch(`/api/v1/sites/${wpModal.site.id}/wordpress/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: wpModal.language,
+        table_prefix: wpModal.tablePrefix
+      })
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || 'WordPress kurulumu başarısız')
+    }
+    wpModal.result = await res.json()
+    notice.value = t('wp.installed_notice', { domain: wpModal.site.name })
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    wpModal.busy = false
+  }
+}
 
 async function load() {
   try {
@@ -65,6 +178,7 @@ async function load() {
 async function create() {
   busy.value = true
   error.value = ''
+  notice.value = ''
   try {
     await api('/sites', {
       method: 'POST',
@@ -81,6 +195,8 @@ async function create() {
 
 async function remove(id) {
   if (!confirm(t('sites.delete_confirm', { id }))) return
+  error.value = ''
+  notice.value = ''
   try {
     await api(`/sites/${id}`, { method: 'DELETE' })
     await load()
@@ -91,3 +207,26 @@ async function remove(id) {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+</style>

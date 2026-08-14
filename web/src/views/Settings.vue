@@ -66,6 +66,54 @@
       </div>
 
       <div class="card">
+        <h2>{{ $t('settings.s3_title') }}</h2>
+        <p class="muted text-sm" style="margin-bottom: 12px">{{ $t('settings.s3_subtitle') }}</p>
+        
+        <div class="row" style="align-items: center; margin-bottom: 12px">
+          <label style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer">
+            <input type="checkbox" v-model="s3Form.enabled" style="width: auto" />
+            <strong>{{ $t('settings.s3_enabled_label') }}</strong>
+          </label>
+        </div>
+
+        <template v-if="s3Form.enabled">
+          <div class="row">
+            <div style="flex: 2">
+              <label>{{ $t('settings.s3_endpoint') }}</label>
+              <input v-model="s3Form.endpoint" placeholder="https://<account_id>.r2.cloudflarestorage.com" />
+              <small class="muted">Cloudflare R2, AWS S3, Wasabi, MinIO endpoint</small>
+            </div>
+            <div style="flex: 1">
+              <label>{{ $t('settings.s3_bucket') }}</label>
+              <input v-model="s3Form.bucket" placeholder="my-backups" />
+            </div>
+            <div style="flex: 1">
+              <label>{{ $t('settings.s3_region') }}</label>
+              <input v-model="s3Form.region" placeholder="auto (R2) veya eu-central-1" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top: 10px">
+            <div style="flex: 1">
+              <label>{{ $t('settings.s3_access_key') }}</label>
+              <input v-model="s3Form.access_key" placeholder="Access Key ID" />
+            </div>
+            <div style="flex: 1">
+              <label>{{ $t('settings.s3_secret_key') }}</label>
+              <input v-model="s3Form.secret_key" type="password" :placeholder="s3Form.has_secret ? '•••••••• (Mevcut şifre kayıtlı)' : 'Secret Access Key'" />
+            </div>
+          </div>
+        </template>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px">
+          <button class="btn primary" @click="saveS3Settings">{{ $t('settings.save_settings') }}</button>
+          <button v-if="s3Form.enabled" class="btn" @click="testS3Connection" :disabled="testingS3">
+            {{ testingS3 ? 'Test ediliyor...' : '🔌 ' + $t('settings.s3_test_btn') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>{{ $t('settings.pat') }}</h2>
         <div class="row">
           <input v-model="patName" :placeholder="$t('settings.token_name')" style="flex: 1" />
@@ -185,6 +233,81 @@ async function saveCaptchaSettings() {
   }
 }
 
+const s3Form = ref({
+  endpoint: '',
+  bucket: '',
+  region: 'auto',
+  access_key: '',
+  secret_key: '',
+  enabled: false,
+  has_secret: false
+})
+const testingS3 = ref(false)
+
+async function loadS3Settings() {
+  try {
+    const res = await fetch('/api/v1/settings/s3')
+    if (res.ok) {
+      const data = await res.json()
+      s3Form.value = {
+        endpoint: data.endpoint || '',
+        bucket: data.bucket || '',
+        region: data.region || 'auto',
+        access_key: data.access_key || '',
+        secret_key: '',
+        enabled: !!data.enabled,
+        has_secret: !!data.has_secret
+      }
+    }
+  } catch (err) {
+    console.error('S3 ayarları okunamadı:', err)
+  }
+}
+
+async function saveS3Settings() {
+  error.value = ''
+  notice.value = ''
+  try {
+    const res = await fetch('/api/v1/settings/s3', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(s3Form.value)
+    })
+    if (res.ok) {
+      notice.value = t('settings.s3_saved_success')
+      await loadS3Settings()
+    } else {
+      const data = await res.json()
+      error.value = data.error || t('settings.s3_save_failed')
+    }
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
+async function testS3Connection() {
+  error.value = ''
+  notice.value = ''
+  testingS3.value = true
+  try {
+    const res = await fetch('/api/v1/backups/s3/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(s3Form.value)
+    })
+    if (res.ok) {
+      notice.value = t('settings.s3_test_success')
+    } else {
+      const data = await res.json()
+      error.value = t('settings.s3_test_failed') + ': ' + (data.error || 'Bağlantı kurulamadı')
+    }
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    testingS3.value = false
+  }
+}
+
 async function patCreate() {
   try {
     const out = await api('/auth/pat', { method: 'POST', body: { name: patName.value } })
@@ -218,6 +341,7 @@ onMounted(async () => {
   } catch (e) {
     console.error('Ayarlar okunamadı', e)
   }
+  await loadS3Settings()
   await loadPats()
 })
 </script>

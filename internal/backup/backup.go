@@ -82,8 +82,9 @@ type FilesSource interface {
 // Service, yedek yaşam döngüsü: encrypt-then-upload, retention, restore.
 type Service struct {
 	store     *store.Store
-	storage   Storage
-	key       []byte // 32 bayt backup encryption key (yedek dosyasının YANINDA ASLA)
+	storage   Storage // Varsayılan yerel depo
+	s3Storage Storage // S3 / Cloudflare R2 uzak depo
+	key       []byte  // 32 bayt backup encryption key (yedek dosyasının YANINDA ASLA)
 	files     FilesSource
 	dumps     DumpEngine
 	audit     *audit.Service
@@ -101,9 +102,19 @@ func NewService(st *store.Store, storage Storage, key []byte, files FilesSource,
 	return &Service{store: st, storage: storage, key: key, files: files, dumps: dumps, audit: au, retention: retention}, nil
 }
 
-// Run, site yedeği alır (kind: full | files | db). Akış:
+// SetS3Storage, S3 / R2 uzak depolama motorunu tanımlar veya günceller.
+func (s *Service) SetS3Storage(s3 Storage) {
+	s.s3Storage = s3
+}
+
+// Run, site yedeği alır (kind: full | files | db, storageType: local | s3). Akış:
 // yedek → şifrele → depola → DB kaydı → retention budaması.
 func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) {
+	return s.RunWithStorage(ctx, siteID, kind, "local")
+}
+
+// RunWithStorage, belirtilen depoya site yedeği alır.
+func (s *Service) RunWithStorage(ctx context.Context, siteID, kind, storageType string) (string, error) {
 	st, err := s.store.GetSite(ctx, siteID)
 	if err != nil {
 		return "", err
@@ -115,7 +126,17 @@ func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) 
 		return "", fmt.Errorf("geçersiz yedek türü: %q", kind)
 	}
 	if (kind == "full" || kind == "db") && s.dumps == nil {
-		return "", fmt.Errorf("db döküm motoru bağlı değil (sunucu fazında bağlanacak)")
+		return "", fmt.Errorf("db döküm motoru bağlı değil")
+	}
+
+	targetStorage := s.storage
+	if storageType == "s3" {
+		if s.s3Storage == nil {
+			return "", fmt.Errorf("S3 / R2 uzak depolama yapılandırılmamış")
+		}
+		targetStorage = s.s3Storage
+	} else {
+		storageType = "local"
 	}
 
 	// Nanosaniye hassasiyeti: aynı saniyedeki ardışık yedekler çakışmaz.
@@ -123,7 +144,7 @@ func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) 
 
 	// Kayıt: pending.
 	recID, err := s.store.InsertBackup(ctx, store.Backup{
-		SiteID: siteID, Kind: kind, Storage: "local", Location: name,
+		SiteID: siteID, Kind: kind, Storage: storageType, Location: name,
 		Encrypted: 1, Status: "running",
 	})
 	if err != nil {
@@ -131,10 +152,10 @@ func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) 
 	}
 
 	// Encrypt-then-upload: geçici dosyaya yaz → şifreli akıta → depola.
-	if err := s.runPipeline(ctx, st, kind, name); err != nil {
+	if err := s.runPipelineWithStorage(ctx, st, kind, name, targetStorage); err != nil {
 		s.store.MarkBackupFailed(ctx, recID)
 		s.audit.Write(ctx, audit.Event{Action: "backup.run", Target: siteID, Result: "failed",
-			Extra: map[string]any{"kind": kind, "error": err.Error()}})
+			Extra: map[string]any{"kind": kind, "storage": storageType, "error": err.Error()}})
 		return "", err
 	}
 
@@ -142,15 +163,15 @@ func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) 
 		return "", err
 	}
 	s.audit.Write(ctx, audit.Event{Action: "backup.run", Target: siteID, Result: "success",
-		Extra: map[string]any{"kind": kind, "name": name}})
+		Extra: map[string]any{"kind": kind, "storage": storageType, "name": name}})
 
 	// Retention: en eski fazlalıkları buda.
 	s.prune(ctx, siteID)
 	return name, nil
 }
 
-// runPipeline, yedek içeriğini şifreli akıtır.
-func (s *Service) runPipeline(ctx context.Context, st *store.Site, kind, name string) error {
+// runPipelineWithStorage, yedek içeriğini şifreli akıtır ve hedef depoya kaydeder.
+func (s *Service) runPipelineWithStorage(ctx context.Context, st *store.Site, kind, name string, storage Storage) error {
 	tmp, err := os.CreateTemp("", "apbackup-*")
 	if err != nil {
 		return err
@@ -189,7 +210,7 @@ func (s *Service) runPipeline(ctx context.Context, st *store.Site, kind, name st
 		return err
 	}
 	defer f.Close()
-	return s.storage.Save(ctx, name, f)
+	return storage.Save(ctx, name, f)
 }
 
 // Restore, yedeği çözer ve site dosyalarına geri yazar (audit'li).
