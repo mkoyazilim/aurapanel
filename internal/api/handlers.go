@@ -378,6 +378,13 @@ func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
 		creq.UserID = u.ID
 	}
 
+	// Faz 3: Reseller kota kontrolü
+	if role == "reseller" {
+		if err := s.deps.Reseller.CheckSiteQuota(r.Context(), u.ID); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
 	id, err := s.deps.Sites.Create(r.Context(), creq)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
@@ -784,8 +791,27 @@ func (s *Server) handleDBList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDBCreate(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	u, role, ok := s.requireAuth(w, r)
+	if !ok {
 		return
+	}
+	siteID := r.PathValue("id")
+	
+	// Yetki kontrolü (admin değilse, sitenin sahibi olmalı)
+	if role != "admin" {
+		st, err := s.deps.Store.GetSite(r.Context(), siteID)
+		if err != nil || st == nil || st.UserID.Int64 != u.ID {
+			writeErr(w, http.StatusForbidden, "bu siteye erişim yetkiniz yok")
+			return
+		}
+	}
+	
+	// Faz 3: Reseller DB kota kontrolü
+	if role == "reseller" {
+		if err := s.deps.Reseller.CheckDatabaseQuota(r.Context(), u.ID); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
 	}
 	var req struct {
 		Name string `json:"name"`

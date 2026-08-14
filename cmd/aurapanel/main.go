@@ -89,22 +89,6 @@ func main() {
 		return
 	}
 
-	// Agent modu: tam panel yerine yalnızca agent endpoint'lerini ayağa kaldır.
-	if *agentMode {
-		if *agentKey == "" {
-			fmt.Fprintln(os.Stderr, "hata: --agent-key gereklidir")
-			os.Exit(1)
-		}
-		mux := http.NewServeMux()
-		agent.NewAgentServer(*agentKey, version).RegisterRoutes(mux)
-		fmt.Printf("aurapanel agent modu: %s dinleniyor\n", *agentAddr)
-		if err := http.ListenAndServe(*agentAddr, mux); err != nil {
-			fmt.Fprintf(os.Stderr, "agent: %v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "config: %v\n", err)
@@ -176,6 +160,22 @@ func main() {
 		&ols.HTTPProber{Timeout: 10 * time.Second})
 
 	siteMgr := site.NewManager(st, site.NewPrivOps(privC), pipeline, au, sitesRoot)
+
+	// Agent modu: tam panel yerine yalnızca agent endpoint'lerini ayağa kaldır.
+	if *agentMode {
+		if *agentKey == "" {
+			fmt.Fprintln(os.Stderr, "hata: --agent-key gereklidir")
+			os.Exit(1)
+		}
+		mux := http.NewServeMux()
+		agent.NewAgentServer(*agentKey, version, siteMgr).RegisterRoutes(mux)
+		fmt.Printf("aurapanel agent modu: %s dinleniyor\n", *agentAddr)
+		if err := http.ListenAndServe(*agentAddr, mux); err != nil {
+			fmt.Fprintf(os.Stderr, "agent: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Dosya yöneticisi backend seçimi: priv helper erişilebilirse Tier-1
 	// (site UID + cgroup — ÜRETİM), değilse LocalBackend (yalnızca DEV).

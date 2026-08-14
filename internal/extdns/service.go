@@ -8,7 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 
 	"github.com/mkoyazilim/aurapanel/internal/crypto"
 	"github.com/mkoyazilim/aurapanel/internal/store"
@@ -186,29 +192,51 @@ func (s *Service) CloudflareSyncPush(ctx context.Context, apiToken, zoneID strin
 
 // ─── Route53 ─────────────────────────────────────────────────────────────────
 // Route53 AWS SDK olmadan vanilla HTTP + AWS SigV4 imzası gerektirir.
-// MVP: credential doğrulama + kayıt listeleme stub (gerçek SigV4 entegrasyonu
-// AWS SDK v2 eklendiğinde tamamlanır; şimdi credential şifreli saklanır).
+// Route53 AWS SDK v2 entegrasyonu.
 
-// Route53ValidateCreds, credential'ın geçerli olup olmadığını kontrol eder.
-// Gerçek AWS çağrısı yapılmaz; format kontrolü yapılır.
-func (s *Service) Route53ValidateCreds(accessKey, secretKey, region string) error {
-	if len(accessKey) < 16 || len(secretKey) < 16 {
-		return fmt.Errorf("invalid AWS credentials format")
-	}
-	if region == "" {
-		return fmt.Errorf("region required")
-	}
-	return nil
-}
-
-// Route53ListZones, kayıtlı Route53 zone listesini döndürür (stub — AWS SDK gerektirir).
-func (s *Service) Route53ListZones(ctx context.Context, accessKey, secretKey, region string) ([]DNSRecord, error) {
-	// AWS SigV4 gerektiren full implementasyon aws-sdk-go-v2 ile gelecek.
-	// Şimdilik credential doğrulaması yapılır, boş liste döner.
-	if err := s.Route53ValidateCreds(accessKey, secretKey, region); err != nil {
+func (s *Service) r53Client(ctx context.Context, accessKey, secretKey, region string) (*route53.Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+	)
+	if err != nil {
 		return nil, err
 	}
-	return []DNSRecord{}, nil
+	return route53.NewFromConfig(cfg), nil
+}
+
+// Route53ValidateCreds, kimlik bilgileriyle bir ListHostedZones çağrısı yaparak doğrular.
+func (s *Service) Route53ValidateCreds(ctx context.Context, accessKey, secretKey, region string) error {
+	if len(accessKey) < 16 || len(secretKey) < 16 || region == "" {
+		return fmt.Errorf("invalid AWS credentials format")
+	}
+	client, err := s.r53Client(ctx, accessKey, secretKey, region)
+	if err != nil {
+		return err
+	}
+	_, err = client.ListHostedZones(ctx, &route53.ListHostedZonesInput{MaxItems: aws.Int32(1)})
+	return err
+}
+
+// Route53ListZones, Route53 hesabındaki zone'ları listeleyip DNSRecord formatına çevirir.
+func (s *Service) Route53ListZones(ctx context.Context, accessKey, secretKey, region string) ([]DNSRecord, error) {
+	client, err := s.r53Client(ctx, accessKey, secretKey, region)
+	if err != nil {
+		return nil, err
+	}
+	out, err := client.ListHostedZones(ctx, &route53.ListHostedZonesInput{})
+	if err != nil {
+		return nil, err
+	}
+	var res []DNSRecord
+	for _, z := range out.HostedZones {
+		res = append(res, DNSRecord{
+			ID:   strings.ReplaceAll(aws.ToString(z.Id), "/hostedzone/", ""),
+			Name: strings.TrimSuffix(aws.ToString(z.Name), "."),
+			Type: "ZONE",
+		})
+	}
+	return res, nil
 }
 
 // ─── Senkron log yardımcıları ─────────────────────────────────────────────────

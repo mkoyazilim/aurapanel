@@ -1,24 +1,30 @@
 package agent
-
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/mkoyazilim/aurapanel/internal/site"
 )
 
 // AgentServer, agent modunda çalışan minimal HTTP sunucusudur.
 // Merkezi panel bu endpoint'lere mTLS üzerinden erişir.
+type SiteManager interface {
+	Create(ctx context.Context, req site.CreateRequest) (string, error)
+}
+
 type AgentServer struct {
 	apiKey  string
 	version string
+	sites   SiteManager
 }
 
 // NewAgentServer, verilen API anahtarıyla agent HTTP sunucusu oluşturur.
-func NewAgentServer(apiKey, version string) *AgentServer {
-	return &AgentServer{apiKey: apiKey, version: version}
+func NewAgentServer(apiKey, version string, sites SiteManager) *AgentServer {
+	return &AgentServer{apiKey: apiKey, version: version, sites: sites}
 }
 
 // RegisterRoutes, mux'a agent endpoint'lerini kaydeder.
@@ -78,17 +84,20 @@ func (a *AgentServer) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleCreateSite, site oluşturma isteğini işler (MVP stub — gerçek impl site.Manager gerektirir).
+// handleCreateSite, site oluşturma isteğini işler.
 func (a *AgentServer) handleCreateSite(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Domain string `json:"domain"`
-	}
+	var req site.CreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Domain == "" {
 		http.Error(w, `{"error":"domain required"}`, http.StatusBadRequest)
 		return
 	}
-	agentJSON(w, http.StatusAccepted, map[string]string{
-		"status": "queued",
+	id, err := a.sites.Create(r.Context(), req)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+	agentJSON(w, http.StatusCreated, map[string]string{
+		"id":     id,
 		"domain": req.Domain,
 	})
 }
