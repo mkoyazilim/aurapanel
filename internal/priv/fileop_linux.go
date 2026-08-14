@@ -88,6 +88,9 @@ func errors2(e1, e2 error) error {
 	return e2
 }
 
+// WorkerMain, worker modunun dışa açılan giriş noktası.
+func WorkerMain(argv []string) int { return fileWorkerMain(argv) }
+
 // fileWorkerMain, worker modunun giriş noktası (site UID'siyle çalışır).
 // Çıktı: tek satır JSON {ok, data?, error?}.
 func fileWorkerMain(argv []string) int {

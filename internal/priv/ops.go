@@ -149,7 +149,10 @@ type fileCopy struct {
 type execSpec struct {
 	bin   string
 	args  []string
-	stdin string // stdin'e yazılacak metin (ör. htpasswd -i)
+	stdin string // stdin'e yazılacak metin
+	// tolerateWarn: çıkış kodu != 0 ama çıktıda "[ERROR]" YOKSA başarılı
+	// say (lshttpd -t yalnızca WARN içeren sağlıklı config'de 1 döner).
+	tolerateWarn bool
 }
 
 type plan struct {
@@ -527,6 +530,7 @@ func opOlsTest(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	lshttpd, _ := bin("lshttpd")
 	p := &plan{}
 	p.exec(lshttpd, "-t")
+	p.actions[len(p.actions)-1].exec.tolerateWarn = true
 	return p, map[string]any{"tested": true}, nil
 }
 

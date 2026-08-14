@@ -3,6 +3,7 @@
 package priv
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -77,6 +78,11 @@ func executePlan(ctx context.Context, p *plan) error {
 			}
 			out, err := cmd.CombinedOutput()
 			if err != nil {
+				// lshttpd -t: yalnızca WARN içeren sağlıklı config'te 1 döner —
+				// gerçek hata yalnızca "[ERROR]" satırıyla ayırt edilir.
+				if a.exec.tolerateWarn && !bytes.Contains(out, []byte("[ERROR]")) {
+					continue
+				}
 				return &ExecError{Bin: a.exec.bin, Args: a.exec.args, Err: err, Output: truncateOutput(out)}
 			}
 		default:
