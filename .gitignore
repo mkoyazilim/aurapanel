@@ -22,3 +22,9 @@ Thumbs.db
 # Local env
 .env
 .env.local
+
+logoandicon/
+ROADMAP.md
+ARCHITECTURE.md
+DEPENDENCIES.md
+FILE_MANAGER.md
