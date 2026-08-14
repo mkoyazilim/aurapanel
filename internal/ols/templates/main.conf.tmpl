@@ -1,0 +1,23 @@
+virtualHost {{ .SiteID }} {
+  vhRoot                   {{ .Docroot }}/
+  allowSymbolLink          1
+  enableScript             1
+  restrained               1
+  configFile               /usr/local/lsws/conf/vhosts/{{ .SiteID }}/vhconf.conf
+}
+
+listener HTTP {
+  address                  *:80
+  secure                   0
+  map                      {{ .SiteID }} {{ .Domain }}{{ if .AliasesLine }}, {{ .AliasesLine }}{{ end }}
+}
+
+{{ if .SSL }}
+listener HTTPS {
+  address                  *:443
+  secure                   1
+  keyFile                  /usr/local/lsws/conf/cert/default.key
+  certFile                 /usr/local/lsws/conf/cert/default.crt
+  map                      {{ .SiteID }} {{ .Domain }}{{ if .AliasesLine }}, {{ .AliasesLine }}{{ end }}
+}
+{{ end }}

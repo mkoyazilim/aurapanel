@@ -20,7 +20,11 @@ type Artifact struct {
 //go:embed templates/vhconf.conf.tmpl
 var vhconfTmpl string
 
+//go:embed templates/main.conf.tmpl
+var mainTmpl string
+
 type vhostTemplateData struct {
+	SiteID        string
 	Docroot       string
 	LogDir        string
 	IniPath       string
@@ -50,6 +54,7 @@ func RenderVhost(sitesRoot, certsRoot string, v Vhost) ([]Artifact, error) {
 
 	phpDigits := strings.ReplaceAll(v.PHPVersion, ".", "")
 	data := vhostTemplateData{
+		SiteID:      v.SiteID,
 		Docroot:     path.Join(sitesRoot, v.SiteID, "home"),
 		LogDir:      path.Join(sitesRoot, v.SiteID, "logs"),
 		IniPath:     path.Join(sitesRoot, v.SiteID, "conf", "php.ini"),
@@ -65,17 +70,27 @@ func RenderVhost(sitesRoot, certsRoot string, v Vhost) ([]Artifact, error) {
 		SSL:         v.SSL,
 	}
 
-	tmpl, err := template.New("vhconf").Parse(vhconfTmpl)
+	vhTmpl, err := template.New("vhconf").Parse(vhconfTmpl)
 	if err != nil {
-		return nil, fmt.Errorf("şablon hatası: %w", err)
+		return nil, fmt.Errorf("vhconf şablon hatası: %w", err)
 	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return nil, fmt.Errorf("render hatası: %w", err)
+	var vhBuf bytes.Buffer
+	if err := vhTmpl.Execute(&vhBuf, data); err != nil {
+		return nil, fmt.Errorf("vhconf render hatası: %w", err)
+	}
+
+	mTmpl, err := template.New("main").Parse(mainTmpl)
+	if err != nil {
+		return nil, fmt.Errorf("main şablon hatası: %w", err)
+	}
+	var mBuf bytes.Buffer
+	if err := mTmpl.Execute(&mBuf, data); err != nil {
+		return nil, fmt.Errorf("main render hatası: %w", err)
 	}
 
 	return []Artifact{
-		{RelPath: "vhconf.conf", Content: buf.Bytes(), Mode: 0o644},
+		{RelPath: "main.conf", Content: mBuf.Bytes(), Mode: 0o644},
+		{RelPath: "vhconf.conf", Content: vhBuf.Bytes(), Mode: 0o644},
 	}, nil
 }
 

@@ -522,6 +522,7 @@ const olsVhostsDir = "/usr/local/lsws/conf/vhosts"
 
 // olsFileAllowlist: bir site bundle'ında bulunabilecek dosya adları.
 var olsFileAllowlist = map[string]struct{}{
+	"main.conf":   {},
 	"vhconf.conf": {},
 }
 

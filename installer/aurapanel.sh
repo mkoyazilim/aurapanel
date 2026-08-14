@@ -251,6 +251,14 @@ apt-mark hold mariadb-server 2>/dev/null || true
 dpkg -l | awk '/openlitespeed|lsphp/ {print $2}' | xargs -r apt-mark hold 2>/dev/null || true
 
 systemctl enable --now mariadb >/dev/null 2>&1 || true
+
+# --- 10.5) OLS VirtualHost Include Hook ---
+if [[ -f /usr/local/lsws/conf/httpd_config.conf ]]; then
+  if ! grep -q "include /usr/local/lsws/conf/vhosts/\*/main.conf" /usr/local/lsws/conf/httpd_config.conf; then
+    echo "include /usr/local/lsws/conf/vhosts/*/main.conf" >> /usr/local/lsws/conf/httpd_config.conf
+  fi
+fi
+
 systemctl enable --now lsws >/dev/null 2>&1 || true
 systemctl start aurapanel.service 2>/dev/null || true
 

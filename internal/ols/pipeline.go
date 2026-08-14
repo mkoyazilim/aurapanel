@@ -30,7 +30,7 @@ type ProbeSpec struct {
 
 // bundleFileNames, bir site bundle'ında bulunabilecek dosya adları
 // (priv helper'daki olsFileAllowlist ile birebir eşleşir).
-var bundleFileNames = []string{"vhconf.conf"}
+var bundleFileNames = []string{"main.conf", "vhconf.conf"}
 
 // Pipeline, ARCHITECTURE §5.1 apply akışını yürütür:
 //
@@ -142,8 +142,10 @@ func (p *Pipeline) rollback(ctx context.Context, site string, snapshot []Artifac
 		snapNames[a.RelPath] = true
 	}
 
-	if err := p.installer.InstallBundle(ctx, site, snapshot); err != nil {
-		return fmt.Errorf("snapshot geri yazılamadı: %w", err)
+	if len(snapshot) > 0 {
+		if err := p.installer.InstallBundle(ctx, site, snapshot); err != nil {
+			return fmt.Errorf("snapshot geri yazılamadı: %w", err)
+		}
 	}
 	var toRemove []string
 	for _, n := range bundleFileNames {
