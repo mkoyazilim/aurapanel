@@ -1,0 +1,84 @@
+# AuraPanel yönetimli OLS native vhost (OLS 1.7+) — elle düzenlemeyin.
+# Drift detection bu dosyayı desired state ile karşılaştırır (ARCHITECTURE §6).
+# Sürüme özgü direktifler entegrasyon testinde doğrulanır.
+
+docRoot                   {{ .Docroot }}/
+vhDomain                  {{ .Domain }}
+{{- if .AliasesLine }}
+vhAliases                 {{ .AliasesLine }}
+{{- end }}
+enableGzip                {{ .EnableGzip }}
+
+index  {
+  useServer               0
+  indexFiles              {{ .IndexFiles }}
+}
+
+errorlog {{ .LogDir }}/error.log {
+  useServer               0
+  logLevel                ERROR
+  rollingSize             10M
+}
+
+accesslog {{ .LogDir }}/access.log {
+  useServer               0
+  rollingSize             10M
+}
+
+scripthandler  {
+  add                     lsapi:{{ .LSAPIName }} php
+}
+
+extprocessor {{ .LSAPIName }} {
+  type                    lsapi
+  address                 {{ .LSAPISock }}
+  maxConns                35
+  env                     PHP_LSAPI_CHILDREN=35
+  initTimeout             60
+  retryTimeout            0
+  persistConn             1
+  respBuffer              0
+  autoStart               1
+  path                    /usr/local/lsws/{{ .LSAPIName }}/bin/lsphp
+  backlog                 100
+  instances               1
+  extUser                 {{ .ExtUser }}
+  extGroup                {{ .ExtUser }}
+  memSoftLimit            2047M
+  memHardLimit            2047M
+  procSoftLimit           400
+  procHardLimit           500
+}
+
+{{- if .TLSRedirect }}
+rewrite  {
+  enable                  1
+  rules                   <<<END_rules
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]
+END_rules
+}
+{{- end }}
+
+{{- if .WAF }}
+module mod_security {
+  modsecurity  on
+  modsecurity_rules <<<END_rules
+Include /usr/local/lsws/conf/modsec/owasp-crs.conf
+END_rules
+}
+{{- end }}
+
+{{- if .SSL }}
+vhssl  {
+  keyFile                 {{ .SSL.KeyPath }}
+  certFile                {{ .SSL.CertPath }}
+  certChain               1
+  sslProtocol             24
+  enableECDHE             1
+  renegProtection         1
+  sslSessionCache         1
+  enableSpdy              15
+  enableStapling          1
+}
+{{- end }}

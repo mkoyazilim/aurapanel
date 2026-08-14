@@ -29,6 +29,7 @@ func TestRegistryAllowlist(t *testing.T) {
 		"priv.ping", "user.create", "user.delete", "user.exists",
 		"cgroup.bootstrap", "cgroup.limits", "quota.set",
 		"firewall.apply", "sshd.install_config", "logrotate.install_config",
+		"ols.test", "ols.read_bundle", "ols.install_bundle", "ols.remove_bundle", "ols.reload",
 	}
 	if len(reg) != len(want) {
 		t.Fatalf("op sayısı beklenmiyor: %d (beklenen %d)", len(reg), len(want))
@@ -241,6 +242,41 @@ func TestSshdInstallOrder(t *testing.T) {
 	}
 }
 
+// OLS bundle doğrulaması: site/dosya adı/NUL/oversize/tekrar/mode redleri.
+func TestOlsBundleValidation(t *testing.T) {
+	cfg := testCfg()
+	fn := newRegistry(cfg)["ols.install_bundle"]
+	ok := map[string]any{"name": "vhconf.conf", "content": "# vhost"}
+	bad := []map[string]any{
+		{"site": "../x", "files": []map[string]any{ok}},
+		{"site": "site001", "files": []map[string]any{}},
+		{"site": "site001", "files": []map[string]any{{"name": "evil.sh", "content": "# x"}}},
+		{"site": "site001", "files": []map[string]any{{"name": "vhconf.conf", "content": "# a\x00b"}}},
+		{"site": "site001", "files": []map[string]any{{"name": "vhconf.conf", "content": strings.Repeat("#", olsBundleContentLimit+1)}}},
+		{"site": "site001", "files": []map[string]any{ok, {"name": "vhconf.conf", "content": "# dup"}}},
+		{"site": "site001", "files": []map[string]any{{"name": "vhconf.conf", "content": "# x", "mode": 0o777}}},
+	}
+	for i, args := range bad {
+		raw, _ := json.Marshal(args)
+		if _, _, err := fn(cfg, raw); err == nil {
+			t.Errorf("ols bundle durumu %d reddedilmedi", i)
+		}
+	}
+	// Geçerli bundle: write eylemleri doğru hedefe, mode varsayılan 0644.
+	raw, _ := json.Marshal(map[string]any{"site": "site001", "files": []map[string]any{ok}})
+	p, _, err := fn(cfg, raw)
+	if err != nil {
+		t.Fatalf("geçerli bundle reddedildi: %v", err)
+	}
+	if p.actions[0].kind != actMkdir {
+		t.Fatal("ilk eylem mkdir olmalı")
+	}
+	w := p.actions[1].write
+	if w.path != "/usr/local/lsws/conf/vhosts/site001/vhconf.conf" || w.mode != 0o644 {
+		t.Fatalf("write hedefi/mode hatalı: %s %v", w.path, w.mode)
+	}
+}
+
 // Her op'un mutlu-yol planı bin allowlist'ine uygun olmalı.
 func TestAllOpsHappyPathBins(t *testing.T) {
 	cfg := testCfg()
@@ -256,6 +292,11 @@ func TestAllOpsHappyPathBins(t *testing.T) {
 		"firewall.apply":            {"ruleset": "/etc/aurapanel/nftables/rules.nft"},
 		"sshd.install_config":       {"config": "/var/lib/aurapanel/stage/sshd-sites.conf"},
 		"logrotate.install_config":  {"config": "/var/lib/aurapanel/stage/logrotate-sites.conf"},
+		"ols.test":                  {},
+		"ols.read_bundle":           {"site": "site001"},
+		"ols.install_bundle":        {"site": "site001", "files": []map[string]any{{"name": "vhconf.conf", "content": "# test"}}},
+		"ols.remove_bundle":         {"site": "site001", "names": []string{"vhconf.conf"}},
+		"ols.reload":                {},
 	}
 	for op, args := range happy {
 		raw, _ := json.Marshal(args)

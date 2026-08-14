@@ -47,6 +47,8 @@ var binPaths = map[string]string{
 	"logrotate": "/usr/sbin/logrotate",
 	"systemctl": "/usr/bin/systemctl",
 	"setquota":  "/usr/sbin/setquota",
+	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
+	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
 }
 
 func bin(name string) (string, error) {
@@ -116,15 +118,17 @@ const (
 	actMkdir actionKind = iota
 	actWrite
 	actCopy
+	actRemove
 	actExec
 )
 
 type action struct {
-	kind  actionKind
-	mkdir string
-	write fileWrite
-	copy  fileCopy
-	exec  execSpec
+	kind   actionKind
+	mkdir  string
+	write  fileWrite
+	copy   fileCopy
+	remove string
+	exec   execSpec
 }
 
 type fileWrite struct {
@@ -151,6 +155,7 @@ type plan struct {
 func (p *plan) mkdir(path string)      { p.actions = append(p.actions, action{kind: actMkdir, mkdir: path}) }
 func (p *plan) write(f fileWrite)      { p.actions = append(p.actions, action{kind: actWrite, write: f}) }
 func (p *plan) copy(c fileCopy)        { p.actions = append(p.actions, action{kind: actCopy, copy: c}) }
+func (p *plan) remove(path string)     { p.actions = append(p.actions, action{kind: actRemove, remove: path}) }
 func (p *plan) exec(bin string, args ...string) {
 	p.actions = append(p.actions, action{kind: actExec, exec: execSpec{bin: bin, args: args}})
 }
@@ -172,6 +177,11 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"firewall.apply":            opFirewallApply,
 		"sshd.install_config":       opSshdInstall,
 		"logrotate.install_config":  opLogrotateInstall,
+		"ols.test":                  opOlsTest,
+		"ols.read_bundle":           opOlsReadBundle,
+		"ols.install_bundle":        opOlsInstallBundle,
+		"ols.remove_bundle":         opOlsRemoveBundle,
+		"ols.reload":                opOlsReload,
 	}
 }
 
@@ -449,4 +459,175 @@ func opLogrotateInstall(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error
 	p.exec(logrotate, "-d", src) // kaynağı doğrula
 	p.copy(fileCopy{src: src, dst: dst, mode: 0o644})
 	return p, map[string]any{"config": dst}, nil
+}
+
+// --- OLS operasyonları (ARCHITECTURE §3.2, W3) ---
+
+// olsVhostsDir, OLS native vhost kökü (OLS 1.7+).
+const olsVhostsDir = "/usr/local/lsws/conf/vhosts"
+
+// olsFileAllowlist: bir site bundle'ında bulunabilecek dosya adları.
+var olsFileAllowlist = map[string]struct{}{
+	"vhconf.conf": {},
+}
+
+const (
+	olsBundleFileLimit    = 8
+	olsBundleContentLimit = 256 << 10 // 256 KiB
+)
+
+func opOlsTest(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct{}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("ols.test: %w", err)
+	}
+	lshttpd, _ := bin("lshttpd")
+	p := &plan{}
+	p.exec(lshttpd, "-t")
+	return p, map[string]any{"tested": true}, nil
+}
+
+// opOlsReadBundle: snapshot için mevcut bundle dosyalarını okur (süreç içi).
+func opOlsReadBundle(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("ols.read_bundle: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("ols.read_bundle: site kimliği geçersiz")
+	}
+	dir := path.Join(olsVhostsDir, a.Site)
+	files := []map[string]any{}
+	for name := range olsFileAllowlist {
+		full := path.Join(dir, name)
+		b, err := os.ReadFile(full)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("ols.read_bundle: %w", err)
+		}
+		if len(b) > olsBundleContentLimit {
+			return nil, nil, fmt.Errorf("ols.read_bundle: %s beklenmeyen boyutta (%d)", name, len(b))
+		}
+		st, err := os.Stat(full)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ols.read_bundle: %w", err)
+		}
+		files = append(files, map[string]any{
+			"name":    name,
+			"content": string(b),
+			"mode":    int(st.Mode().Perm()),
+		})
+	}
+	return &plan{}, map[string]any{"site": a.Site, "files": files}, nil
+}
+
+type bundleFile struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	Mode    int    `json:"mode"`
+}
+
+func validateBundle(a struct {
+	Site  string       `json:"site"`
+	Files []bundleFile `json:"files"`
+}, opName string) (string, []bundleFile, error) {
+	if !reSiteID.MatchString(a.Site) {
+		return "", nil, errors.New(opName + ": site kimliği geçersiz")
+	}
+	if len(a.Files) == 0 || len(a.Files) > olsBundleFileLimit {
+		return "", nil, fmt.Errorf("%s: dosya sayısı 1..%d olmalı", opName, olsBundleFileLimit)
+	}
+	seen := map[string]bool{}
+	for _, f := range a.Files {
+		if _, ok := olsFileAllowlist[f.Name]; !ok {
+			return "", nil, fmt.Errorf("%s: dosya izinli değil: %q", opName, f.Name)
+		}
+		if seen[f.Name] {
+			return "", nil, fmt.Errorf("%s: tekrarlanan dosya: %q", opName, f.Name)
+		}
+		seen[f.Name] = true
+		if len(f.Content) > olsBundleContentLimit {
+			return "", nil, fmt.Errorf("%s: %s içerik sınırını aşıyor", opName, f.Name)
+		}
+		if strings.ContainsRune(f.Content, '\x00') {
+			return "", nil, fmt.Errorf("%s: %s NUL bayt içeriyor", opName, f.Name)
+		}
+		if f.Mode != 0 && (f.Mode < 0o600 || f.Mode > 0o644) {
+			return "", nil, fmt.Errorf("%s: %s mode 0600..0644 olmalı", opName, f.Name)
+		}
+	}
+	dir := path.Join(olsVhostsDir, a.Site)
+	return dir, a.Files, nil
+}
+
+func opOlsInstallBundle(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site  string       `json:"site"`
+		Files []bundleFile `json:"files"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("ols.install_bundle: %w", err)
+	}
+	dir, files, err := validateBundle(a, "ols.install_bundle")
+	if err != nil {
+		return nil, nil, err
+	}
+	p := &plan{}
+	p.mkdir(dir)
+	installed := []string{}
+	for _, f := range files {
+		mode := os.FileMode(f.Mode)
+		if mode == 0 {
+			mode = 0o644
+		}
+		p.write(fileWrite{path: path.Join(dir, f.Name), content: f.Content, mode: mode})
+		installed = append(installed, f.Name)
+	}
+	return p, map[string]any{"site": a.Site, "installed": installed}, nil
+}
+
+func opOlsRemoveBundle(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site  string   `json:"site"`
+		Names []string `json:"names"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("ols.remove_bundle: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("ols.remove_bundle: site kimliği geçersiz")
+	}
+	if len(a.Names) == 0 || len(a.Names) > olsBundleFileLimit {
+		return nil, nil, fmt.Errorf("ols.remove_bundle: ad sayısı 1..%d olmalı", olsBundleFileLimit)
+	}
+	seen := map[string]bool{}
+	p := &plan{}
+	removed := []string{}
+	for _, n := range a.Names {
+		if _, ok := olsFileAllowlist[n]; !ok {
+			return nil, nil, fmt.Errorf("ols.remove_bundle: dosya izinli değil: %q", n)
+		}
+		if seen[n] {
+			return nil, nil, fmt.Errorf("ols.remove_bundle: tekrarlanan dosya: %q", n)
+		}
+		seen[n] = true
+		p.remove(path.Join(olsVhostsDir, a.Site, n))
+		removed = append(removed, n)
+	}
+	return p, map[string]any{"site": a.Site, "removed": removed}, nil
+}
+
+func opOlsReload(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct{}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("ols.reload: %w", err)
+	}
+	lswsctrl, _ := bin("lswsctrl")
+	p := &plan{}
+	p.exec(lswsctrl, "reload")
+	return p, map[string]any{"reloaded": true}, nil
 }

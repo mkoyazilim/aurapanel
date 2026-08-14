@@ -56,6 +56,10 @@ func executePlan(ctx context.Context, p *plan) error {
 			if err := os.WriteFile(a.copy.dst, b, a.copy.mode); err != nil {
 				return fmt.Errorf("copy dst %s: %w", a.copy.dst, err)
 			}
+		case actRemove:
+			if err := os.Remove(a.remove); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("remove %s: %w", a.remove, err)
+			}
 		case actExec:
 			cmd := exec.CommandContext(ctx, a.exec.bin, a.exec.args...)
 			cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8"}
