@@ -11,7 +11,7 @@ LDFLAGS := -s -w \
 	-X main.commit=$(COMMIT) \
 	-X main.built=$(BUILDTIME)
 
-.PHONY: build test vet run clean
+.PHONY: build test vet run clean web
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/aurapanel
@@ -24,6 +24,10 @@ vet:
 
 run:
 	go run ./cmd/aurapanel -config configs/aurapanel.example.yaml
+
+# Web arayüzü: dist/ go:embed ile binary'ye gömülür — build'den ÖNCE çalıştırılmalı.
+web:
+	cd web && npm install --no-audit --no-fund && npm run build
 
 clean:
 	rm -rf bin

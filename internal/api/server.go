@@ -42,6 +42,7 @@ type Deps struct {
 	Cipher   *crypto.Cipher
 	Cfg      *config.Config
 	Log      *slog.Logger
+	Web      http.Handler // gömülü SPA (webui.Handler)
 
 	Sites     SiteManager
 	Files     *fm.FileService
@@ -83,6 +84,11 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) routes() {
 	m := s.mux
 	m.HandleFunc("GET /healthz", s.handleHealthz)
+
+	// Gömülü SPA: "/" catch-all (API rotaları daha spesifik — kazanır).
+	if s.deps.Web != nil {
+		m.Handle("GET /", s.deps.Web)
+	}
 
 	// Auth (login public; diğerleri oturumlu).
 	m.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
@@ -132,6 +138,7 @@ func (s *Server) routes() {
 
 	// Veritabanları.
 	m.HandleFunc("GET /api/v1/sites/{id}/databases", s.handleDBList)
+	m.HandleFunc("GET /api/v1/sites/{id}/db-users", s.handleDBUserList)
 	m.HandleFunc("POST /api/v1/sites/{id}/databases", s.handleDBCreate)
 	m.HandleFunc("DELETE /api/v1/sites/{id}/databases/{name}", s.handleDBDrop)
 	m.HandleFunc("POST /api/v1/sites/{id}/db-users", s.handleDBUserCreate)

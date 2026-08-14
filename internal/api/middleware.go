@@ -49,9 +49,8 @@ func (s *Server) recoverMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// publicPaths, oturum gerektirmeyen uç noktalar.
+// publicPaths, oturum gerektirmeyen API uç noktaları.
 var publicPaths = map[string]bool{
-	"GET /healthz":           true,
 	"POST /api/v1/auth/login": true,
 }
 
@@ -65,6 +64,14 @@ var mustChangeExempt = map[string]bool{
 // authMiddleware: session/PAT doğrulama + CSRF + zorunlu şifre değişimi.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Web UI istekleri (SPA + asset'ler) herkese açıktır — güvenlik
+		// API katmanındadır; UI kendi router'ıyla oturumsuz kullanıcıyı
+		// /login'e yönlendirir.
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		key := r.Method + " " + r.URL.Path
 		if publicPaths[key] {
 			next.ServeHTTP(w, r)

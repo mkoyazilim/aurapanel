@@ -34,6 +34,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
+	"github.com/mkoyazilim/aurapanel/internal/webui"
 )
 
 var (
@@ -170,6 +171,7 @@ func main() {
 
 	srv := api.New(api.Deps{
 		Store: st, Audit: au, Sessions: sessions, Cipher: cipher, Cfg: cfg, Log: log,
+		Web: webui.Handler(),
 		Sites: siteMgr, Files: files, Uploads: uploads, Archive: archives, Trash: trash,
 		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc,
 		DriftScan: scanner, DriftFix: repairer,
