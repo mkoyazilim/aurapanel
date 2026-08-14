@@ -8,6 +8,7 @@ const routes = [
   { path: '/files', component: () => import('./views/FileManager.vue') },
   { path: '/databases', component: () => import('./views/Databases.vue') },
   { path: '/ssl', component: () => import('./views/SSL.vue') },
+  { path: '/sftp', component: () => import('./views/SFTP.vue') },
   { path: '/backups', component: () => import('./views/Backups.vue') },
   { path: '/drift', component: () => import('./views/Drift.vue') },
   { path: '/settings', component: () => import('./views/Settings.vue') },

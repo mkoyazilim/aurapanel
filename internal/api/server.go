@@ -21,6 +21,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/fm"
 	"github.com/mkoyazilim/aurapanel/internal/php"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
+	"github.com/mkoyazilim/aurapanel/internal/sftp"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
@@ -53,6 +54,7 @@ type Deps struct {
 	Archive   *fm.ArchiveService
 	Trash     *fm.TrashService
 	PHP       *php.Service
+	SFTP      *sftp.Service
 	DB        *db.Service
 	SSL       *ssl.Service
 	Backups   *backup.Service
@@ -139,6 +141,11 @@ func (s *Server) routes() {
 	// PHP.
 	m.HandleFunc("GET /api/v1/php/versions", s.handlePHPVersions)
 	m.HandleFunc("POST /api/v1/sites/{id}/php/switch", s.handlePHPSwitch)
+
+	// SFTP.
+	m.HandleFunc("GET /api/v1/sites/{id}/sftp", s.handleSFTPList)
+	m.HandleFunc("POST /api/v1/sites/{id}/sftp", s.handleSFTPCreate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/sftp/{username}", s.handleSFTPDelete)
 
 	// Veritabanları.
 	m.HandleFunc("GET /api/v1/sites/{id}/databases", s.handleDBList)

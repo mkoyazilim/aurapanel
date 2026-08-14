@@ -1045,3 +1045,50 @@ func (s *Server) handleUpdateSelf(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"version": v, "note": "binary değişti; yeniden başlatma önerilir"})
 }
+
+// --- SFTP ---
+
+func (s *Server) handleSFTPList(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	list, err := s.deps.SFTP.ListAccounts(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if list == nil {
+		list = []store.SFTPAccount{}
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (s *Server) handleSFTPCreate(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	pwd, err := s.deps.SFTP.CreateAccount(r.Context(), r.PathValue("id"), req.Username, req.Password)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"password": pwd})
+}
+
+func (s *Server) handleSFTPDelete(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	if err := s.deps.SFTP.RemoveAccount(r.Context(), r.PathValue("id"), r.PathValue("username")); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}

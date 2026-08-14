@@ -31,6 +31,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/php"
 	"github.com/mkoyazilim/aurapanel/internal/priv"
 	"github.com/mkoyazilim/aurapanel/internal/privclient"
+	"github.com/mkoyazilim/aurapanel/internal/sftp"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
@@ -173,6 +174,8 @@ func main() {
 
 	sslSvc := ssl.NewService(st, ssl.NewCertStore(certsRoot), acmeClient, pipeline, au, sitesRoot, certsRoot, 30*24*time.Hour)
 
+	sftpSvc := sftp.NewService(st, sftp.NewPrivOps(privC), au, sitesRoot)
+
 	// Yedekler: master key'i yedek anahtarı olarak kullan (Faz 2'de ayrı
 	// backup key yönetimi gelecek).
 	backupKey, err := os.ReadFile(keyPath)
@@ -181,7 +184,7 @@ func main() {
 		os.Exit(1)
 	}
 	bkSvc, err := backup.NewService(st, backup.NewLocalStorage(cfg.Paths.BackupDir),
-		backupKey, archives, nil, au, 7)
+		backupKey, archives, db.NewMariaDBDumpEngine(cfg.MariaDB.User, cfg.MariaDB.Password, cfg.MariaDB.Socket), au, 7)
 	if err != nil {
 		log.Error("backup servisi", "error", err)
 		os.Exit(1)
@@ -205,7 +208,7 @@ func main() {
 		Priv:  privC,
 		Web:   webui.Handler(),
 		Sites: siteMgr, Files: files, Uploads: uploads, Archive: archives, Trash: trash,
-		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc,
+		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc, SFTP: sftpSvc,
 		DriftScan: scanner, DriftFix: repairer, Updates: upd,
 	})
 
