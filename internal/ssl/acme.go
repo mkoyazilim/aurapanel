@@ -73,10 +73,15 @@ func NewLetsEncryptClient(contact string, solver Solver) *LetsEncryptClient {
 	}
 }
 
-func (c *LetsEncryptClient) createClient() *acme.Client {
-	return &acme.Client{
-		DirectoryURL: c.DirectoryURL,
+func (c *LetsEncryptClient) createClient() (*acme.Client, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("account key üretilemedi: %w", err)
 	}
+	return &acme.Client{
+		Key:          key,
+		DirectoryURL: c.DirectoryURL,
+	}, nil
 }
 
 // Obtain, yeni sertifika + anahtar edinir (HTTP-01).
@@ -85,7 +90,10 @@ func (c *LetsEncryptClient) Obtain(ctx context.Context, domain string) (certPEM,
 		return nil, nil, fmt.Errorf("acme solver bağlı değil")
 	}
 
-	client := c.createClient()
+	client, err := c.createClient()
+	if err != nil {
+		return nil, nil, err
+	}
 	
 	// 1. Hesap oluştur veya getir. (MVP: her seferinde yeni geçici hesap oluşturuyoruz, ileride e-posta tabanlı kalıcı hesap yapılabilir).
 	account, err := client.Register(ctx, &acme.Account{
