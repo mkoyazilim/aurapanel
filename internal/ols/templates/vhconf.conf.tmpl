@@ -56,10 +56,18 @@ rewrite  {
   enable                  1
   rules                   <<<END_rules
 RewriteCond %{HTTPS} !=on
+RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
 RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]
 END_rules
 }
 {{- end }}
+
+context /.well-known/acme-challenge/ {
+  type                    NULL
+  location                /var/lib/aurapanel/acme/
+  allowBrowse             1
+}
+
 
 {{- if .WAF }}
 module mod_security {

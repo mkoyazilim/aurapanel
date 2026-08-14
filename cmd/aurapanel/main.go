@@ -165,7 +165,13 @@ func main() {
 	}
 	dbSvc := db.NewService(st, db.NewMariaDBEngine(mysqlDB), cipher, au)
 	phpSvc := php.NewService(st, php.NewPrivOps(privC), pipeline, au, sitesRoot, certsRoot)
-	sslSvc := ssl.NewService(st, ssl.NewCertStore(certsRoot), nil, pipeline, au, sitesRoot, certsRoot, 30*24*time.Hour)
+	// ACME
+	acmeDir := filepath.Join(cfg.Paths.DataDir, "acme")
+	acmeSolver := ssl.NewLocalSolver(acmeDir)
+	// TODO: Config'ten admin e-posta almak iyi olabilir, MVP için admin@ varsayılanı kullanıyoruz.
+	acmeClient := ssl.NewLetsEncryptClient("admin@aurapanel.local", acmeSolver)
+
+	sslSvc := ssl.NewService(st, ssl.NewCertStore(certsRoot), acmeClient, pipeline, au, sitesRoot, certsRoot, 30*24*time.Hour)
 
 	// Yedekler: master key'i yedek anahtarı olarak kullan (Faz 2'de ayrı
 	// backup key yönetimi gelecek).
