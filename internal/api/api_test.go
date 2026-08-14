@@ -6,18 +6,24 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/http/cookiejar"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+)
 
+import (
 	"github.com/mkoyazilim/aurapanel/internal/audit"
 	"github.com/mkoyazilim/aurapanel/internal/auth"
 	"github.com/mkoyazilim/aurapanel/internal/config"
 	"github.com/mkoyazilim/aurapanel/internal/crypto"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
+	"github.com/mkoyazilim/aurapanel/internal/priv"
+	"github.com/mkoyazilim/aurapanel/internal/privclient"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 )
@@ -42,8 +48,9 @@ func (f *fakeSiteMgr) ListSites(ctx context.Context) ([]store.Site, error) {
 	return []store.Site{}, nil
 }
 
-// testServer, gerçek store + auth + fm (LocalBackend) ile test sunucusu kurar.
-func testServer(t *testing.T) (*httptest.Server, *store.Store, string) {
+// testServerWithPriv, gerçek store + auth + fm (LocalBackend) ile test
+// sunucusu kurar; sock boş değilse Priv istemcisi o sokete bağlanır.
+func testServerWithPriv(t *testing.T, sock string) (*httptest.Server, *store.Store, string) {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "api.db"))
 	if err != nil {
@@ -61,17 +68,26 @@ func testServer(t *testing.T) (*httptest.Server, *store.Store, string) {
 	files := fm.New(fm.NewLocalBackend(), au, sitesRoot)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	srv := New(Deps{
+	deps := Deps{
 		Store: st, Audit: au, Sessions: auth.NewSessionStore(st), Cipher: cipher,
 		Cfg: config.Default(), Log: log,
 		Sites: &fakeSiteMgr{}, Files: files,
 		Uploads: fm.NewUploadService(files, filepath.Join(t.TempDir(), "staging")),
 		Archive: fm.NewArchiveService(files),
 		Trash:   fm.NewTrashService(files, filepath.Join(t.TempDir(), "trash")),
-	})
+	}
+	if sock != "" {
+		deps.Priv = privclient.New(sock, 5*time.Second)
+	}
+	srv := New(deps)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return ts, st, sitesRoot
+}
+
+func testServer(t *testing.T) (*httptest.Server, *store.Store, string) {
+	t.Helper()
+	return testServerWithPriv(t, "")
 }
 
 // createAdmin, test için admin kullanıcısı üretir; (username, password) döner.
@@ -305,5 +321,84 @@ func TestFileAPIWithOptimisticLock(t *testing.T) {
 	code, _ = c.get("/api/v1/sites/site001/files?path=../../etc")
 	if code != 403 {
 		t.Fatalf("traversal: %d", code)
+	}
+}
+
+// fakePrivReq, sahte priv sunucusunun yakaladığı tek istek.
+type fakePrivReq struct {
+	op   string
+	args map[string]any
+}
+
+// startFakePriv, JSON satır protokolünü konuşan tek op'luk sahte priv
+// sunucusu başlatır; gelen istekleri ch kanalına bırakır.
+func startFakePriv(t *testing.T, ch chan<- fakePrivReq) string {
+	t.Helper()
+	sock := filepath.Join(t.TempDir(), "priv.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				var req priv.Request
+				if err := json.NewDecoder(c).Decode(&req); err != nil {
+					return
+				}
+				var args map[string]any
+				_ = json.Unmarshal(req.Args, &args)
+				select {
+				case ch <- fakePrivReq{op: req.Op, args: args}:
+				default:
+				}
+				c.Write([]byte(`{"ok":true,"data":{}}`))
+			}(conn)
+		}
+	}()
+	return sock
+}
+
+// TestPasswordChangeSyncsOlsWebAdmin: şifre değişiminde panel, OLS WebAdmin
+// tek giriş çiftini helper'a senkronlar (ARCHITECTURE §9.10).
+func TestPasswordChangeSyncsOlsWebAdmin(t *testing.T) {
+	ch := make(chan fakePrivReq, 4)
+	sock := startFakePriv(t, ch)
+	ts, st, _ := testServerWithPriv(t, sock)
+	createAdmin(t, st, "admin-sync", "eski-parola-12345")
+	c := newClient(t, ts.URL)
+
+	code, out := c.post("/api/v1/auth/login",
+		map[string]string{"username": "admin-sync", "password": "eski-parola-12345"}, false)
+	if code != 200 {
+		t.Fatalf("giriş: %d %v", code, out)
+	}
+	c.csrf, _ = out["csrf_token"].(string)
+
+	code, _ = c.post("/api/v1/auth/change-password",
+		map[string]string{"old_password": "eski-parola-12345", "new_password": "yeni-guclu-12345"}, true)
+	if code != 200 {
+		t.Fatalf("şifre değişimi: %d", code)
+	}
+
+	select {
+	case req := <-ch:
+		if req.op != "ols.webadmin_credentials" {
+			t.Fatalf("op: %q", req.op)
+		}
+		if req.args["username"] != "admin-sync" {
+			t.Fatalf("username: %v", req.args["username"])
+		}
+		if req.args["password"] != "yeni-guclu-12345" {
+			t.Fatalf("password: %v", req.args["password"])
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("helper'a senkron isteği gitmedi")
 	}
 }

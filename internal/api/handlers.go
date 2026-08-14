@@ -105,9 +105,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Action: "auth.login", Target: u.Username, IP: ip, Result: "success",
 	})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"username":            u.Username,
+		"username":             u.Username,
 		"must_change_password": u.MustChangePassword,
-		"csrf_token":          csrf,
+		"csrf_token":           csrf,
 	})
 }
 
@@ -160,6 +160,24 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.deps.Audit.Write(r.Context(), audit.Event{Action: "auth.password_change", Target: u.Username, Result: "success"})
+
+	// OLS WebAdmin tek giriş çifti (ARCHITECTURE §9.10): şifre değişince
+	// WebAdmin'e helper üzerinden senkronla. Panel şifresi otoritedir —
+	// senkron hatası panel değişikliğini GERİ ALMAZ (kilitlenme riski),
+	// audit'e "failed" olarak işlenir.
+	if s.deps.Priv != nil {
+		if _, err := s.deps.Priv.Call(r.Context(), "ols.webadmin_credentials", map[string]any{
+			"username": u.Username,
+			"password": req.NewPassword,
+		}); err != nil {
+			s.deps.Log.Warn("OLS WebAdmin senkronu başarısız", "error", err)
+			s.deps.Audit.Write(r.Context(), audit.Event{Action: "ols.webadmin_sync",
+				Target: u.Username, Result: "failed", Extra: map[string]any{"error": err.Error()}})
+		} else {
+			s.deps.Audit.Write(r.Context(), audit.Event{Action: "ols.webadmin_sync",
+				Target: u.Username, Result: "success"})
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -320,10 +338,10 @@ func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Domain     string            `json:"domain"`
-		Aliases    []string          `json:"aliases"`
-		PHPVersion string            `json:"php_version"`
-		Limits     site.Limits       `json:"limits"`
+		Domain     string      `json:"domain"`
+		Aliases    []string    `json:"aliases"`
+		PHPVersion string      `json:"php_version"`
+		Limits     site.Limits `json:"limits"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
@@ -416,8 +434,8 @@ func (s *Server) handleFileWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		ContentB64   string `json:"content_b64"`
-		ExpectedHash string `json:"expected_hash"`
+		ContentB64    string `json:"content_b64"`
+		ExpectedHash  string `json:"expected_hash"`
 		ExpectedMTime string `json:"expected_mtime"`
 	}
 	if !decodeBody(w, r, &req) {

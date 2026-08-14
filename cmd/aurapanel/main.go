@@ -116,9 +116,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Priv istemcisi bootstrap'tan önce: yeni admin'in kimlik bilgileri OLS
+	// WebAdmin'e de yazılır (ARCHITECTURE §9.10 — tek giriş çifti).
+	privC := privclient.New(privSocket, 30*time.Second)
+
 	// Bootstrap admin: ilk kurulumda rastgele kimlik bilgileri üretilir,
 	// yalnızca BİR KEZ yazdırılır, ilk girişte şifre değişimi ZORUNLUDUR.
-	if err := bootstrapAdmin(ctx, st, au, log); err != nil {
+	if err := bootstrapAdmin(ctx, st, au, log, privC); err != nil {
 		log.Error("bootstrap admin", "error", err)
 		os.Exit(1)
 	}
@@ -129,8 +133,6 @@ func main() {
 	}
 
 	sessions := auth.NewSessionStore(st)
-	privC := privclient.New(privSocket, 30*time.Second)
-
 	// OLS pipeline: priv üzerinden, loopback health probe'lu.
 	sitesRoot := cfg.Paths.SitesRoot
 	certsRoot := filepath.Join(cfg.Paths.DataDir, "state", "certs")
@@ -194,7 +196,8 @@ func main() {
 
 	srv := api.New(api.Deps{
 		Store: st, Audit: au, Sessions: sessions, Cipher: cipher, Cfg: cfg, Log: log,
-		Web: webui.Handler(),
+		Priv:  privC,
+		Web:   webui.Handler(),
 		Sites: siteMgr, Files: files, Uploads: uploads, Archive: archives, Trash: trash,
 		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc,
 		DriftScan: scanner, DriftFix: repairer, Updates: upd,
@@ -221,7 +224,7 @@ func main() {
 }
 
 // bootstrapAdmin, kullanıcı yoksa admin üretir ve yalnızca bir kez yazdırır.
-func bootstrapAdmin(ctx context.Context, st *store.Store, au *audit.Service, log *slog.Logger) error {
+func bootstrapAdmin(ctx context.Context, st *store.Store, au *audit.Service, log *slog.Logger, privC *privclient.Client) error {
 	n, err := st.CountUsers(ctx)
 	if err != nil {
 		return err
@@ -246,6 +249,19 @@ func bootstrapAdmin(ctx context.Context, st *store.Store, au *audit.Service, log
 		return err
 	}
 	au.Write(ctx, audit.Event{Action: "auth.bootstrap", Target: "panel", Result: "success"})
+
+	// OLS WebAdmin tek giriş çifti (ARCHITECTURE §9.10): bootstrap kimliği
+	// WebAdmin'e de yazılır; ilk şifre değişiminde yeniden senkronlanır.
+	// Helper yoksa (dev/manuel kurulum) yalnızca uyarı — şifre değişimi
+	// aşaması yine de çalışır.
+	if privC != nil {
+		if _, err := privC.Call(ctx, "ols.webadmin_credentials", map[string]any{
+			"username": username,
+			"password": password,
+		}); err != nil {
+			log.Warn("OLS WebAdmin senkronu başarısız (bootstrap)", "error", err)
+		}
+	}
 	fmt.Fprintf(os.Stderr, "\n==============================================\n")
 	fmt.Fprintf(os.Stderr, " AuraPanel ilk kurulum bilgileri\n")
 	fmt.Fprintf(os.Stderr, " Kullanıcı adı: %s\n", username)
@@ -255,4 +271,3 @@ func bootstrapAdmin(ctx context.Context, st *store.Store, au *audit.Service, log
 	fmt.Fprintf(os.Stderr, "==============================================\n\n")
 	return nil
 }
-

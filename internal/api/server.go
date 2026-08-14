@@ -20,6 +20,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/drift"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
 	"github.com/mkoyazilim/aurapanel/internal/php"
+	"github.com/mkoyazilim/aurapanel/internal/privclient"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
@@ -40,6 +41,7 @@ type Deps struct {
 	Store    *store.Store
 	Audit    *audit.Service
 	Sessions *auth.SessionStore
+	Priv     *privclient.Client // priv helper (OLS WebAdmin senkronu vb.)
 	Cipher   *crypto.Cipher
 	Cfg      *config.Config
 	Log      *slog.Logger
