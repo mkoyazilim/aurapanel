@@ -1,0 +1,22 @@
+# AuraPanel örnek yapılandırması.
+# Üretim kurulumunda installer bu dosyayı /etc/aurapanel/aurapanel.yaml
+# olarak yazar (bkz. ROADMAP W13).
+
+listen:
+  # private mod (varsayılan): yalnızca loopback. public mod yalnızca
+  # kurulumda bilinçli seçilirse kullanılır (ARCHITECTURE §9.4).
+  address: "127.0.0.1:8080"
+  mode: private            # private | public
+
+database:
+  path: /var/lib/aurapanel/aurapanel.db
+
+log:
+  level: info              # debug | info | warn | error
+  format: json             # json | text
+
+paths:
+  data_dir: /var/lib/aurapanel
+  sites_root: /srv/aurapanel/sites
+  backup_dir: /srv/aurapanel/backups
+  trash_dir: /var/lib/aurapanel/trash

@@ -1,8 +1,12 @@
 # Go build artifacts
 /aurapanel
 /aurapanel.exe
+/bin/
 *.test
 *.out
+
+# Yerel geliştirme verisi
+/data/
 
 # Frontend
 web/node_modules/
