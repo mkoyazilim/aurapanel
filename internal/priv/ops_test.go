@@ -33,6 +33,7 @@ func TestRegistryAllowlist(t *testing.T) {
 		"site.prepare", "site.teardown", "cgroup.cleanup",
 		"cgroup.read", "site.status", "quota.get",
 		"php.detect", "php.install_ini", "php.read_ini",
+		"ols.webadmin_credentials",
 	}
 	if len(reg) != len(want) {
 		t.Fatalf("op sayısı beklenmiyor: %d (beklenen %d)", len(reg), len(want))
@@ -425,6 +426,7 @@ func TestAllOpsHappyPathBins(t *testing.T) {
 		"php.detect":                {},
 		"php.install_ini":           {"site": "site001", "content": "memory_limit = 256M\n"},
 		"php.read_ini":              {"site": "site001"},
+		"ols.webadmin_credentials":  {"username": "admin-abc", "password": "güçlü-parola-123"},
 	}
 	for op, args := range happy {
 		raw, _ := json.Marshal(args)

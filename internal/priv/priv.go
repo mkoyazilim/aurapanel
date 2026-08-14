@@ -31,6 +31,12 @@ const requestTimeout = 10 * time.Second
 
 // Main, aurapanel-priv giriş noktasıdır; çıkış kodunu döndürür.
 func Main(argv []string) int {
+	// file.op worker modu: helper kendini site UID'siyle yeniden başlatır
+	// (FILE_MANAGER §14 Tier-1) — bayrak yalnızca helper TARAFINDAN konur.
+	if os.Getenv("AURAPANEL_FILE_WORKER") == "1" {
+		return fileWorkerMain(argv)
+	}
+
 	fs := flag.NewFlagSet("aurapanel-priv", flag.ContinueOnError)
 	socketPath := fs.String("socket", "/run/aurapanel/priv.sock", "helper Unix socket yolu")
 	panelUser := fs.String("panel-user", "aurapanel", "sokete bağlanmasına izin verilen panel kullanıcısı")
@@ -164,6 +170,24 @@ func handleConn(cfg *runtimeCfg, reg map[string]opFunc, pl *privLog, conn net.Co
 	}
 	entry["op"] = req.Op
 	entry["request_id"] = req.RequestID
+
+	// file.op: plan modeli dışında — worker spawn'ı (site UID + cgroup).
+	if req.Op == "file.op" {
+		opCtx, cancel := context.WithTimeout(context.Background(), cfg.opTimeout)
+		data, err := runFileOp(opCtx, req.Args)
+		cancel()
+		if err != nil {
+			writeResponse(conn, Response{OK: false, Error: err.Error(), RequestID: req.RequestID})
+			entry["result"] = "failed"
+			entry["error"] = err.Error()
+			pl.write(entry)
+			return
+		}
+		writeResponse(conn, Response{OK: true, Data: data, RequestID: req.RequestID})
+		entry["result"] = "success"
+		pl.write(entry)
+		return
+	}
 
 	fn, ok := reg[req.Op]
 	if !ok {

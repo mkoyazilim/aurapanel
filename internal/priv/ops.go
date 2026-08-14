@@ -49,6 +49,7 @@ var binPaths = map[string]string{
 	"setquota":  "/usr/sbin/setquota",
 	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
 	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
+	"ols_htpasswd": "/usr/local/lsws/admin/misc/htpasswd",
 }
 
 func bin(name string) (string, error) {
@@ -147,8 +148,9 @@ type fileCopy struct {
 }
 
 type execSpec struct {
-	bin  string
-	args []string
+	bin   string
+	args  []string
+	stdin string // stdin'e yazılacak metin (ör. htpasswd -i)
 }
 
 type plan struct {
@@ -198,7 +200,32 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"php.detect":                opPHPDetect,
 		"php.install_ini":           opPHPInstallIni,
 		"php.read_ini":              opPHPReadIni,
+		"ols.webadmin_credentials":  opOlsWebadminCredentials,
 	}
+}
+
+// opOlsWebadminCredentials, OLS WebAdmin kimlik bilgilerini senkronlar
+// (ARCHITECTURE §9.10: panel admin şifresiyle tek giriş çifti).
+// htpasswd, stdin üzerinden parola alır (-i) — parola argv'de GÖRÜNMEZ.
+func opOlsWebadminCredentials(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("ols.webadmin_credentials: %w", err)
+	}
+	if !reUserName.MatchString(a.Username) {
+		return nil, nil, errors.New("ols.webadmin_credentials: kullanıcı adı geçersiz")
+	}
+	if len(a.Password) < 12 || len(a.Password) > 128 {
+		return nil, nil, errors.New("ols.webadmin_credentials: parola 12..128 karakter olmalı")
+	}
+	htpasswd, _ := bin("ols_htpasswd")
+	p := &plan{}
+	p.exec(htpasswd, "-i", "-b", "/usr/local/lsws/admin/conf/htpasswd", a.Username)
+	p.actions[len(p.actions)-1].exec.stdin = a.Password + "\n"
+	return p, map[string]any{"username": a.Username}, nil
 }
 
 func opPing(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {

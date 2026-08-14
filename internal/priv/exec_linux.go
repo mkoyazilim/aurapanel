@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // requireRoot, helper'ın root olarak çalıştığını zorunlu kılar.
@@ -71,6 +72,9 @@ func executePlan(ctx context.Context, p *plan) error {
 		case actExec:
 			cmd := exec.CommandContext(ctx, a.exec.bin, a.exec.args...)
 			cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8"}
+			if a.exec.stdin != "" {
+				cmd.Stdin = strings.NewReader(a.exec.stdin)
+			}
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				return &ExecError{Bin: a.exec.bin, Args: a.exec.args, Err: err, Output: truncateOutput(out)}

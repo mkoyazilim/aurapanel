@@ -132,11 +132,17 @@ func main() {
 
 	siteMgr := site.NewManager(st, site.NewPrivOps(privC), pipeline, au, sitesRoot)
 
-	// Dosya yöneticisi: dev ortamında LocalBackend (Tier-1 priv backend'i
-	// sunucu fazında bağlanır — panel kullanıcısı site dizinlerine
-	// yazamaz, üretimde LocalBackend KULLANILMAZ).
-	log.Warn("fm backend: LocalBackend (DEV) — üretimde Tier-1 priv backend şart")
-	files := fm.New(fm.NewLocalBackend(), au, sitesRoot)
+	// Dosya yöneticisi backend seçimi: priv helper erişilebilirse Tier-1
+	// (site UID + cgroup — ÜRETİM), değilse LocalBackend (yalnızca DEV).
+	var fmBackend fm.Backend
+	if _, err := privC.Call(ctx, "priv.ping", nil); err == nil {
+		fmBackend = fm.NewPrivBackend(privC, sitesRoot)
+		log.Info("fm backend: Tier-1 (priv file.op, site UID + cgroup)")
+	} else {
+		fmBackend = fm.NewLocalBackend()
+		log.Warn("fm backend: LocalBackend (DEV) — priv helper erişilemedi; üretimde Tier-1 şart")
+	}
+	files := fm.New(fmBackend, au, sitesRoot)
 	uploads := fm.NewUploadService(files, filepath.Join(cfg.Paths.DataDir, "uploads"))
 	archives := fm.NewArchiveService(files)
 	trash := fm.NewTrashService(files, cfg.Paths.TrashDir)
