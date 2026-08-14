@@ -171,11 +171,11 @@ async function saveCaptchaSettings() {
   try {
     await api('/settings', {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         captcha_provider: captchaProvider.value,
         captcha_sitekey: captchaSiteKey.value,
         captcha_secret: captchaSecret.value,
-      })
+      },
     })
     notice.value = 'Bot koruması ayarları başarıyla kaydedildi.'
   } catch (e) {

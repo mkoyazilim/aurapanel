@@ -87,7 +87,7 @@ async function createAccount() {
   try {
     const res = await api(`/sites/${siteId.value}/sftp`, {
       method: 'POST',
-      body: JSON.stringify({ username: newUser.value, password: '' })
+      body: { username: newUser.value, password: '' }
     })
     passwordNotice.value = res.password
     notice.value = `${newUser.value} hesabı başarıyla oluşturuldu!`
