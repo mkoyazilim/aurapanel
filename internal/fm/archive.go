@@ -122,7 +122,13 @@ func (a *ArchiveService) createTarGz(ctx context.Context, siteID, out string, re
 		return err
 	}
 	defer f.Close()
-	gz := gzip.NewWriter(f)
+	return a.StreamTarGz(ctx, siteID, rels, abses, f)
+}
+
+// StreamTarGz, site kaynaklarını tar.gz olarak w'ye akıtır (yedekleme
+// ve arşiv oluşturmanın ortak çekirdeği).
+func (a *ArchiveService) StreamTarGz(ctx context.Context, siteID string, rels, abses []string, w io.Writer) error {
+	gz := gzip.NewWriter(w)
 	defer gz.Close()
 	tw := tar.NewWriter(gz)
 	defer tw.Close()
