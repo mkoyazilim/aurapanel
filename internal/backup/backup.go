@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/mkoyazilim/aurapanel/internal/audit"
-	"github.com/mkoyazilim/aurapanel/internal/fm"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 )
 
