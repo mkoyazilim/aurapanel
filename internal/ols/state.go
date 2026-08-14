@@ -53,6 +53,15 @@ const (
 	maxIndexFiles = 20
 )
 
+// ValidateDomain, tek bir domain'in kurallara uygunluğunu denetler
+// (FQDN zorunlu, TLD >= 2, toplam <= 253).
+func ValidateDomain(d string) error {
+	if len(d) > maxDomainLen || !reDomain.MatchString(d) {
+		return fmt.Errorf("domain geçersiz: %q", d)
+	}
+	return nil
+}
+
 // Validate, desired state'i sıkı kurallarla denetler.
 // Docroot/log dizinleri kullanıcıdan ALINMAZ — renderer bunları
 // siteID'den türetir; böylece docroot'a müdahale imkânsızdır.
@@ -60,8 +69,8 @@ func (v *Vhost) Validate(sitesRoot, certsRoot string) error {
 	if !reSiteID.MatchString(v.SiteID) {
 		return fmt.Errorf("site kimliği geçersiz: %q", v.SiteID)
 	}
-	if len(v.Domain) > maxDomainLen || !reDomain.MatchString(v.Domain) {
-		return fmt.Errorf("domain geçersiz: %q", v.Domain)
+	if err := ValidateDomain(v.Domain); err != nil {
+		return err
 	}
 	if len(v.Aliases) > maxAliases {
 		return fmt.Errorf("alias sayısı %d'yi aşamaz", maxAliases)

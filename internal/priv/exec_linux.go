@@ -38,7 +38,11 @@ func executePlan(ctx context.Context, p *plan) error {
 	for _, a := range p.actions {
 		switch a.kind {
 		case actMkdir:
-			if err := os.MkdirAll(a.mkdir, 0o755); err != nil {
+			mode := a.mkdirMode
+			if mode == 0 {
+				mode = 0o755
+			}
+			if err := os.MkdirAll(a.mkdir, mode); err != nil {
 				return fmt.Errorf("mkdir %s: %w", a.mkdir, err)
 			}
 		case actWrite:
@@ -59,6 +63,10 @@ func executePlan(ctx context.Context, p *plan) error {
 		case actRemove:
 			if err := os.Remove(a.remove); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("remove %s: %w", a.remove, err)
+			}
+		case actRemoveAll:
+			if err := os.RemoveAll(a.removeAll); err != nil {
+				return fmt.Errorf("removeall %s: %w", a.removeAll, err)
 			}
 		case actExec:
 			cmd := exec.CommandContext(ctx, a.exec.bin, a.exec.args...)

@@ -103,6 +103,31 @@ func composeErr(stage string, err, rbErr error) error {
 	return fmt.Errorf("%s başarısız: %w (rollback uygulandı ve doğrulandı)", stage, err)
 }
 
+// Remove, bir sitenin vhost'unu güvenle kaldırır: snapshot → dosyaları
+// kaldır → config testi → reload; herhangi bir aşama başarısız olursa
+// snapshot geri yüklenir (site hizmette kalır).
+func (p *Pipeline) Remove(ctx context.Context, site string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	snapshot, err := p.installer.ReadBundle(ctx, site)
+	if err != nil {
+		return fmt.Errorf("snapshot alınamadı (değişiklik yapılmadı): %w", err)
+	}
+
+	names := append([]string{}, bundleFileNames...)
+	if err := p.installer.RemoveBundle(ctx, site, names); err != nil {
+		return composeErr("vhost kaldırma", err, p.rollback(ctx, site, snapshot))
+	}
+	if err := p.installer.TestConfig(ctx); err != nil {
+		return composeErr("ols config doğrulaması", err, p.rollback(ctx, site, snapshot))
+	}
+	if err := p.installer.Reload(ctx); err != nil {
+		return composeErr("reload", err, p.rollback(ctx, site, snapshot))
+	}
+	return nil
+}
+
 // rollback, snapshot'ı geri yükler: önceki içerikler yazılır, yeni
 // oluşturulan dosyalar silinir, ardından config testi + reload ile
 // eski hâlin çalışır durumda olduğu doğrulanır.

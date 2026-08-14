@@ -242,6 +242,41 @@ func TestApplySerialized(t *testing.T) {
 	}
 }
 
+// Remove: dosyalar kaldırılır, test + reload çalışır.
+func TestRemoveHappy(t *testing.T) {
+	fi := newFakeInstaller()
+	fi.bundles["site001"] = map[string]string{"vhconf.conf": "# eski"}
+	p := NewPipeline(testSitesRoot, testCertsRoot, fi, &fakeProber{})
+
+	if err := p.Remove(context.Background(), "site001"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if len(fi.bundles["site001"]) != 0 {
+		t.Fatalf("bundle kaldırılmadı: %v", fi.bundles["site001"])
+	}
+	want := "read,remove,test,reload"
+	if got := strings.Join(fi.calls[:4], ","); got != want {
+		t.Fatalf("sıra: %s (beklenen %s)", got, want)
+	}
+}
+
+// Remove sonrası config testi başarısız olursa snapshot geri yüklenmeli
+// (site hizmette kalmalı).
+func TestRemoveRollbackOnTestFailure(t *testing.T) {
+	fi := newFakeInstaller()
+	fi.bundles["site001"] = map[string]string{"vhconf.conf": "# eski"}
+	fi.failTest = true
+	p := NewPipeline(testSitesRoot, testCertsRoot, fi, &fakeProber{})
+
+	err := p.Remove(context.Background(), "site001")
+	if err == nil || !strings.Contains(err.Error(), "rollback") {
+		t.Fatalf("rollback raporlanmadı: %v", err)
+	}
+	if got := fi.bundles["site001"]["vhconf.conf"]; got != "# eski" {
+		t.Fatalf("eski vhost geri gelmedi: %q", got)
+	}
+}
+
 // SSL'li vhost'ta probe 443 + TLS olmalı.
 func TestProbeForSSL(t *testing.T) {
 	fi := newFakeInstaller()

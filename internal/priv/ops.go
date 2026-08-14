@@ -119,16 +119,19 @@ const (
 	actWrite
 	actCopy
 	actRemove
+	actRemoveAll
 	actExec
 )
 
 type action struct {
-	kind   actionKind
-	mkdir  string
-	write  fileWrite
-	copy   fileCopy
-	remove string
-	exec   execSpec
+	kind      actionKind
+	mkdir     string
+	mkdirMode os.FileMode
+	write     fileWrite
+	copy      fileCopy
+	remove    string
+	removeAll string
+	exec      execSpec
 }
 
 type fileWrite struct {
@@ -152,10 +155,14 @@ type plan struct {
 	actions []action
 }
 
-func (p *plan) mkdir(path string)      { p.actions = append(p.actions, action{kind: actMkdir, mkdir: path}) }
+func (p *plan) mkdir(path string)      { p.mkdirMode(path, 0o755) }
+func (p *plan) mkdirMode(path string, mode os.FileMode) {
+	p.actions = append(p.actions, action{kind: actMkdir, mkdir: path, mkdirMode: mode})
+}
 func (p *plan) write(f fileWrite)      { p.actions = append(p.actions, action{kind: actWrite, write: f}) }
 func (p *plan) copy(c fileCopy)        { p.actions = append(p.actions, action{kind: actCopy, copy: c}) }
 func (p *plan) remove(path string)     { p.actions = append(p.actions, action{kind: actRemove, remove: path}) }
+func (p *plan) removeAll(path string)  { p.actions = append(p.actions, action{kind: actRemoveAll, removeAll: path}) }
 func (p *plan) exec(bin string, args ...string) {
 	p.actions = append(p.actions, action{kind: actExec, exec: execSpec{bin: bin, args: args}})
 }
@@ -182,6 +189,9 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"ols.install_bundle":        opOlsInstallBundle,
 		"ols.remove_bundle":         opOlsRemoveBundle,
 		"ols.reload":                opOlsReload,
+		"site.prepare":              opSitePrepare,
+		"site.teardown":             opSiteTeardown,
+		"cgroup.cleanup":            opCgroupCleanup,
 	}
 }
 
@@ -630,4 +640,72 @@ func opOlsReload(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	p := &plan{}
 	p.exec(lswsctrl, "reload")
 	return p, map[string]any{"reloaded": true}, nil
+}
+
+// --- Site yaşam döngüsü operasyonları (W4) ---
+
+// opSitePrepare, site dizin iskeletini kurar: logs (0750), tmp (0700)
+// ve site kökünün tamamını site kullanıcısına devreder (chown -R).
+func opSitePrepare(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+		User string `json:"user"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("site.prepare: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("site.prepare: site kimliği geçersiz")
+	}
+	if a.User != "www-"+a.Site {
+		return nil, nil, errors.New("site.prepare: user 'www-<site>' biçiminde olmalı")
+	}
+	root := path.Join(cfg.sitesRoot, a.Site)
+	chown, _ := bin("chown")
+	p := &plan{}
+	p.mkdirMode(path.Join(root, "logs"), 0o750)
+	p.mkdirMode(path.Join(root, "tmp"), 0o700)
+	p.exec(chown, "-R", a.User+":"+a.User, root)
+	return p, map[string]any{"site": a.Site, "root": root}, nil
+}
+
+// opSiteTeardown, site dizin ağacını kaldırır. RemoveAll yalnızca TAM
+// site köküne uygulanır — başka hiçbir yol bu op'ta geçemez.
+func opSiteTeardown(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+		User string `json:"user"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("site.teardown: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("site.teardown: site kimliği geçersiz")
+	}
+	if a.User != "www-"+a.Site {
+		return nil, nil, errors.New("site.teardown: user 'www-<site>' biçiminde olmalı")
+	}
+	root := path.Join(cfg.sitesRoot, a.Site)
+	p := &plan{}
+	p.removeAll(root)
+	return p, map[string]any{"site": a.Site, "root": root}, nil
+}
+
+// opCgroupCleanup, site cgroup alt dizinini kaldırır. Cgroup içinde
+// yaşayan süreçler varsa çekirdek reddeder (EBUSY) — hata panelde
+// "deleting" durumunda kalır ve admin yeniden dener.
+func opCgroupCleanup(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Site string `json:"site"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("cgroup.cleanup: %w", err)
+	}
+	if !reSiteID.MatchString(a.Site) {
+		return nil, nil, errors.New("cgroup.cleanup: site kimliği geçersiz")
+	}
+	dir := path.Join(cfg.cgroupBase, "sites", a.Site)
+	p := &plan{}
+	p.removeAll(dir)
+	return p, map[string]any{"site": a.Site}, nil
 }

@@ -30,6 +30,7 @@ func TestRegistryAllowlist(t *testing.T) {
 		"cgroup.bootstrap", "cgroup.limits", "quota.set",
 		"firewall.apply", "sshd.install_config", "logrotate.install_config",
 		"ols.test", "ols.read_bundle", "ols.install_bundle", "ols.remove_bundle", "ols.reload",
+		"site.prepare", "site.teardown", "cgroup.cleanup",
 	}
 	if len(reg) != len(want) {
 		t.Fatalf("op sayısı beklenmiyor: %d (beklenen %d)", len(reg), len(want))
@@ -277,6 +278,48 @@ func TestOlsBundleValidation(t *testing.T) {
 	}
 }
 
+// site.prepare/teardown değişmezi: user www-<site> olmalı; teardown
+// RemoveAll'ı yalnızca TAM site köküne uygular.
+func TestSitePrepareTeardownValidation(t *testing.T) {
+	cfg := testCfg()
+	prep := newRegistry(cfg)["site.prepare"]
+	tear := newRegistry(cfg)["site.teardown"]
+
+	if _, _, err := prep(cfg, mustJSON(t, map[string]any{"site": "site001", "user": "www-site002"})); err == nil {
+		t.Error("user değişmezi ihlali kabul edildi")
+	}
+	if _, _, err := prep(cfg, mustJSON(t, map[string]any{"site": "../x", "user": "www-../x"})); err == nil {
+		t.Error("geçersiz site kabul edildi")
+	}
+	p, _, err := prep(cfg, mustJSON(t, map[string]any{"site": "site001", "user": "www-site001"}))
+	if err != nil {
+		t.Fatalf("geçerli prepare reddedildi: %v", err)
+	}
+	if p.actions[0].kind != actMkdir || p.actions[0].mkdir != "/srv/aurapanel/sites/site001/logs" {
+		t.Fatal("ilk eylem mkdir(logs) olmalı")
+	}
+	if p.actions[1].mkdirMode != 0o700 {
+		t.Errorf("tmp 0700 olmalı, %o geldi", p.actions[1].mkdirMode)
+	}
+
+	pt, _, err := tear(cfg, mustJSON(t, map[string]any{"site": "site001", "user": "www-site001"}))
+	if err != nil {
+		t.Fatalf("geçerli teardown reddedildi: %v", err)
+	}
+	if pt.actions[0].kind != actRemoveAll || pt.actions[0].removeAll != "/srv/aurapanel/sites/site001" {
+		t.Fatalf("teardown TAM site kökünü hedeflemeli: %+v", pt.actions[0])
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
 // Her op'un mutlu-yol planı bin allowlist'ine uygun olmalı.
 func TestAllOpsHappyPathBins(t *testing.T) {
 	cfg := testCfg()
@@ -297,6 +340,9 @@ func TestAllOpsHappyPathBins(t *testing.T) {
 		"ols.install_bundle":        {"site": "site001", "files": []map[string]any{{"name": "vhconf.conf", "content": "# test"}}},
 		"ols.remove_bundle":         {"site": "site001", "names": []string{"vhconf.conf"}},
 		"ols.reload":                {},
+		"site.prepare":              {"site": "site001", "user": "www-site001"},
+		"site.teardown":             {"site": "site001", "user": "www-site001"},
+		"cgroup.cleanup":            {"site": "site001"},
 	}
 	for op, args := range happy {
 		raw, _ := json.Marshal(args)
