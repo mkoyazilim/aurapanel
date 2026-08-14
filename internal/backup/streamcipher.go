@@ -52,12 +52,15 @@ func (e *encryptWriter) Write(p []byte) (int, error) {
 			return total, err
 		}
 		ct := e.aead.Seal(nil, nonce, p[:n], nil)
+		// Biçim: [4B uzunluk][24B nonce][şifreli metin+etiket] — nonce
+		// ŞİFRELİ AKIŞA DAHİL EDİLİR; çözücü onu blok başından okur.
+		blob := append(nonce, ct...)
 		var lenBuf [4]byte
-		binary.BigEndian.PutUint32(lenBuf[:], uint32(len(ct)))
+		binary.BigEndian.PutUint32(lenBuf[:], uint32(len(blob)))
 		if _, err := e.w.Write(lenBuf[:]); err != nil {
 			return total, err
 		}
-		if _, err := e.w.Write(ct); err != nil {
+		if _, err := e.w.Write(blob); err != nil {
 			return total, err
 		}
 		total += n

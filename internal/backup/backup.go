@@ -115,7 +115,8 @@ func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) 
 		return "", fmt.Errorf("geçersiz yedek türü: %q", kind)
 	}
 
-	name := fmt.Sprintf("%s-%s-%s.apbk", siteID, kind, time.Now().UTC().Format("20060102T150405Z"))
+	// Nanosaniye hassasiyeti: aynı saniyedeki ardışık yedekler çakışmaz.
+	name := fmt.Sprintf("%s-%s-%s.apbk", siteID, kind, time.Now().UTC().Format("20060102T150405.000000000Z"))
 
 	// Kayıt: pending.
 	recID, err := s.store.InsertBackup(ctx, store.Backup{
