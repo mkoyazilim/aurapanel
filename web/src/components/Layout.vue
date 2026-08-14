@@ -122,7 +122,7 @@ async function logout() {
   padding: 24px 12px;
 }
 .brand { padding: 4px 6px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
-.server-address { font-size: 11px; color: #64748b; font-weight: 600; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0; letter-spacing: 0.5px; }
+.server-address { font-size: 13px; color: #64748b; font-weight: 600; background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0; letter-spacing: 0.5px; }
 .brand-link { display: flex; align-items: center; justify-content: center; width: 100%; text-decoration: none; }
 .brand-logo { width: 100%; max-width: 210px; height: auto; max-height: 48px; object-fit: contain; }
 .brand-icon { width: 34px; height: 34px; object-fit: contain; }
