@@ -338,9 +338,17 @@ func opCgroupBootstrap(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cgroup.bootstrap: %w", err)
 	}
+	sites := path.Join(base, "sites")
 	chown, _ := bin("chown")
 	p := &plan{}
 	p.mkdir(base)
+	// Enable controllers in root before creating child (sites)
+	p.write(fileWrite{path: path.Join(base, "cgroup.subtree_control"), content: "+cpu +memory +pids\n", mode: 0o644})
+	
+	p.mkdir(sites)
+	// Enable controllers in sites so that site001, site002 etc. get them
+	p.write(fileWrite{path: path.Join(sites, "cgroup.subtree_control"), content: "+cpu +memory +pids\n", mode: 0o644})
+	
 	// Delegation: alt ağacın sahipliğini panel kullanıcısına devret
 	// (panel, site cgroup'larını root olmadan yönetebilsin — §3).
 	p.exec(chown, "-R", cfg.panelUser+":"+cfg.panelUser, base)
