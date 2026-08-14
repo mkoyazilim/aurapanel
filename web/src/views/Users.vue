@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { api } from '../api.js'
 
 const users = ref([])
 const loading = ref(true)
@@ -11,8 +12,9 @@ const notice = ref('')
 async function loadUsers() {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/users')
-    if (res.ok) users.value = await res.json()
+    users.value = await api.get('/users') || []
+  } catch (e) {
+    error.value = e.message || 'Yükleme hatası'
   } finally {
     loading.value = false
   }
@@ -22,24 +24,27 @@ async function createUser() {
   error.value = ''
   notice.value = ''
   if (!form.value.username || !form.value.password) return
-  const res = await fetch('/api/v1/users', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(form.value)
-  })
-  if (!res.ok) {
-    const data = await res.json()
-    error.value = data.error || 'Failed to create user'
+  try {
+    await api.post('/users', form.value)
+  } catch (e) {
+    error.value = e.message || 'Oluşturma hatası'
     return
   }
-  notice.value = 'User created successfully.'
+  notice.value = 'Kullanıcı oluşturuldu.'
   form.value = { username: '', password: '', role: 'user' }
   loadUsers()
 }
 
 async function deleteUser(id) {
-  if (!confirm('Are you sure you want to delete this user?')) return
-  await fetch(`/api/v1/users/${id}`, { method: 'DELETE' })
+  if (!confirm('Emin misiniz?')) return
+  try {
+    await api.delete(`/users/${id}`)
+  } catch (e) {
+    error.value = e.message || 'Silme hatası'
+    return
+  }
+  loadUsers()
+
   loadUsers()
 }
 

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { api } from "../api.js"
 import Layout from '../components/Layout.vue'
 
 const metrics     = ref([])   // []ServerMetrics
@@ -13,9 +14,7 @@ let refreshTimer = null
 async function loadMetrics() {
   loadingM.value = true
   try {
-    const res = await fetch('/api/v1/cluster/metrics')
-    if (res.ok) metrics.value = await res.json() ?? []
-    else error.value = 'Failed to load metrics'
+    metrics.value = await api.get('/cluster/metrics') || []
   } catch (e) {
     error.value = e.message
   } finally {
@@ -26,8 +25,7 @@ async function loadMetrics() {
 async function loadEvents() {
   loadingE.value = true
   try {
-    const res = await fetch('/api/v1/cluster/events?limit=20')
-    if (res.ok) events.value = await res.json() ?? []
+    events.value = await api.get('/cluster/events?limit=20') || []
   } finally {
     loadingE.value = false
   }

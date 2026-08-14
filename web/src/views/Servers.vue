@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { api } from '../api.js'
 
 const servers   = ref([])
 const loading   = ref(true)
@@ -25,8 +26,9 @@ const metricsSrv   = ref(null)
 async function loadServers() {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/cluster')
-    if (res.ok) servers.value = await res.json()
+    servers.value = await api.get('/cluster') || []
+  } catch (e) {
+    error.value = e.message || 'Yükleme hatası'
   } finally {
     loading.value = false
   }
@@ -36,51 +38,45 @@ async function addServer() {
   error.value  = ''
   notice.value = ''
   if (!form.value.name || !form.value.ip_address) return
-  const res = await fetch('/api/v1/cluster', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(form.value)
-  })
-  if (!res.ok) {
-    const d = await res.json()
-    error.value = d.error || 'Failed to add server'
-    return
+  try {
+    await api.post('/cluster', form.value)
+    notice.value = 'Cluster node added.'
+    form.value = { name: '', ip_address: '' }
+    loadServers()
+  } catch (e) {
+    error.value = e.message || 'Ekleme hatası'
   }
-  notice.value = 'Cluster node added.'
-  form.value = { name: '', ip_address: '' }
-  loadServers()
 }
 
 async function deleteServer(id) {
   if (!confirm('Remove this server from cluster?')) return
-  await fetch(`/api/v1/cluster/${id}`, { method: 'DELETE' })
-  loadServers()
+  try {
+    await api.delete(`/cluster/${id}`)
+    loadServers()
+  } catch (e) { error.value = e.message }
 }
 
 async function checkHealth(id) {
   const srv = servers.value.find(s => s.id === id)
   if (srv) srv.status = 'checking...'
-  const res = await fetch(`/api/v1/cluster/${id}/health`)
-  if (res.ok) {
-    const d = await res.json()
+  try {
+    const d = await api.get(`/cluster/${id}/health`)
     if (srv) srv.status = d.status
-  }
+  } catch {}
 }
 
 async function rotateKey(id) {
   if (!confirm('Rotate API key? The old key will be invalidated immediately.')) return
   rotatingSrv.value = id
   rotatedKey.value  = ''
-  const res = await fetch(`/api/v1/servers/${id}/rotate-key`, { method: 'POST' })
-  rotatingSrv.value = null
-  if (!res.ok) {
-    const d = await res.json()
-    error.value = d.error || 'Key rotation failed'
-    return
+  try {
+    const d = await api.post(`/servers/${id}/rotate-key`)
+    rotatedKey.value = d.api_key
+    notice.value = 'Key rotated — copy it now, it will not be shown again.'
+  } catch (e) {
+    error.value = e.message || 'Key rotation failed'
   }
-  const d = await res.json()
-  rotatedKey.value = d.api_key
-  notice.value = 'Key rotated — copy it now, it will not be shown again.'
+  rotatingSrv.value = null
 }
 
 function openSiteModal(id) {
@@ -91,29 +87,23 @@ function openSiteModal(id) {
 
 async function createSite() {
   error.value = ''
-  const res = await fetch(`/api/v1/servers/${siteSrvID.value}/sites`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(siteForm.value)
-  })
-  siteModal.value = false
-  if (!res.ok) {
-    const d = await res.json()
-    error.value = d.error || 'Site create failed'
-    return
+  try {
+    await api.post(`/servers/${siteSrvID.value}/sites`, siteForm.value)
+    notice.value = 'Site creation queued on remote agent.'
+    siteModal.value = false
+  } catch (e) {
+    error.value = e.message || 'Site create failed'
   }
-  notice.value = 'Site creation queued on remote agent.'
 }
 
 async function showMetrics(srv) {
   metricsData.value = null
   metricsSrv.value  = srv
   metricsModal.value = true
-  const res = await fetch('/api/v1/cluster/metrics')
-  if (res.ok) {
-    const all = await res.json()
+  try {
+    const all = await api.get('/cluster/metrics') || []
     metricsData.value = all.find(m => m.server_id === srv.id) || null
-  }
+  } catch (e) { error.value = e.message }
 }
 
 onMounted(loadServers)

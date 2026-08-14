@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { api } from '../api.js'
 
 const resellers = ref([])
 const loading = ref(true)
@@ -22,15 +23,9 @@ async function loadResellers() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch('/api/v1/resellers')
-    if (res.ok) {
-      resellers.value = await res.json()
-    } else {
-      const d = await res.json().catch(() => ({}))
-      error.value = d.error || 'Yükleme hatası'
-    }
-  } catch {
-    error.value = 'Bağlantı hatası'
+    resellers.value = await api.get('/resellers') || []
+  } catch (err) {
+    error.value = err.message || 'Yükleme hatası'
   } finally {
     loading.value = false
   }
@@ -48,14 +43,10 @@ async function createReseller() {
     addError.value = 'Kullanıcı adı ve şifre gereklidir.'
     return
   }
-  const res = await fetch('/api/v1/resellers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(addForm.value),
-  })
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    addError.value = d.error || 'Oluşturma hatası'
+  try {
+    await api.post('/resellers', addForm.value)
+  } catch (err) {
+    addError.value = err.message || 'Oluşturma hatası'
     return
   }
   notice.value = 'Reseller oluşturuldu.'
@@ -66,10 +57,10 @@ async function createReseller() {
 async function deleteReseller(id, username) {
   if (!confirm(`"${username}" adlı reseller silinecek. Emin misiniz?`)) return
   error.value = ''
-  const res = await fetch(`/api/v1/resellers/${id}`, { method: 'DELETE' })
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    error.value = d.error || 'Silme hatası'
+  try {
+    await api.delete(`/resellers/${id}`)
+  } catch (err) {
+    error.value = err.message || 'Silme hatası'
     return
   }
   notice.value = 'Reseller silindi.'
@@ -80,34 +71,33 @@ async function openQuotaModal(r) {
   quotaError.value = ''
   quotaResellerId.value = r.id
   quotaForm.value = { max_sites: 0, max_databases: 0, max_disk_gb: 0, max_bandwidth_gb: 0 }
-  const res = await fetch(`/api/v1/resellers/${r.id}/quota`)
-  if (res.ok) {
-    const q = await res.json()
-    quotaForm.value = {
-      max_sites: q.max_sites ?? 0,
-      max_databases: q.max_databases ?? 0,
-      max_disk_gb: q.max_disk_gb ?? 0,
-      max_bandwidth_gb: q.max_bandwidth_gb ?? 0,
+  try {
+    const q = await api.get(`/resellers/${r.id}/quota`)
+    if (q) {
+      quotaForm.value = {
+        max_sites: q.max_sites ?? 0,
+        max_databases: q.max_databases ?? 0,
+        max_disk_gb: q.max_disk_gb ?? 0,
+        max_bandwidth_gb: q.max_bandwidth_gb ?? 0,
+      }
     }
+  } catch (err) {
+    quotaError.value = 'Mevcut kota yüklenemedi: ' + err.message
   }
   showQuotaModal.value = true
 }
 
 async function saveQuota() {
   quotaError.value = ''
-  const res = await fetch(`/api/v1/resellers/${quotaResellerId.value}/quota`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await api.put(`/resellers/${quotaResellerId.value}/quota`, {
       max_sites: Number(quotaForm.value.max_sites),
       max_databases: Number(quotaForm.value.max_databases),
       max_disk_gb: Number(quotaForm.value.max_disk_gb),
       max_bandwidth_gb: Number(quotaForm.value.max_bandwidth_gb),
-    }),
-  })
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    quotaError.value = d.error || 'Kaydetme hatası'
+    })
+  } catch (err) {
+    quotaError.value = err.message || 'Kaydetme hatası'
     return
   }
   notice.value = 'Kota güncellendi.'
