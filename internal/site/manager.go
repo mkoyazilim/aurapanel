@@ -189,7 +189,16 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 		{"user.create", func() error { return m.priv.UserCreate(ctx, user, home) }},
 		{"site.prepare", func() error { return m.priv.SitePrepare(ctx, siteID, user) }},
 		{"cgroup.limits", func() error { return m.priv.CgroupLimits(ctx, siteID, limits) }},
-		{"quota.set", func() error { return m.priv.QuotaSet(ctx, user, limits.DiskMB, limits.Inodes) }},
+		{"quota.set", func() error {
+			if err := m.priv.QuotaSet(ctx, user, limits.DiskMB, limits.Inodes); err != nil {
+				// Faz 1: VPS'te quota aktif değilse (kernel desteksiz vb.) uyarı bırak, siteyi bozma.
+				m.audit.Write(ctx, audit.Event{
+					Action: "site.create.warn", Target: siteID, Result: "warn",
+					Extra: map[string]any{"step": "quota.set", "error": err.Error()},
+				})
+			}
+			return nil
+		}},
 		{"vhost.apply", func() error {
 			return m.vhost.Apply(ctx, ols.Vhost{
 				SiteID:     siteID,
