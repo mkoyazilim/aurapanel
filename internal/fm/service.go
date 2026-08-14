@@ -221,6 +221,10 @@ func (s *FileService) Write(ctx context.Context, siteID, relPath string, content
 			return ErrConflict
 		}
 	}
+	// Ebeveyn dizin garantisi: derin yollara yazım her zaman çalışır.
+	if err := s.backend.MkdirAll(ctx, path.Dir(abs), 0o755); err != nil {
+		return err
+	}
 	if err := s.backend.WriteFileAtomic(ctx, abs, content, 0o644); err != nil {
 		return err
 	}
