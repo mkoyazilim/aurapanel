@@ -162,6 +162,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/adminer/open", s.handleAdminerOpen)
 
 	// SSL.
+	m.HandleFunc("GET /api/v1/sites/{id}/ssl", s.handleSSLInfo)
 	m.HandleFunc("POST /api/v1/sites/{id}/ssl/letsencrypt", s.handleSSLEnableLE)
 	m.HandleFunc("POST /api/v1/sites/{id}/ssl/custom", s.handleSSLCustom)
 	m.HandleFunc("POST /api/v1/sites/{id}/ssl/disable", s.handleSSLDisable)

@@ -247,7 +247,7 @@ func (s *Service) renewOne(ctx context.Context, rec *store.SSLCert) error {
 
 // ExpiringSoon, izleme için yaklaşan süreleri raporlar.
 func (s *Service) ExpiringSoon(ctx context.Context) ([]map[string]any, error) {
-	cutoff := time.Now().UTC().Add(s.renewBefore).Format(time.RFC3339)
+	cutoff := time.Now().Add(s.renewBefore).UTC().Format(time.RFC3339)
 	due, err := s.store.ListSSLCertsExpiringBefore(ctx, cutoff)
 	if err != nil {
 		return nil, err
@@ -255,18 +255,53 @@ func (s *Service) ExpiringSoon(ctx context.Context) ([]map[string]any, error) {
 	out := make([]map[string]any, 0, len(due))
 	for _, rec := range due {
 		d, err := s.store.GetDomainByID(ctx, rec.DomainID.Int64)
-		if err != nil {
-			return nil, err
-		}
-		if d == nil {
+		if err != nil || d == nil {
 			continue
 		}
 		out = append(out, map[string]any{
-			"site_id": rec.SiteID, "domain": d.Domain,
-			"expires": rec.NotAfter.String, "auto_renew": rec.AutoRenew == 1,
+			"site_id":    rec.SiteID,
+			"domain":     d.Domain,
+			"not_after":  rec.NotAfter.String,
+			"issuer":     rec.Issuer,
+			"auto_renew": rec.AutoRenew == 1,
 		})
 	}
 	return out, nil
+}
+
+// Info, sitenin ana domaini için SSL durumunu döndürür.
+func (s *Service) Info(ctx context.Context, siteID string) (map[string]any, error) {
+	domains, err := s.store.ListDomainsBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	var mainDomain *store.Domain
+	for i, d := range domains {
+		if d.Kind == "main" {
+			mainDomain = &domains[i]
+			break
+		}
+	}
+	if mainDomain == nil {
+		return map[string]any{"enabled": false}, nil
+	}
+
+	rec, err := s.store.GetSSLCertByDomain(ctx, mainDomain.ID)
+	if err != nil {
+		return nil, err
+	}
+	if rec == nil {
+		return map[string]any{"enabled": false}, nil
+	}
+
+	return map[string]any{
+		"enabled":    true,
+		"domain":     mainDomain.Domain,
+		"issuer":     rec.Issuer,
+		"not_before": rec.NotBefore.String,
+		"not_after":  rec.NotAfter.String,
+		"auto_renew": rec.AutoRenew == 1,
+	}, nil
 }
 
 // buildVhost, site kaydından vhost desired state'ini üretir; ana domainin

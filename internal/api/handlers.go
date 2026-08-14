@@ -893,6 +893,18 @@ func (s *Server) handleAdminerOpen(w http.ResponseWriter, r *http.Request) {
 
 // --- SSL ---
 
+func (s *Server) handleSSLInfo(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	info, err := s.deps.SSL.Info(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
 func (s *Server) handleSSLEnableLE(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
