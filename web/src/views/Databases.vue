@@ -84,19 +84,15 @@ async function loadAll() {
   if (!siteId.value) return
   error.value = ''
   try {
-    dbs.value = await api(`/sites/${siteId.value}/databases`)
-    const raw = await api(`/sites/${siteId.value}/databases`)
-    dbs.value = raw
-    users.value = (await api(`/sites/${siteId.value}/databases`)).length ? users.value : users.value
-    // Kullanıcılar listesi: db-users uç noktası eklenmedi; db.users kullanılır.
+    dbs.value = await api(`/sites/${siteId.value}/databases`) || []
   } catch (e) {
     error.value = e.message
+    dbs.value = []
   }
+  
   try {
-    // Kullanıcı listesi: API'de /db-users/list yok; /db/users dönüşü db paketi ListUsers.
-    const u = await fetch('/api/v1/sites/' + siteId.value + '/db-users').then((r) => r.json())
-    users.value = Array.isArray(u) ? u : []
-  } catch {
+    users.value = await api(`/sites/${siteId.value}/db-users`) || []
+  } catch (e) {
     users.value = []
   }
 }

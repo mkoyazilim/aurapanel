@@ -8,11 +8,11 @@ import (
 
 // Database, databases kaydı.
 type Database struct {
-	ID        int64
-	SiteID    string
-	Name      string
-	Charset   string
-	CreatedAt string
+	ID        int64  `json:"id"`
+	SiteID    string `json:"site_id"`
+	Name      string `json:"name"`
+	Charset   string `json:"charset"`
+	CreatedAt string `json:"created_at"`
 }
 
 // InsertDatabase, yeni DB kaydı ekler.
@@ -86,12 +86,12 @@ func (s *Store) DeleteDatabase(ctx context.Context, id int64) error {
 
 // DatabaseUser, database_users kaydı (password_enc = encrypted-at-rest).
 type DatabaseUser struct {
-	ID          int64
-	SiteID      string
-	Username    string
-	PasswordEnc string
-	Host        string
-	CreatedAt   string
+	ID          int64  `json:"id"`
+	SiteID      string `json:"site_id"`
+	Username    string `json:"username"`
+	PasswordEnc string `json:"-"`
+	Host        string `json:"host"`
+	CreatedAt   string `json:"created_at"`
 }
 
 // InsertDatabaseUser, yeni DB kullanıcısı ekler.
