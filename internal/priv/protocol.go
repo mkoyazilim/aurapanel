@@ -26,25 +26,34 @@ type Response struct {
 	RequestID string `json:"request_id,omitempty"`
 }
 
-// decodeRequest, tek bir JSON isteğini sıkı kurallarla okur:
+// decodeRequest, bağlantıdan TEK bir JSON isteğini sıkı kurallarla okur:
 // bilinmeyen alan reddi, 64 KiB boyut sınırı, artık veri reddi, boş op reddi.
+//
+// NOT: Akıştan tek JSON değeri okunur — asla EOF beklenmez. İstemci,
+// isteği gönderdikten sonra yazma tarafını kapatmadan yanıt bekler;
+// EOF beklemek her isteği zaman aşımına sokardı (sunucu smoke testinde
+// yakalanan gerçek hata — regresyon testi: TestDecodeStreamingWithoutHalfClose).
 func decodeRequest(r io.Reader) (*Request, error) {
-	b, err := io.ReadAll(io.LimitReader(r, maxRequestSize+1))
-	if err != nil {
-		return nil, fmt.Errorf("okuma: %w", err)
-	}
-	if len(b) > maxRequestSize {
-		return nil, errors.New("istek boyutu sınırı aşıldı (64 KiB)")
-	}
+	dec := json.NewDecoder(io.LimitReader(r, maxRequestSize+1))
+	dec.DisallowUnknownFields()
 
 	var req Request
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
+		if err == io.EOF {
+			return nil, errors.New("boş istek")
+		}
 		return nil, fmt.Errorf("json çözümleme: %w", err)
 	}
-	if dec.More() {
-		return nil, errors.New("istekte artık veri var")
+	// Artık veri kontrolü YALNIZCA decoder'ın tamponunda kalana bakar —
+	// canlı sokette More()/yeni okuma BLOKE OLUR (regresyon testi:
+	// TestDecodeStreamingWithoutHalfClose). Tampondaki beyaz boşluk dışı
+	// artık baytlar reddedilir; tampon dışı artıklar bağlantı kapanışında
+	// atılır ve hiçbir işlem görmez.
+	if br := dec.Buffered(); br != nil {
+		leftover, err := io.ReadAll(br)
+		if err == nil && len(bytes.TrimSpace(leftover)) > 0 {
+			return nil, errors.New("istekte artık veri var")
+		}
 	}
 	if req.Op == "" {
 		return nil, errors.New("op boş olamaz")

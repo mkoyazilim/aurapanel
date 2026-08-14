@@ -3,8 +3,10 @@ package priv
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDecodeValid(t *testing.T) {
@@ -59,6 +61,36 @@ func TestDecodeRejectsGarbage(t *testing.T) {
 			t.Fatalf("bozuk girdi kabul edildi: %q", in)
 		}
 	}
+}
+
+// Sunucu smoke testinden gelen regresyon: istemci isteği gönderir ve
+// yazma tarafını KAPATMADAN yanıt bekler. decodeRequest tek JSON değerini
+// okuyup dönmeli; EOF beklemek zaman aşımı üretirdi.
+func TestDecodeStreamingWithoutHalfClose(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		client.Write([]byte(`{"op":"priv.ping","request_id":"r1"}`))
+		client.SetReadDeadline(time.Now().Add(2 * time.Second))
+		buf := make([]byte, 512)
+		if _, err := client.Read(buf); err != nil {
+			t.Errorf("yanıt alınamadı: %v", err)
+		}
+	}()
+
+	req, err := decodeRequest(server)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if req.Op != "priv.ping" || req.RequestID != "r1" {
+		t.Fatalf("istek hatalı: %+v", req)
+	}
+	// İstemci yazma tarafını kapatmasa bile yanıt hemen yazılabilmeli.
+	server.Write([]byte("{\"ok\":true}\n"))
+	<-done
 }
 
 func TestResponseRoundTrip(t *testing.T) {
