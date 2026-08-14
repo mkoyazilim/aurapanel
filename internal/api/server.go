@@ -23,6 +23,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
+	"github.com/mkoyazilim/aurapanel/internal/update"
 )
 
 // SiteManager, site yaşam döngüsü arayüzü (site.Manager bunu sağlar).
@@ -55,6 +56,7 @@ type Deps struct {
 	Backups   *backup.Service
 	DriftScan *drift.Scanner
 	DriftFix  *drift.Repairer
+	Updates   *update.Service
 }
 
 // Server, HTTP sunucusu.
@@ -161,6 +163,10 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/drift/scan", s.handleDriftScan)
 	m.HandleFunc("POST /api/v1/drift/repair", s.handleDriftRepair)
 	m.HandleFunc("PUT /api/v1/drift/auto-repair", s.handleDriftAutoRepair)
+
+	// Güncelleme merkezi (W14).
+	m.HandleFunc("GET /api/v1/update/check", s.handleUpdateCheck)
+	m.HandleFunc("POST /api/v1/update/self", s.handleUpdateSelf)
 }
 
 // --- JSON yardımcıları ---

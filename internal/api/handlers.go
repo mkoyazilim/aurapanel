@@ -993,3 +993,37 @@ func (s *Server) handleDriftAutoRepair(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
+
+// --- Güncelleme merkezi (W14) ---
+
+func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	if s.deps.Updates == nil {
+		writeErr(w, http.StatusNotImplemented, "güncelleme servisi bağlı değil")
+		return
+	}
+	out, err := s.deps.Updates.Check(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleUpdateSelf(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	if s.deps.Updates == nil {
+		writeErr(w, http.StatusNotImplemented, "güncelleme servisi bağlı değil")
+		return
+	}
+	v, err := s.deps.Updates.SelfUpdate(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"version": v, "note": "binary değişti; yeniden başlatma önerilir"})
+}

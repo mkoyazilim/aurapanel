@@ -34,6 +34,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/ssl"
 	"github.com/mkoyazilim/aurapanel/internal/store"
+	"github.com/mkoyazilim/aurapanel/internal/update"
 	"github.com/mkoyazilim/aurapanel/internal/webui"
 )
 
@@ -169,12 +170,21 @@ func main() {
 	repairer := drift.NewRepairer(st, dc, sitesRoot, certsRoot)
 	scanner := drift.NewScanner(st, dc, sitesRoot, certsRoot, au, repairer)
 
+	// Güncelleme merkezi: manifest, ikili dağıtım reposundan (pinned).
+	exe, err := os.Executable()
+	if err != nil {
+		exe = "/usr/local/sbin/aurapanel"
+	}
+	upd := update.NewService(&update.HTTPFetcher{},
+		"https://github.com/mkoyazilim/downloadaurapanel/releases/latest/download/versions.json",
+		version, exe)
+
 	srv := api.New(api.Deps{
 		Store: st, Audit: au, Sessions: sessions, Cipher: cipher, Cfg: cfg, Log: log,
 		Web: webui.Handler(),
 		Sites: siteMgr, Files: files, Uploads: uploads, Archive: archives, Trash: trash,
 		PHP: phpSvc, DB: dbSvc, SSL: sslSvc, Backups: bkSvc,
-		DriftScan: scanner, DriftFix: repairer,
+		DriftScan: scanner, DriftFix: repairer, Updates: upd,
 	})
 
 	httpSrv := &http.Server{
