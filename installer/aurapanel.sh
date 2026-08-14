@@ -85,6 +85,12 @@ install -d -o aurapanel -g aurapanel -m 750 /var/lib/aurapanel /var/lib/aurapane
 install -d -o aurapanel -g aurapanel -m 755 /srv/aurapanel /srv/aurapanel/sites /srv/aurapanel/backups
 install -d -m 750 /run/aurapanel && chown root:aurapanel /run/aurapanel
 install -d -m 750 /var/log/aurapanel && chown root:aurapanel /var/log/aurapanel
+# /run tmpfs'tir: reboot'ta silinir. tmpfiles.d, priv socket dizinini her açılışta
+# yeniden oluşturur (priv.sock'un kendisi systemd socket unit'ine aittir).
+cat > /usr/lib/tmpfiles.d/aurapanel.conf <<'EOF'
+d /run/aurapanel 0750 root aurapanel -
+EOF
+systemd-tmpfiles --create /usr/lib/tmpfiles.d/aurapanel.conf >/dev/null 2>&1 || true
 if [[ ! -f /var/lib/aurapanel/keys/master.key ]]; then
   head -c 32 /dev/urandom > /var/lib/aurapanel/keys/master.key
   chown aurapanel:aurapanel /var/lib/aurapanel/keys/master.key
@@ -149,12 +155,11 @@ EOF
 chmod 640 /etc/aurapanel/aurapanel.yaml
 chown root:aurapanel /etc/aurapanel/aurapanel.yaml
 
-# --- 8) systemd birimleri ---
-log "systemd birimleri…"
 cat > /etc/systemd/system/aurapanel.service <<'EOF'
 [Unit]
 Description=AuraPanel (OpenLiteSpeed control panel)
-After=network.target mariadb.service
+After=network.target mariadb.service aurapanel-priv.socket
+Wants=aurapanel-priv.socket
 
 [Service]
 User=aurapanel
@@ -182,20 +187,35 @@ SocketMode=0660
 WantedBy=sockets.target
 EOF
 
-cat > /etc/systemd/system/aurapanel-priv@.service <<'EOF'
+cat > /etc/systemd/system/aurapanel-priv.service <<'EOF'
 [Unit]
 Description=AuraPanel privileged helper
-
 [Service]
 Type=simple
 ExecStart=/usr/local/sbin/aurapanel-priv
 StandardInput=socket
 StandardOutput=journal
+Restart=on-failure
+RestartSec=2
 EOF
 
 systemctl daemon-reload
 systemctl enable --now aurapanel-priv.socket >/dev/null 2>&1 || true
 systemctl enable aurapanel.service >/dev/null 2>&1 || true
+
+# --- 8.5) Log rotation (priv.log append-only: copytruncate) ---
+log "Log rotation…"
+cat > /etc/logrotate.d/aurapanel <<'EOF'
+/var/log/aurapanel/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
 
 # --- 9) nftables default-deny ---
 log "Firewall (nftables default-deny)…"

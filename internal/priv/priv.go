@@ -99,26 +99,56 @@ func stdLogger() *logpkg.Logger {
 	return logpkg.New(os.Stderr, "aurapanel-priv: ", logpkg.LstdFlags)
 }
 
-// serve, Unix socket'i açar ve istekleri kabul eder.
-// Socket 0660 root:panel-user olarak oluşturulur; yalnızca panel kullanıcısı bağlanabilir.
-func serve(cfg *runtimeCfg, pl *privLog, socketPath string) error {
+// sdListenEnabled, systemd socket activation'ı algılar (sd_listen_fds
+// protokolü): LISTEN_FDS=1 ve LISTEN_PID kendimiz ise fd 3 hazır dinleyen
+// sokettir. LISTEN_PID boşsa kendi pid'imiz sayılır (sd_listen_fds davranışı).
+func sdListenEnabled() bool {
+	if runtime.GOOS == "windows" {
+		return false
+	}
+	if os.Getenv("LISTEN_FDS") != "1" {
+		return false
+	}
+	pid := os.Getenv("LISTEN_PID")
+	return pid == "" || pid == strconv.Itoa(os.Getpid())
+}
+
+// openListener, dinleme soketini açar. systemd socket activation varsa soketi
+// devralır (systemdListener — socket dosyası systemd'e aittir, dokunulmaz);
+// yoksa dosyayı kendisi oluşturur (0660 root:panel-user).
+func openListener(socketPath string, panelGID uint32) (net.Listener, error) {
 	dir := filepath.Dir(socketPath)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("socket dizini: %w", err)
+		return nil, fmt.Errorf("socket dizini: %w", err)
 	}
 	if runtime.GOOS != "windows" {
-		os.Chown(dir, 0, int(cfg.panelGID))
+		os.Chown(dir, 0, int(panelGID))
+	}
+	if ln, ok := systemdListener(); ok {
+		return ln, nil
+	}
+	if runtime.GOOS != "windows" {
 		os.Remove(socketPath) // bayat socket dosyası
 	}
 	ln, err := net.Listen("unix", socketPath)
 	if err != nil {
-		return fmt.Errorf("dinleme %s: %w", socketPath, err)
+		return nil, fmt.Errorf("dinleme %s: %w", socketPath, err)
 	}
-	defer ln.Close()
 	if runtime.GOOS != "windows" {
 		os.Chmod(socketPath, 0o660)
-		os.Chown(socketPath, 0, int(cfg.panelGID))
+		os.Chown(socketPath, 0, int(panelGID))
 	}
+	return ln, nil
+}
+
+// serve, Unix socket'i açar ve istekleri kabul eder.
+// Socket 0660 root:panel-user olarak oluşturulur; yalnızca panel kullanıcısı bağlanabilir.
+func serve(cfg *runtimeCfg, pl *privLog, socketPath string) error {
+	ln, err := openListener(socketPath, cfg.panelGID)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
 
 	log := stdLogger()
 	log.Printf("dinleniyor %s (panel kullanıcısı: %s uid=%d)", socketPath, cfg.panelUser, cfg.panelUID)
