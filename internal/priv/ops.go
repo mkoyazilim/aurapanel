@@ -674,6 +674,12 @@ func opOlsRemoveBundle(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error)
 		p.remove(path.Join(olsVhostsDir, a.Site, n))
 		removed = append(removed, n)
 	}
+	// Tüm bundle dosyaları silinince vhost dizinini de kaldır.
+	// OLS'nin "include conf/vhosts/*/main.conf" wildcard'ı bu dizini
+	// görmemeli; aksi hâlde eksik vhconf.conf nedeniyle config testi bozulur.
+	if len(seen) == len(olsFileAllowlist) {
+		p.removeAll(path.Join(olsVhostsDir, a.Site))
+	}
 	return p, map[string]any{"site": a.Site, "removed": removed}, nil
 }
 
