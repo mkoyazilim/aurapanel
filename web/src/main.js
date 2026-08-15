@@ -28,3 +28,5 @@ window.fetch = async function(resource, config) {
   return originalFetch.call(this, resource, config)
 }
 createApp(App).use(createPinia()).use(router).use(i18n).mount('#app')
+// bust cache
+console.log('cache bust 2')
