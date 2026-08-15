@@ -157,6 +157,10 @@ onMounted(loadZones)
   <Layout>
     <div class="page">
       <h1>{{ $t('dns.title') }} <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">{{ $t('dns.subtitle') }}</span></h1>
+      <div class="tab-nav">
+        <router-link to="/dns" class="tab-item" active-class="active">{{ $t('dns.title') || 'DNS Yönetimi' }}</router-link>
+        <router-link to="/extdns" class="tab-item" active-class="active">Dış DNS (CF/AWS)</router-link>
+      </div>
       <div v-if="error"  class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
@@ -306,3 +310,14 @@ onMounted(loadZones)
     </div>
   </Layout>
 </template>
+
+<style scoped>
+.tab-nav {
+  display: flex; gap: 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); margin-bottom: 24px;
+}
+.tab-item {
+  padding: 8px 16px; color: var(--muted, #64748b); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; transition: all 0.2s;
+}
+.tab-item:hover { color: var(--text, #1e293b); }
+.tab-item.active { color: var(--primary, #3b82f6); border-bottom-color: var(--primary, #3b82f6); }
+</style>
