@@ -53,24 +53,24 @@
             <tr v-if="path !== ''" @click="goToPath(pathParts.slice(0, -1).join('/'))" class="clickable-row">
               <td colspan="4">📁 ..</td>
             </tr>
-            <tr v-for="e in entries" :key="e.path" class="file-row">
+            <tr v-for="e in entries" :key="e.Path || e.path" class="file-row">
               <td>
-                <span v-if="e.IsDir" class="clickable" @click="enter(e)">📁 <strong>{{ e.name }}</strong></span>
-                <span v-else>{{ iconFor(e.name) }} {{ e.name }}</span>
+                <span v-if="e.IsDir" class="clickable" @click="enter(e)">📁 <strong>{{ e.Name || e.name }}</strong></span>
+                <span v-else>{{ iconFor(e.Name || e.name) }} {{ e.Name || e.name }}</span>
               </td>
-              <td class="mono">{{ e.IsDir ? '—' : humanSize(e.size) }}</td>
-              <td class="muted">{{ new Date(e.mod_time || e.ModTime).toLocaleString() }}</td>
+              <td class="mono">{{ e.IsDir ? '—' : humanSize(e.Size ?? e.size) }}</td>
+              <td class="muted">{{ new Date(e.ModTime || e.mod_time).toLocaleString() }}</td>
               <td style="text-align: right;">
                 <div class="dropdown">
                   <button class="btn btn-sm">⋮</button>
                   <div class="dropdown-menu">
-                    <a v-if="!e.IsDir" @click.prevent="openEditor(e.path)">✏️ {{ $t('filemanager.edit') }}</a>
-                    <a @click.prevent="promptRename(e.path)">📝 {{ $t('filemanager.rename') }}</a>
-                    <a @click.prevent="promptCopy(e.path)">📄 {{ $t('filemanager.copy') }}</a>
-                    <a @click.prevent="promptMove(e.path)">🚚 {{ $t('filemanager.move') }}</a>
-                    <a v-if="!e.IsDir && isArchive(e.name)" @click.prevent="extract(e.path)">📦 {{ $t('filemanager.extract') }}</a>
-                    <a v-if="e.IsDir" @click.prevent="archiveDir(e.path)">📦 {{ $t('filemanager.zip') }}</a>
-                    <a class="text-danger" @click.prevent="remove(e.path)">🗑️ {{ $t('filemanager.delete') }}</a>
+                    <a v-if="!e.IsDir" @click.prevent="openEditor(e.Path || e.path)">✏️ {{ $t('filemanager.edit') }}</a>
+                    <a @click.prevent="promptRename(e.Path || e.path)">📝 {{ $t('filemanager.rename') }}</a>
+                    <a @click.prevent="promptCopy(e.Path || e.path)">📄 {{ $t('filemanager.copy') }}</a>
+                    <a @click.prevent="promptMove(e.Path || e.path)">🚚 {{ $t('filemanager.move') }}</a>
+                    <a v-if="!e.IsDir && isArchive(e.Name || e.name)" @click.prevent="extract(e.Path || e.path)">📦 {{ $t('filemanager.extract') }}</a>
+                    <a v-if="e.IsDir" @click.prevent="archiveDir(e.Path || e.path)">📦 {{ $t('filemanager.zip') }}</a>
+                    <a class="text-danger" @click.prevent="remove(e.Path || e.path)">🗑️ {{ $t('filemanager.delete') }}</a>
                   </div>
                 </div>
               </td>
