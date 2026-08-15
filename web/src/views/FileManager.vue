@@ -171,7 +171,6 @@ async function loadSites() {
 }
 
 async function loadDir() {
-  if (!siteId.value) return
   selected.value = []
   error.value = ''
   notice.value = ''
@@ -186,7 +185,7 @@ async function loadDir() {
 }
 
 function enter(e) {
-  path.value = e.path
+  path.value = e.Path || e.path
   loadDir()
 }
 
