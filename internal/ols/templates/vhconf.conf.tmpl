@@ -39,7 +39,7 @@ extprocessor {{ .LSAPIName }} {
   persistConn             1
   respBuffer              0
   autoStart               1
-  path                    /usr/local/lsws/{{ .LSAPIName }}/bin/lsphp
+  path                    /usr/local/lsws/{{ .PHPBinDir }}/bin/lsphp
   backlog                 100
   instances               1
   extUser                 {{ .ExtUser }}

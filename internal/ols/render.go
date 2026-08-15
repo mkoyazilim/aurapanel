@@ -31,8 +31,9 @@ type vhostTemplateData struct {
 	Domain        string
 	AliasesLine   string
 	IndexFiles    string
-	LSAPIName     string
-	LSAPISock     string
+		LSAPIName     string
+		LSAPISock     string
+		PHPBinDir     string
 	ExtUser       string
 	EnableGzip    int
 	TLSRedirect   bool
@@ -62,8 +63,9 @@ func RenderVhost(sitesRoot, certsRoot string, v Vhost) ([]Artifact, error) {
 		Domain:      v.Domain,
 		AliasesLine: strings.Join(v.Aliases, ", "),
 		IndexFiles:  strings.Join(v.IndexFiles, ", "),
-		LSAPIName:   "lsphp" + phpDigits,
-		LSAPISock:   "uds://tmp/lshttpd/lsphp" + phpDigits + ".sock",
+			LSAPIName:   "lsphp" + phpDigits + "_" + v.SiteID,
+			LSAPISock:   "uds://tmp/lshttpd/lsphp" + phpDigits + "_" + v.SiteID + ".sock",
+			PHPBinDir:   "lsphp" + phpDigits,
 		ExtUser:     "www-" + v.SiteID,
 		EnableGzip:  boolToInt(v.EnableGzip),
 		TLSRedirect: v.TLSRedirect,
