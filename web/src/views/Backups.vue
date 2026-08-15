@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -25,7 +26,7 @@
             <label>{{ $t('backups.destination') }}</label>
             <select v-model="storage">
               <option value="local">📁 {{ $t('backups.local_storage') }}</option>
-              <option value="s3">☁️ S3 / Cloudflare R2</option>
+              <option value="s3">☁️ {{ $t('backups.s3_cloudflare_r2') }}</option>
             </select>
           </div>
           <button class="btn primary" style="margin-top: 18px" :disabled="busy" @click="run">
@@ -44,7 +45,7 @@
               <td>{{ b.kind }}</td>
               <td>
                 <span class="badge" :class="b.storage === 's3' ? 'badge-primary' : 'badge-secondary'">
-                  {{ b.storage === 's3' ? '☁️ S3/R2' : '📁 Local' }}
+                  {{ b.storage === 's3' ? '☁️ ' + $t('backups.s3_r2_badge') : '📁 ' + $t('backups.local_badge') }}
                 </span>
               </td>
               <td><span class="badge" :class="b.status === 'success' ? 'ok' : 'err'">{{ b.status }}</span></td>

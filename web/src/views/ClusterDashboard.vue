@@ -1,7 +1,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from "../api.js"
 import Layout from '../components/Layout.vue'
+
+const { t } = useI18n()
 
 const metrics     = ref([])   // []ServerMetrics
 const events      = ref([])   // []ClusterEvent
@@ -52,13 +55,13 @@ function barColor(pct) {
 function fmtUptime(sec) {
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
-  return `${h}h ${m}m`
+  return t('clusterdashboard.uptime_format', { h, m })
 }
 
-function eventTypeClass(t) {
-  if (t === 'health_fail') return 'error'
-  if (t === 'key_rotated') return 'warning'
-  if (t === 'site_created') return 'ok'
+function eventTypeClass(type) {
+  if (type === 'health_fail') return 'error'
+  if (type === 'key_rotated') return 'warning'
+  if (type === 'site_created') return 'ok'
   return ''
 }
 
@@ -72,14 +75,14 @@ onUnmounted(() => clearInterval(refreshTimer))
 <template>
   <Layout>
     <div class="page">
-      <h1>Cluster Dashboard
-        <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">Auto-refreshes every 30s</span>
+      <h1>{{ $t('clusterdashboard.cluster_dashboard') }}
+        <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">{{ $t('clusterdashboard.auto_refresh') }}</span>
       </h1>
       <div v-if="error" class="alert error">{{ error }}</div>
 
       <!-- Metrics cards -->
-      <h2 style="margin-top:24px">Server Metrics</h2>
-      <div v-if="loadingM" class="muted">Loading metrics…</div>
+      <h2 style="margin-top:24px">{{ $t('clusterdashboard.server_metrics') }}</h2>
+      <div v-if="loadingM" class="muted">{{ $t('clusterdashboard.loading_metrics') }}</div>
       <div v-else style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px">
         <div v-for="m in metrics" :key="m.server_id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -88,43 +91,43 @@ onUnmounted(() => clearInterval(refreshTimer))
               <div class="muted" style="font-size:12px">{{ m.ip_address }}</div>
             </div>
             <span class="badge" :class="statusClass(m)">
-              {{ m.error ? 'offline' : m.status }}
+              {{ m.error ? $t('clusterdashboard.offline') : m.status }}
             </span>
           </div>
           <div v-if="!m.error">
             <!-- CPU -->
             <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
-              <span>CPU</span><span>{{ m.cpu_percent?.toFixed(1) }}%</span>
+              <span>{{ $t('clusterdashboard.cpu') }}</span><span>{{ m.cpu_percent?.toFixed(1) }}%</span>
             </div>
             <div style="background:#e5e7eb;border-radius:4px;height:8px;margin-bottom:10px">
               <div :style="`width:${Math.min(m.cpu_percent,100)}%;background:${barColor(m.cpu_percent)};height:8px;border-radius:4px`"></div>
             </div>
             <!-- RAM -->
             <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
-              <span>RAM</span><span>{{ m.ram_percent?.toFixed(1) }}%</span>
+              <span>{{ $t('clusterdashboard.ram') }}</span><span>{{ m.ram_percent?.toFixed(1) }}%</span>
             </div>
             <div style="background:#e5e7eb;border-radius:4px;height:8px;margin-bottom:10px">
               <div :style="`width:${Math.min(m.ram_percent,100)}%;background:${barColor(m.ram_percent)};height:8px;border-radius:4px`"></div>
             </div>
             <!-- Uptime -->
-            <div style="font-size:12px;color:var(--muted)">Uptime: {{ fmtUptime(m.uptime_sec || 0) }}</div>
+            <div style="font-size:12px;color:var(--muted)">{{ $t('clusterdashboard.uptime') }}: {{ fmtUptime(m.uptime_sec || 0) }}</div>
           </div>
           <div v-else class="muted" style="font-size:13px">{{ m.error }}</div>
         </div>
-        <div v-if="!metrics.length" class="muted">No cluster nodes configured.</div>
+        <div v-if="!metrics.length" class="muted">{{ $t('clusterdashboard.no_nodes') }}</div>
       </div>
 
       <!-- Event log -->
-      <h2>Recent Cluster Events</h2>
-      <div v-if="loadingE" class="muted">Loading events…</div>
+      <h2>{{ $t('clusterdashboard.recent_events') }}</h2>
+      <div v-if="loadingE" class="muted">{{ $t('clusterdashboard.loading_events') }}</div>
       <div v-else class="card">
         <table>
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Server</th>
-              <th>Event</th>
-              <th>Detail</th>
+              <th>{{ $t('clusterdashboard.time') }}</th>
+              <th>{{ $t('clusterdashboard.server') }}</th>
+              <th>{{ $t('clusterdashboard.event') }}</th>
+              <th>{{ $t('clusterdashboard.detail') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -135,7 +138,7 @@ onUnmounted(() => clearInterval(refreshTimer))
               <td class="text-sm muted">{{ e.detail || '—' }}</td>
             </tr>
             <tr v-if="!events.length">
-              <td colspan="4" class="muted">No cluster events yet.</td>
+              <td colspan="4" class="muted">{{ $t('clusterdashboard.no_events') }}</td>
             </tr>
           </tbody>
         </table>

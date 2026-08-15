@@ -1,7 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Layout from '../components/Layout.vue'
 import { api } from '../api.js'
+
+const { t } = useI18n()
 
 const servers   = ref([])
 const loading   = ref(true)
@@ -28,7 +31,7 @@ async function loadServers() {
   try {
     servers.value = await api.get('/cluster') || []
   } catch (e) {
-    error.value = e.message || 'Yükleme hatası'
+    error.value = e.message || t('servers.load_error')
   } finally {
     loading.value = false
   }
@@ -40,16 +43,16 @@ async function addServer() {
   if (!form.value.name || !form.value.ip_address) return
   try {
     await api.post('/cluster', form.value)
-    notice.value = 'Cluster node added.'
+    notice.value = t('servers.node_added')
     form.value = { name: '', ip_address: '' }
     loadServers()
   } catch (e) {
-    error.value = e.message || 'Ekleme hatası'
+    error.value = e.message || t('servers.add_error')
   }
 }
 
 async function deleteServer(id) {
-  if (!confirm('Remove this server from cluster?')) return
+  if (!confirm(t('servers.confirm_remove'))) return
   try {
     await api.delete(`/cluster/${id}`)
     loadServers()
@@ -58,7 +61,7 @@ async function deleteServer(id) {
 
 async function checkHealth(id) {
   const srv = servers.value.find(s => s.id === id)
-  if (srv) srv.status = 'checking...'
+  if (srv) srv.status = t('servers.status_checking')
   try {
     const d = await api.get(`/cluster/${id}/health`)
     if (srv) srv.status = d.status
@@ -66,15 +69,15 @@ async function checkHealth(id) {
 }
 
 async function rotateKey(id) {
-  if (!confirm('Rotate API key? The old key will be invalidated immediately.')) return
+  if (!confirm(t('servers.confirm_rotate'))) return
   rotatingSrv.value = id
   rotatedKey.value  = ''
   try {
     const d = await api.post(`/servers/${id}/rotate-key`)
     rotatedKey.value = d.api_key
-    notice.value = 'Key rotated — copy it now, it will not be shown again.'
+    notice.value = t('servers.key_rotated')
   } catch (e) {
-    error.value = e.message || 'Key rotation failed'
+    error.value = e.message || t('servers.rotate_failed')
   }
   rotatingSrv.value = null
 }
@@ -89,10 +92,10 @@ async function createSite() {
   error.value = ''
   try {
     await api.post(`/servers/${siteSrvID.value}/sites`, siteForm.value)
-    notice.value = 'Site creation queued on remote agent.'
+    notice.value = t('servers.site_queued')
     siteModal.value = false
   } catch (e) {
-    error.value = e.message || 'Site create failed'
+    error.value = e.message || t('servers.site_create_failed')
   }
 }
 
@@ -112,42 +115,42 @@ onMounted(loadServers)
 <template>
   <Layout>
     <div class="page">
-      <h1>Cluster Servers <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">Multi-server node management</span></h1>
+      <h1>{{ $t('servers.title') }} <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">{{ $t('servers.subtitle') }}</span></h1>
       <div v-if="error"  class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
       <!-- Rotated key banner -->
       <div v-if="rotatedKey" class="alert ok" style="font-family:monospace;word-break:break-all">
-        New API Key: <strong>{{ rotatedKey }}</strong>
-        <button class="btn" style="margin-left:12px" @click="rotatedKey=''">Dismiss</button>
+        {{ $t('servers.new_api_key') }} <strong>{{ rotatedKey }}</strong>
+        <button class="btn" style="margin-left:12px" @click="rotatedKey=''">{{ $t('servers.dismiss') }}</button>
       </div>
 
       <!-- Add node form -->
       <div class="card">
         <div class="row">
           <div style="flex:1">
-            <label>Server Name</label>
-            <input v-model="form.name" placeholder="node-2" />
+            <label>{{ $t('servers.server_name') }}</label>
+            <input v-model="form.name" :placeholder="$t('servers.placeholder_node')" />
           </div>
           <div style="flex:1">
-            <label>IP Address</label>
-            <input v-model="form.ip_address" placeholder="192.168.1.100" />
+            <label>{{ $t('servers.ip_address') }}</label>
+            <input v-model="form.ip_address" :placeholder="$t('servers.placeholder_ip')" />
           </div>
-          <button class="btn primary" style="margin-top:18px" @click="addServer">➕ Add Node</button>
+          <button class="btn primary" style="margin-top:18px" @click="addServer">➕ {{ $t('servers.add_node') }}</button>
         </div>
       </div>
 
       <!-- Server list -->
       <div class="card">
-        <h2>Cluster Nodes</h2>
-        <div v-if="loading" class="muted">Loading servers…</div>
+        <h2>{{ $t('servers.cluster_nodes') }}</h2>
+        <div v-if="loading" class="muted">{{ $t('servers.loading_servers') }}</div>
         <table v-else>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>IP Address</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>{{ $t('servers.th_name') }}</th>
+              <th>{{ $t('servers.th_ip') }}</th>
+              <th>{{ $t('servers.th_status') }}</th>
+              <th>{{ $t('servers.th_actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -158,21 +161,21 @@ onMounted(loadServers)
                 <span class="badge" :class="{
                   'ok':      s.status === 'online' || s.status === 'active',
                   'error':   s.status === 'offline',
-                  'warning': s.status === 'checking...'
+                  'warning': s.status === $t('servers.status_checking')
                 }">{{ s.status }}</span>
               </td>
               <td style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="btn" @click="checkHealth(s.id)">Health</button>
-                <button class="btn" @click="showMetrics(s)">Metrics</button>
-                <button class="btn" @click="openSiteModal(s.id)">Add Site</button>
+                <button class="btn" @click="checkHealth(s.id)">{{ $t('servers.action_health') }}</button>
+                <button class="btn" @click="showMetrics(s)">{{ $t('servers.action_metrics') }}</button>
+                <button class="btn" @click="openSiteModal(s.id)">{{ $t('servers.action_add_site') }}</button>
                 <button class="btn warning" :disabled="rotatingSrv===s.id" @click="rotateKey(s.id)">
-                  {{ rotatingSrv===s.id ? 'Rotating…' : 'Rotate Key' }}
+                  {{ rotatingSrv===s.id ? $t('servers.action_rotating') : $t('servers.action_rotate_key') }}
                 </button>
-                <button class="btn danger" @click="deleteServer(s.id)">Remove</button>
+                <button class="btn danger" @click="deleteServer(s.id)">{{ $t('servers.action_remove') }}</button>
               </td>
             </tr>
             <tr v-if="!servers.length">
-              <td colspan="4" class="muted">No cluster nodes found.</td>
+              <td colspan="4" class="muted">{{ $t('servers.no_nodes') }}</td>
             </tr>
           </tbody>
         </table>
@@ -182,18 +185,18 @@ onMounted(loadServers)
       <Teleport to="body">
         <div v-if="siteModal" class="modal-overlay" @click.self="siteModal=false">
           <div class="modal">
-            <h3>Create Site on Remote Node</h3>
-            <label>Domain</label>
-            <input v-model="siteForm.domain" placeholder="example.com" />
-            <label style="margin-top:10px">PHP Version</label>
+            <h3>{{ $t('servers.create_site_title') }}</h3>
+            <label>{{ $t('servers.domain') }}</label>
+            <input v-model="siteForm.domain" :placeholder="$t('servers.placeholder_domain')" />
+            <label style="margin-top:10px">{{ $t('servers.php_version') }}</label>
             <select v-model="siteForm.php_version">
-              <option value="lsphp83">LSPHP 8.3</option>
-              <option value="lsphp82">LSPHP 8.2</option>
-              <option value="lsphp81">LSPHP 8.1</option>
+              <option value="lsphp83">{{ $t('servers.lsphp83') }}</option>
+              <option value="lsphp82">{{ $t('servers.lsphp82') }}</option>
+              <option value="lsphp81">{{ $t('servers.lsphp81') }}</option>
             </select>
             <div style="display:flex;gap:8px;margin-top:16px">
-              <button class="btn primary" @click="createSite">Create</button>
-              <button class="btn" @click="siteModal=false">Cancel</button>
+              <button class="btn primary" @click="createSite">{{ $t('servers.create') }}</button>
+              <button class="btn" @click="siteModal=false">{{ $t('servers.cancel') }}</button>
             </div>
           </div>
         </div>
@@ -203,28 +206,28 @@ onMounted(loadServers)
       <Teleport to="body">
         <div v-if="metricsModal" class="modal-overlay" @click.self="metricsModal=false">
           <div class="modal">
-            <h3>{{ metricsSrv?.name }} — Live Metrics</h3>
-            <div v-if="!metricsData" class="muted">Loading…</div>
+            <h3>{{ metricsSrv?.name }} — {{ $t('servers.live_metrics') }}</h3>
+            <div v-if="!metricsData" class="muted">{{ $t('servers.loading') }}</div>
             <template v-else>
               <div v-if="metricsData.error" class="alert error">{{ metricsData.error }}</div>
               <template v-else>
                 <div class="row" style="gap:16px;margin-top:12px">
                   <div class="card" style="flex:1;text-align:center">
                     <div style="font-size:28px;font-weight:700">{{ metricsData.cpu_percent?.toFixed(1) }}%</div>
-                    <div class="muted">CPU</div>
+                    <div class="muted">{{ $t('servers.cpu') }}</div>
                   </div>
                   <div class="card" style="flex:1;text-align:center">
                     <div style="font-size:28px;font-weight:700">{{ metricsData.ram_percent?.toFixed(1) }}%</div>
-                    <div class="muted">RAM</div>
+                    <div class="muted">{{ $t('servers.ram') }}</div>
                   </div>
                   <div class="card" style="flex:1;text-align:center">
                     <div style="font-size:28px;font-weight:700">{{ Math.floor((metricsData.uptime_sec||0)/3600) }}h</div>
-                    <div class="muted">Uptime</div>
+                    <div class="muted">{{ $t('servers.uptime') }}</div>
                   </div>
                 </div>
               </template>
             </template>
-            <button class="btn" style="margin-top:16px" @click="metricsModal=false">Close</button>
+            <button class="btn" style="margin-top:16px" @click="metricsModal=false">{{ $t('servers.close') }}</button>
           </div>
         </div>
       </Teleport>

@@ -1,6 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Layout from '../components/Layout.vue'
+
+const { t } = useI18n()
 
 const me = ref(null)
 const sites = ref([])
@@ -13,7 +16,7 @@ async function loadMe() {
     me.value = await res.json()
   } else {
     const d = await res.json().catch(() => ({}))
-    error.value = d.error || 'Bilgi yüklenemedi'
+    error.value = d.error || t('resellerdashboard.failed_to_load_info')
   }
 }
 
@@ -37,10 +40,10 @@ function barColor(p) {
 }
 
 const metrics = [
-  { key: 'sites',     label: 'Siteler',            usedKey: 'site_count',           maxKey: 'max_sites',      icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" /></svg>' },
-  { key: 'databases', label: 'Veritabanları',       usedKey: 'db_count',             maxKey: 'max_databases',  icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>' },
-  { key: 'disk',      label: 'Disk (GB)',            usedKey: 'disk_used_gb',         maxKey: 'max_disk_gb',    icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>' },
-  { key: 'bw',        label: 'Bant Genişliği (GB)', usedKey: 'bandwidth_used_gb',    maxKey: 'max_bandwidth_gb', icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" /></svg>' },
+  { key: 'sites',     label: t('resellerdashboard.sites'),            usedKey: 'site_count',           maxKey: 'max_sites',      icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" /></svg>' },
+  { key: 'databases', label: t('resellerdashboard.databases'),       usedKey: 'db_count',             maxKey: 'max_databases',  icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>' },
+  { key: 'disk',      label: t('resellerdashboard.disk_gb'),            usedKey: 'disk_used_gb',         maxKey: 'max_disk_gb',    icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>' },
+  { key: 'bw',        label: t('resellerdashboard.bandwidth_gb'), usedKey: 'bandwidth_used_gb',    maxKey: 'max_bandwidth_gb', icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" /></svg>' },
 ]
 
 onMounted(async () => {
@@ -53,10 +56,10 @@ onMounted(async () => {
 <template>
   <Layout>
     <div class="page">
-      <h1>Reseller Dashboard</h1>
+      <h1>{{ $t('resellerdashboard.reseller_dashboard') }}</h1>
 
       <div v-if="error" class="alert error">{{ error }}</div>
-      <div v-if="loading" class="muted">Yükleniyor...</div>
+      <div v-if="loading" class="muted">{{ $t('resellerdashboard.loading') }}</div>
 
       <template v-else-if="me">
         <!-- Quota Cards -->
@@ -92,16 +95,16 @@ onMounted(async () => {
 
         <!-- Sites Table -->
         <div class="card" style="margin-top: 24px">
-          <h2 style="margin:0 0 16px">Sitelerim</h2>
+          <h2 style="margin:0 0 16px">{{ $t('resellerdashboard.my_sites') }}</h2>
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Alan Adı</th>
-                <th>Durum</th>
-                <th>PHP</th>
-                <th>Linux Kullanıcısı</th>
-                <th>Oluşturulma</th>
+                <th>{{ $t('resellerdashboard.id') }}</th>
+                <th>{{ $t('resellerdashboard.domain_name') }}</th>
+                <th>{{ $t('resellerdashboard.status') }}</th>
+                <th>{{ $t('resellerdashboard.php') }}</th>
+                <th>{{ $t('resellerdashboard.linux_user') }}</th>
+                <th>{{ $t('resellerdashboard.created_at') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -116,7 +119,7 @@ onMounted(async () => {
                 <td class="muted">{{ s.created_at ? new Date(s.created_at).toLocaleDateString('tr-TR') : '—' }}</td>
               </tr>
               <tr v-if="!sites.length">
-                <td colspan="6" class="muted">Henüz site yok.</td>
+                <td colspan="6" class="muted">{{ $t('resellerdashboard.no_sites_yet') }}</td>
               </tr>
             </tbody>
           </table>

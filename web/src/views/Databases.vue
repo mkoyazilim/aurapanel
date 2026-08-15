@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -15,12 +16,12 @@
           </div>
           <div style="flex: 1">
             <label>{{ $t('databases.new_db_name') }}</label>
-            <input v-model="newDb" placeholder="wp" />
+            <input v-model="newDb" :placeholder="$t('databases.placeholder_db')" />
           </div>
           <button class="btn primary" style="margin-top: 18px" @click="createDb">➕ {{ $t('databases.add_db') }}</button>
           <div style="flex: 1">
             <label>{{ $t('databases.new_user') }}</label>
-            <input v-model="newUser" placeholder="user" />
+            <input v-model="newUser" :placeholder="$t('databases.placeholder_user')" />
           </div>
           <button class="btn primary" style="margin-top: 18px" @click="createUser">➕ {{ $t('databases.add_user') }}</button>
         </div>
@@ -129,7 +130,7 @@ async function createUser() {
       method: 'POST',
       body: { username: newUser.value, password: '' },
     })
-    notice.value = `${t('databases.user')} created. ${t('databases.password')}: ${out.password}`
+    notice.value = t('databases.user_created_notice', { password: out.password })
     newUser.value = ''
     await loadAll()
   } catch (e) {
@@ -168,7 +169,7 @@ async function openAdminer(d) {
       method: 'POST',
       body: { site_id: siteId.value, database_id: d.id },
     })
-    notice.value = `Adminer Token (15 min): ${out.token}`
+    notice.value = t('databases.adminer_token_notice', { token: out.token })
   } catch (e) {
     error.value = e.message
   }
@@ -180,7 +181,7 @@ async function resetPw(u) {
       method: 'POST',
       body: { password: '' },
     })
-    notice.value = `${t('databases.password')}: ${out.password}`
+    notice.value = t('databases.new_password_notice', { password: out.password })
   } catch (e) {
     error.value = e.message
   }

@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -109,7 +110,7 @@ async function installCustom() {
       method: 'POST',
       body: { cert_pem: certPem.value, key_pem: keyPem.value },
     })
-    notice.value = 'Custom sertifika kuruldu.'
+    notice.value = t('ssl.custom_cert_success')
     certPem.value = ''
     keyPem.value = ''
     await loadInfo()

@@ -1,6 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Layout from '../components/Layout.vue'
+
+const { t } = useI18n()
 
 const zones   = ref([])
 const loading = ref(true)
@@ -43,15 +46,15 @@ async function createZone() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ domain: form.value.domain, nameservers: nsList })
   })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
-  notice.value = 'Zone created.'
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
+  notice.value = t('dns.msg_zone_created')
   form.value = { domain: '', nameservers: 'ns1.example.com,ns2.example.com' }
   loadZones()
 }
 
 async function deleteZone(name) {
   const domain = name.replace(/\.$/, '')
-  if (!confirm(`Delete zone ${domain}?`)) return
+  if (!confirm(t('dns.msg_delete_zone_confirm', { domain }))) return
   await fetch(`/api/v1/dns/zones/${domain}`, { method: 'DELETE' })
   loadZones()
 }
@@ -59,7 +62,7 @@ async function deleteZone(name) {
 async function exportZone(name) {
   const domain = name.replace(/\.$/, '')
   const res = await fetch(`/api/v1/dns/zones/${domain}/export`)
-  if (!res.ok) { error.value = 'Export failed'; return }
+  if (!res.ok) { error.value = t('dns.msg_export_failed'); return }
   const text = await res.text()
   const blob = new Blob([text], { type: 'text/plain' })
   const a = document.createElement('a')
@@ -85,19 +88,19 @@ async function addRecord() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(recForm.value)
   })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
-  notice.value = 'Record added.'
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
+  notice.value = t('dns.msg_record_added')
   openRecords(recordsDomain.value + '.')
 }
 
 async function deleteRecord(name, type) {
-  if (!confirm(`Delete ${type} record ${name}?`)) return
+  if (!confirm(t('dns.msg_delete_record_confirm', { type, name }))) return
   const res = await fetch(`/api/v1/dns/zones/${recordsDomain.value}/records`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, type })
   })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
   openRecords(recordsDomain.value + '.')
 }
 
@@ -112,16 +115,16 @@ async function openDNSSEC(name) {
 
 async function enableDNSSEC() {
   const res = await fetch(`/api/v1/dns/zones/${dnssecDomain.value}/dnssec`, { method: 'POST' })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
-  notice.value = 'DNSSEC enabled.'
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
+  notice.value = t('dns.msg_dnssec_enabled')
   openDNSSEC(dnssecDomain.value + '.')
 }
 
 async function disableDNSSEC() {
-  if (!confirm('Disable DNSSEC? This will remove zone signing.')) return
+  if (!confirm(t('dns.msg_disable_dnssec_confirm'))) return
   const res = await fetch(`/api/v1/dns/zones/${dnssecDomain.value}/dnssec`, { method: 'DELETE' })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
-  notice.value = 'DNSSEC disabled.'
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
+  notice.value = t('dns.msg_dnssec_disabled')
   cryptoKeys.value = []
 }
 
@@ -131,20 +134,20 @@ async function addCryptoKey() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(addKeyForm.value)
   })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
   openDNSSEC(dnssecDomain.value + '.')
 }
 
 async function deleteCryptoKey(keyId) {
-  if (!confirm('Delete crypto key? This may break DNSSEC validation.')) return
+  if (!confirm(t('dns.msg_delete_key_confirm'))) return
   await fetch(`/api/v1/dns/zones/${dnssecDomain.value}/cryptokeys/${keyId}`, { method: 'DELETE' })
   openDNSSEC(dnssecDomain.value + '.')
 }
 
 async function rectify() {
   const res = await fetch(`/api/v1/dns/zones/${dnssecDomain.value}/rectify`, { method: 'POST' })
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
-  notice.value = 'Zone rectified.'
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('dns.msg_failed'); return }
+  notice.value = t('dns.msg_zone_rectified')
 }
 
 onMounted(loadZones)
@@ -153,7 +156,7 @@ onMounted(loadZones)
 <template>
   <Layout>
     <div class="page">
-      <h1>DNS Zones <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">PowerDNS · F4</span></h1>
+      <h1>{{ $t('dns.title') }} <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">{{ $t('dns.subtitle') }}</span></h1>
       <div v-if="error"  class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
@@ -161,29 +164,29 @@ onMounted(loadZones)
       <div class="card">
         <div class="row">
           <div style="flex:1">
-            <label>Domain</label>
-            <input v-model="form.domain" placeholder="example.com" />
+            <label>{{ $t('dns.domain_label') }}</label>
+            <input v-model="form.domain" :placeholder="$t('dns.domain_placeholder')" />
           </div>
           <div style="flex:1">
-            <label>Nameservers (comma-separated)</label>
+            <label>{{ $t('dns.nameservers_label') }}</label>
             <input v-model="form.nameservers" />
           </div>
-          <button class="btn primary" style="margin-top:18px" @click="createZone">➕ Create Zone</button>
+          <button class="btn primary" style="margin-top:18px" @click="createZone">➕ {{ $t('dns.create_zone') }}</button>
         </div>
       </div>
 
       <!-- Zone list -->
       <div class="card">
-        <h2>DNS Zones</h2>
-        <div v-if="loading" class="muted">Loading…</div>
+        <h2>{{ $t('dns.title') }}</h2>
+        <div v-if="loading" class="muted">{{ $t('dns.loading') }}</div>
         <table v-else>
           <thead>
             <tr>
-              <th>Domain</th>
-              <th>Kind</th>
-              <th>Serial</th>
-              <th>DNSSEC</th>
-              <th>Actions</th>
+              <th>{{ $t('dns.table_domain') }}</th>
+              <th>{{ $t('dns.table_kind') }}</th>
+              <th>{{ $t('dns.table_serial') }}</th>
+              <th>{{ $t('dns.table_dnssec') }}</th>
+              <th>{{ $t('dns.table_actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -192,17 +195,17 @@ onMounted(loadZones)
               <td class="text-sm muted">{{ z.kind }}</td>
               <td class="text-sm muted">{{ z.serial || '—' }}</td>
               <td>
-                <span class="badge" :class="z.dnssec ? 'ok' : ''">{{ z.dnssec ? 'signed' : 'off' }}</span>
+                <span class="badge" :class="z.dnssec ? 'ok' : ''">{{ z.dnssec ? $t('dns.badge_signed') : $t('dns.badge_off') }}</span>
               </td>
               <td style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="btn" @click="openRecords(z.name)">Records</button>
-                <button class="btn" @click="openDNSSEC(z.name)">DNSSEC</button>
-                <button class="btn" @click="exportZone(z.name)">Export</button>
-                <button class="btn danger" @click="deleteZone(z.name)">Delete</button>
+                <button class="btn" @click="openRecords(z.name)">{{ $t('dns.btn_records') }}</button>
+                <button class="btn" @click="openDNSSEC(z.name)">{{ $t('dns.btn_dnssec') }}</button>
+                <button class="btn" @click="exportZone(z.name)">{{ $t('dns.btn_export') }}</button>
+                <button class="btn danger" @click="deleteZone(z.name)">{{ $t('dns.btn_delete') }}</button>
               </td>
             </tr>
             <tr v-if="!zones.length">
-              <td colspan="5" class="muted">No zones found or PowerDNS not configured.</td>
+              <td colspan="5" class="muted">{{ $t('dns.empty_zones') }}</td>
             </tr>
           </tbody>
         </table>
@@ -212,22 +215,22 @@ onMounted(loadZones)
       <Teleport to="body">
         <div v-if="recordsModal" class="modal-overlay" @click.self="recordsModal=false">
           <div class="modal" style="max-width:720px;width:90vw">
-            <h3>Records — {{ recordsDomain }}</h3>
-            <div v-if="recordsLoading" class="muted">Loading records…</div>
+            <h3>{{ $t('dns.modal_records_title', { domain: recordsDomain }) }}</h3>
+            <div v-if="recordsLoading" class="muted">{{ $t('dns.loading_records') }}</div>
             <template v-else-if="recordsData">
               <!-- Add record form -->
               <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
-                <input v-model="recForm.name" placeholder="Name (e.g. @, www)" style="flex:2;min-width:100px" />
+                <input v-model="recForm.name" :placeholder="$t('dns.record_name_placeholder')" style="flex:2;min-width:100px" />
                 <select v-model="recForm.type" style="flex:1;min-width:80px">
                   <option v-for="t in RECORD_TYPES" :key="t">{{ t }}</option>
                 </select>
-                <input v-model.number="recForm.ttl" type="number" placeholder="TTL" style="width:70px" />
-                <input v-model="recForm.content" placeholder="Content" style="flex:3;min-width:120px" />
-                <button class="btn primary" @click="addRecord">Add</button>
+                <input v-model.number="recForm.ttl" type="number" :placeholder="$t('dns.record_ttl_placeholder')" style="width:70px" />
+                <input v-model="recForm.content" :placeholder="$t('dns.record_content_placeholder')" style="flex:3;min-width:120px" />
+                <button class="btn primary" @click="addRecord">{{ $t('dns.btn_add') }}</button>
               </div>
               <!-- Existing rrsets -->
               <table>
-                <thead><tr><th>Name</th><th>Type</th><th>TTL</th><th>Records</th><th></th></tr></thead>
+                <thead><tr><th>{{ $t('dns.table_name') }}</th><th>{{ $t('dns.table_type') }}</th><th>{{ $t('dns.table_ttl') }}</th><th>{{ $t('dns.table_records') }}</th><th></th></tr></thead>
                 <tbody>
                   <template v-for="rr in (recordsData.rrsets || [])" :key="rr.name+rr.type">
                     <tr>
@@ -243,12 +246,12 @@ onMounted(loadZones)
                     </tr>
                   </template>
                   <tr v-if="!(recordsData.rrsets||[]).length">
-                    <td colspan="5" class="muted">No records.</td>
+                    <td colspan="5" class="muted">{{ $t('dns.empty_records') }}</td>
                   </tr>
                 </tbody>
               </table>
             </template>
-            <button class="btn" style="margin-top:16px" @click="recordsModal=false">Close</button>
+            <button class="btn" style="margin-top:16px" @click="recordsModal=false">{{ $t('dns.btn_close') }}</button>
           </div>
         </div>
       </Teleport>
@@ -257,32 +260,32 @@ onMounted(loadZones)
       <Teleport to="body">
         <div v-if="dnssecModal" class="modal-overlay" @click.self="dnssecModal=false">
           <div class="modal" style="max-width:600px;width:90vw">
-            <h3>DNSSEC — {{ dnssecDomain }}</h3>
+            <h3>{{ $t('dns.modal_dnssec_title', { domain: dnssecDomain }) }}</h3>
             <div style="display:flex;gap:8px;margin-bottom:16px">
-              <button class="btn primary" @click="enableDNSSEC">Enable DNSSEC</button>
-              <button class="btn warning" @click="disableDNSSEC">Disable DNSSEC</button>
-              <button class="btn" @click="rectify">Rectify Zone</button>
+              <button class="btn primary" @click="enableDNSSEC">{{ $t('dns.btn_enable_dnssec') }}</button>
+              <button class="btn warning" @click="disableDNSSEC">{{ $t('dns.btn_disable_dnssec') }}</button>
+              <button class="btn" @click="rectify">{{ $t('dns.btn_rectify') }}</button>
             </div>
 
-            <h4>Crypto Keys</h4>
+            <h4>{{ $t('dns.subtitle_crypto_keys') }}</h4>
             <table>
-              <thead><tr><th>ID</th><th>Type</th><th>Algorithm</th><th>Active</th><th>DS</th><th></th></tr></thead>
+              <thead><tr><th>{{ $t('dns.table_id') }}</th><th>{{ $t('dns.table_type') }}</th><th>{{ $t('dns.table_algorithm') }}</th><th>{{ $t('dns.table_active') }}</th><th>{{ $t('dns.table_ds') }}</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="k in cryptoKeys" :key="k.id">
                   <td class="text-sm">{{ k.id }}</td>
                   <td class="text-sm"><span class="badge">{{ k.keytype }}</span></td>
                   <td class="text-sm muted">{{ k.algorithm }}</td>
-                  <td><span class="badge" :class="k.active?'ok':'error'">{{ k.active?'active':'inactive' }}</span></td>
+                  <td><span class="badge" :class="k.active?'ok':'error'">{{ k.active ? $t('dns.badge_active') : $t('dns.badge_inactive') }}</span></td>
                   <td class="text-sm muted" style="max-width:180px;word-break:break-all">
                     {{ (k.ds||[]).join(' | ').slice(0,60) || '—' }}
                   </td>
                   <td><button class="btn danger" style="padding:2px 8px" @click="deleteCryptoKey(k.id)">✕</button></td>
                 </tr>
-                <tr v-if="!cryptoKeys.length"><td colspan="6" class="muted">No crypto keys.</td></tr>
+                <tr v-if="!cryptoKeys.length"><td colspan="6" class="muted">{{ $t('dns.empty_crypto_keys') }}</td></tr>
               </tbody>
             </table>
 
-            <h4 style="margin-top:16px">Add Key</h4>
+            <h4 style="margin-top:16px">{{ $t('dns.subtitle_add_key') }}</h4>
             <div class="row" style="gap:8px">
               <select v-model="addKeyForm.key_type">
                 <option value="zsk">ZSK</option>
@@ -293,10 +296,10 @@ onMounted(loadZones)
                 <option value="ecdsa384">ECDSA P-384</option>
                 <option value="rsasha256">RSA-SHA256</option>
               </select>
-              <button class="btn primary" @click="addCryptoKey">Add Key</button>
+              <button class="btn primary" @click="addCryptoKey">{{ $t('dns.btn_add_key') }}</button>
             </div>
 
-            <button class="btn" style="margin-top:16px" @click="dnssecModal=false">Close</button>
+            <button class="btn" style="margin-top:16px" @click="dnssecModal=false">{{ $t('dns.btn_close') }}</button>
           </div>
         </div>
       </Teleport>

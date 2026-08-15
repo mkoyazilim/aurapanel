@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -15,7 +16,7 @@
       <div class="card">
         <div class="row" style="align-items: flex-end">
           <div style="flex: 2; min-width: 240px">
-            <label style="margin: 0 0 6px 0; font-weight: 600">🌐 Site Seçin</label>
+            <label style="margin: 0 0 6px 0; font-weight: 600">🌐 {{ $t('cron.select_site_label') }}</label>
             <select v-model="selectedSite" @change="loadCrons" style="width: 100%">
               <option value="" disabled>{{ $t('cron.select_site') }}</option>
               <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }} ({{ s.id }})</option>
@@ -43,15 +44,15 @@
       <!-- Cron Görevleri Listesi -->
       <div v-else class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px">
-          <h2 style="margin: 0">{{ selectedSite }} — Zamanlanmış Görevler</h2>
-          <span class="badge" style="background: rgba(0,0,0,0.06)">{{ jobs.length }} Görev</span>
+          <h2 style="margin: 0">{{ selectedSite }} — {{ $t('cron.scheduled_tasks') }}</h2>
+          <span class="badge" style="background: rgba(0,0,0,0.06)">{{ $t('cron.task_count', { count: jobs.length }) }}</span>
         </div>
 
         <div v-if="jobs.length === 0" class="empty-state" style="padding: 32px">
           <div style="font-size: 32px; margin-bottom: 8px">📭</div>
           <p class="muted">{{ $t('cron.no_jobs') }}</p>
           <button class="btn primary btn-sm" style="margin-top: 10px" @click="openCreateModal">
-            İlk Görevi Ekle
+            {{ $t('cron.add_first_job') }}
           </button>
         </div>
 
@@ -82,7 +83,7 @@
                 </span>
               </td>
               <td style="text-align: right">
-                <button class="btn danger btn-sm" @click="deleteJob(j.id)" title="Görevi Sil">
+                <button class="btn danger btn-sm" @click="deleteJob(j.id)" :title="$t('cron.delete_job_title')">
                   🗑️ {{ $t('common.delete') }}
                 </button>
               </td>
@@ -107,17 +108,17 @@
 
             <div style="margin-bottom: 14px">
               <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px">
-                <label style="margin: 0; font-weight: 600">{{ $t('cron.schedule') }} (5 alan)</label>
-                <small class="muted">Örn: dakika saat gün ay hafta-günü</small>
+                <label style="margin: 0; font-weight: 600">{{ $t('cron.schedule') }} ({{ $t('cron.schedule_fields') }})</label>
+                <small class="muted">{{ $t('cron.schedule_hint') }}</small>
               </div>
               <input v-model="form.schedule" type="text" placeholder="0 * * * *" class="mono" required />
               
               <!-- Hazır Şablonlar -->
               <div class="preset-pills" style="margin-top: 8px">
-                <button type="button" class="preset-btn" @click="form.schedule = '*/15 * * * *'">15 dk bir</button>
-                <button type="button" class="preset-btn" @click="form.schedule = '0 * * * *'">Her saat</button>
-                <button type="button" class="preset-btn" @click="form.schedule = '0 0 * * *'">Her gece</button>
-                <button type="button" class="preset-btn" @click="form.schedule = '0 0 * * 0'">Haftada bir</button>
+                <button type="button" class="preset-btn" @click="form.schedule = '*/15 * * * *'">{{ $t('cron.preset_every_15min') }}</button>
+                <button type="button" class="preset-btn" @click="form.schedule = '0 * * * *'">{{ $t('cron.preset_every_hour') }}</button>
+                <button type="button" class="preset-btn" @click="form.schedule = '0 0 * * *'">{{ $t('cron.preset_every_night') }}</button>
+                <button type="button" class="preset-btn" @click="form.schedule = '0 0 * * 0'">{{ $t('cron.preset_every_week') }}</button>
               </div>
             </div>
 
@@ -203,7 +204,7 @@ async function saveJob() {
       body: form.value
     })
     showModal.value = false
-    notice.value = 'Cron görevi başarıyla oluşturuldu.'
+    notice.value = t('cron.job_created')
     await loadCrons()
   } catch (err) {
     error.value = err.message
@@ -220,7 +221,7 @@ async function deleteJob(id) {
     await api(`/sites/${selectedSite.value}/crons/${id}`, {
       method: 'DELETE'
     })
-    notice.value = 'Cron görevi silindi.'
+    notice.value = t('cron.job_deleted')
     await loadCrons()
   } catch (err) {
     error.value = err.message

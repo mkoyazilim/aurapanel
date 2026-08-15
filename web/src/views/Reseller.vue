@@ -1,7 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Layout from '../components/Layout.vue'
 import { api } from '../api.js'
+
+const { t } = useI18n()
 
 const resellers = ref([])
 const loading = ref(true)
@@ -25,7 +28,7 @@ async function loadResellers() {
   try {
     resellers.value = await api.get('/resellers') || []
   } catch (err) {
-    error.value = err.message || 'Yükleme hatası'
+    error.value = err.message || t('reseller.load_error')
   } finally {
     loading.value = false
   }
@@ -40,30 +43,30 @@ function openAddModal() {
 async function createReseller() {
   addError.value = ''
   if (!addForm.value.username || !addForm.value.password) {
-    addError.value = 'Kullanıcı adı ve şifre gereklidir.'
+    addError.value = t('reseller.username_password_required')
     return
   }
   try {
     await api.post('/resellers', addForm.value)
   } catch (err) {
-    addError.value = err.message || 'Oluşturma hatası'
+    addError.value = err.message || t('reseller.create_error')
     return
   }
-  notice.value = 'Reseller oluşturuldu.'
+  notice.value = t('reseller.reseller_created')
   showAddModal.value = false
   loadResellers()
 }
 
 async function deleteReseller(id, username) {
-  if (!confirm(`"${username}" adlı reseller silinecek. Emin misiniz?`)) return
+  if (!confirm(t('reseller.delete_confirm', { username }))) return
   error.value = ''
   try {
     await api.delete(`/resellers/${id}`)
   } catch (err) {
-    error.value = err.message || 'Silme hatası'
+    error.value = err.message || t('reseller.delete_error')
     return
   }
-  notice.value = 'Reseller silindi.'
+  notice.value = t('reseller.reseller_deleted')
   loadResellers()
 }
 
@@ -82,7 +85,7 @@ async function openQuotaModal(r) {
       }
     }
   } catch (err) {
-    quotaError.value = 'Mevcut kota yüklenemedi: ' + err.message
+    quotaError.value = t('reseller.quota_load_error', { message: err.message })
   }
   showQuotaModal.value = true
 }
@@ -97,10 +100,10 @@ async function saveQuota() {
       max_bandwidth_gb: Number(quotaForm.value.max_bandwidth_gb),
     })
   } catch (err) {
-    quotaError.value = err.message || 'Kaydetme hatası'
+    quotaError.value = err.message || t('reseller.save_error')
     return
   }
-  notice.value = 'Kota güncellendi.'
+  notice.value = t('reseller.quota_updated')
   showQuotaModal.value = false
   loadResellers()
 }
@@ -112,10 +115,10 @@ onMounted(loadResellers)
   <Layout>
     <div class="page">
       <div class="page-header">
-        <h1>Reseller Yönetimi</h1>
+        <h1>{{ $t('reseller.reseller_management') }}</h1>
         <button class="btn primary" @click="openAddModal">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          Yeni Reseller
+          {{ $t('reseller.new_reseller') }}
         </button>
       </div>
 
@@ -123,15 +126,15 @@ onMounted(loadResellers)
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
       <div class="card">
-        <div v-if="loading" class="muted">Yükleniyor...</div>
+        <div v-if="loading" class="muted">{{ $t('reseller.loading') }}</div>
         <table v-else>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Kullanıcı Adı</th>
-              <th>Durum</th>
-              <th>Siteler</th>
-              <th>Oluşturulma</th>
+              <th>{{ $t('reseller.id') }}</th>
+              <th>{{ $t('reseller.username') }}</th>
+              <th>{{ $t('reseller.status') }}</th>
+              <th>{{ $t('reseller.sites') }}</th>
+              <th>{{ $t('reseller.created_at') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -145,12 +148,12 @@ onMounted(loadResellers)
               <td>{{ r.site_count ?? 0 }} / {{ r.max_sites ?? '∞' }}</td>
               <td class="muted">{{ r.created_at ? new Date(r.created_at).toLocaleDateString('tr-TR') : '—' }}</td>
               <td class="actions-cell">
-                <button class="btn" @click="openQuotaModal(r)">Kota Düzenle</button>
-                <button class="btn danger" @click="deleteReseller(r.id, r.username)">Sil</button>
+                <button class="btn" @click="openQuotaModal(r)">{{ $t('reseller.edit_quota') }}</button>
+                <button class="btn danger" @click="deleteReseller(r.id, r.username)">{{ $t('reseller.delete') }}</button>
               </td>
             </tr>
             <tr v-if="!resellers.length">
-              <td colspan="6" class="muted">Henüz reseller yok.</td>
+              <td colspan="6" class="muted">{{ $t('reseller.no_resellers') }}</td>
             </tr>
           </tbody>
         </table>
@@ -161,21 +164,21 @@ onMounted(loadResellers)
         <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
           <div class="modal-box">
             <div class="modal-header">
-              <h2>Yeni Reseller Ekle</h2>
-              <button class="modal-close" @click="showAddModal = false" title="Kapat">✕</button>
+              <h2>{{ $t('reseller.add_new_reseller') }}</h2>
+              <button class="modal-close" @click="showAddModal = false" :title="$t('reseller.close')">✕</button>
             </div>
             <div v-if="addError" class="alert error">{{ addError }}</div>
             <div class="field">
-              <label>Kullanıcı Adı</label>
-              <input v-model="addForm.username" placeholder="kullanici_adi" autocomplete="off" />
+              <label>{{ $t('reseller.username') }}</label>
+              <input v-model="addForm.username" :placeholder="$t('reseller.username_placeholder')" autocomplete="off" />
             </div>
             <div class="field">
-              <label>Şifre</label>
+              <label>{{ $t('reseller.password') }}</label>
               <input v-model="addForm.password" type="password" placeholder="••••••••" autocomplete="new-password" />
             </div>
             <div class="modal-actions">
-              <button class="btn" @click="showAddModal = false">İptal</button>
-              <button class="btn primary" @click="createReseller">Oluştur</button>
+              <button class="btn" @click="showAddModal = false">{{ $t('reseller.cancel') }}</button>
+              <button class="btn primary" @click="createReseller">{{ $t('reseller.create') }}</button>
             </div>
           </div>
         </div>
@@ -186,29 +189,29 @@ onMounted(loadResellers)
         <div v-if="showQuotaModal" class="modal-overlay" @click.self="showQuotaModal = false">
           <div class="modal-box">
             <div class="modal-header">
-              <h2>Kota Düzenle</h2>
-              <button class="modal-close" @click="showQuotaModal = false" title="Kapat">✕</button>
+              <h2>{{ $t('reseller.edit_quota') }}</h2>
+              <button class="modal-close" @click="showQuotaModal = false" :title="$t('reseller.close')">✕</button>
             </div>
             <div v-if="quotaError" class="alert error">{{ quotaError }}</div>
             <div class="field">
-              <label>Maks. Site Sayısı</label>
+              <label>{{ $t('reseller.max_sites') }}</label>
               <input v-model.number="quotaForm.max_sites" type="number" min="0" step="1" />
             </div>
             <div class="field">
-              <label>Maks. Veritabanı Sayısı</label>
+              <label>{{ $t('reseller.max_databases') }}</label>
               <input v-model.number="quotaForm.max_databases" type="number" min="0" step="1" />
             </div>
             <div class="field">
-              <label>Maks. Disk (GB)</label>
+              <label>{{ $t('reseller.max_disk_gb') }}</label>
               <input v-model.number="quotaForm.max_disk_gb" type="number" min="0" step="1" />
             </div>
             <div class="field">
-              <label>Maks. Bant Genişliği (GB)</label>
+              <label>{{ $t('reseller.max_bandwidth_gb') }}</label>
               <input v-model.number="quotaForm.max_bandwidth_gb" type="number" min="0" step="1" />
             </div>
             <div class="modal-actions">
-              <button class="btn" @click="showQuotaModal = false">İptal</button>
-              <button class="btn primary" @click="saveQuota">Kaydet</button>
+              <button class="btn" @click="showQuotaModal = false">{{ $t('reseller.cancel') }}</button>
+              <button class="btn primary" @click="saveQuota">{{ $t('reseller.save') }}</button>
             </div>
           </div>
         </div>

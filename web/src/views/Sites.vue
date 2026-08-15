@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -10,7 +11,7 @@
         <div class="row">
           <div style="flex: 2">
             <label>{{ $t('sites.domain') }}</label>
-            <input v-model="newSite.domain" placeholder="example.com" />
+            <input v-model="newSite.domain" :placeholder="$t('sites.placeholder_domain')" />
           </div>
           <div style="flex: 1">
             <label>{{ $t('sites.php_version') }}</label>
@@ -27,7 +28,7 @@
         <table>
           <thead>
             <tr>
-              <th>ID</th>
+              <th>{{ $t('sites.id') }}</th>
               <th>{{ $t('sites.domain') }}</th>
               <th>{{ $t('sites.linux_user') }}</th>
               <th>{{ $t('sites.status') }}</th>
@@ -50,25 +51,25 @@
                       <span>⚡</span> {{ $t('sites.install_wp') }}
                     </button>
                     <router-link :to="'/sites/' + s.id + '/git'" class="dropdown-item">
-                      <span>🐙</span> Git
+                      <span>🐙</span> {{ $t('sites.dropdown_git') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/nodejs'" class="dropdown-item">
-                      <span>🟢</span> Node
+                      <span>🟢</span> {{ $t('sites.dropdown_node') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/staging'" class="dropdown-item">
-                      <span>🧪</span> Staging
+                      <span>🧪</span> {{ $t('sites.dropdown_staging') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/cloudflare'" class="dropdown-item">
-                      <span>☁️</span> CF
+                      <span>☁️</span> {{ $t('sites.dropdown_cf') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/mail'" class="dropdown-item">
-                      <span>📧</span> Mail
+                      <span>📧</span> {{ $t('sites.dropdown_mail') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/waf'" class="dropdown-item">
-                      <span>🛡️</span> WAF
+                      <span>🛡️</span> {{ $t('sites.dropdown_waf') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/cdn'" class="dropdown-item">
-                      <span>⚡</span> CDN
+                      <span>⚡</span> {{ $t('sites.dropdown_cdn') }}
                     </router-link>
                     <div class="dropdown-divider"></div>
                     <button class="dropdown-item danger" @click="remove(s.id); activeDropdown = null">
@@ -95,8 +96,8 @@
             <h4>🎉 {{ $t('wp.install_success') }}</h4>
             <p style="margin: 6px 0 0 0">{{ $t('wp.install_success_desc') }}</p>
             <div class="mono" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-top: 8px">
-              <div><strong>DB Adı:</strong> {{ wpModal.result.db_name }}</div>
-              <div><strong>DB Kullanıcısı:</strong> {{ wpModal.result.db_user }}</div>
+              <div><strong>{{ $t('sites.db_name_label') }}</strong> {{ wpModal.result.db_name }}</div>
+              <div><strong>{{ $t('sites.db_user_label') }}</strong> {{ wpModal.result.db_user }}</div>
             </div>
             <div style="margin-top: 10px">
               <a :href="'http://' + wpModal.site.name" target="_blank" class="btn primary btn-sm">
@@ -111,8 +112,8 @@
             <div style="margin: 14px 0">
               <label>{{ $t('wp.language') }}</label>
               <select v-model="wpModal.language">
-                <option value="tr">🇹🇷 Türkçe (tr.wordpress.org)</option>
-                <option value="en">🇺🇸 English (wordpress.org)</option>
+                <option value="tr">{{ $t('sites.wp_lang_tr') }}</option>
+                <option value="en">{{ $t('sites.wp_lang_en') }}</option>
               </select>
             </div>
 
@@ -194,7 +195,7 @@ async function installWordpress() {
     })
     if (!res.ok) {
       const data = await res.json()
-      throw new Error(data.error || 'WordPress kurulumu başarısız')
+      throw new Error(data.error || t('sites.wp_install_failed'))
     }
     wpModal.result = await res.json()
     notice.value = t('wp.installed_notice', { domain: wpModal.site.name })
@@ -271,7 +272,6 @@ onUnmounted(() => {
   padding: 24px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
-</style>
 
 .action-dropdown {
   display: inline-block;
@@ -327,4 +327,4 @@ onUnmounted(() => {
   background: var(--border-color, #e2e8f0);
   margin: 4px 0;
 }
-
+</style>

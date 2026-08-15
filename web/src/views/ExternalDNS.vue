@@ -1,6 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Layout from '../components/Layout.vue'
+
+const { t } = useI18n()
 
 const providers = ref([])
 const syncLog   = ref([])
@@ -51,8 +54,8 @@ async function createProvider() {
     body: JSON.stringify({ name: addForm.value.name, provider: addForm.value.provider, credentials: creds })
   })
   addModal.value = false
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Failed'; return }
-  notice.value = 'Provider added. Credentials are encrypted.'
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('externaldns.failed'); return }
+  notice.value = t('externaldns.provider_added')
   addForm.value = { name: '', provider: 'cloudflare' }
   cfCreds.value  = { api_token: '', zone_id: '' }
   r53Creds.value = { access_key: '', secret_key: '', region: 'us-east-1' }
@@ -60,7 +63,7 @@ async function createProvider() {
 }
 
 async function deleteProvider(id, name) {
-  if (!confirm(`Delete provider "${name}"?`)) return
+  if (!confirm(t('externaldns.delete_provider_confirm', { name }))) return
   await fetch(`/api/v1/extdns/providers/${id}`, { method: 'DELETE' })
   load()
 }
@@ -100,9 +103,9 @@ async function doSync() {
   })
   syncModal.value  = false
   syncLoading.value = false
-  if (!res.ok) { const d = await res.json(); error.value = d.error || 'Sync failed'; return }
+  if (!res.ok) { const d = await res.json(); error.value = d.error || t('externaldns.sync_failed'); return }
   const result = await res.json()
-  notice.value = `Sync done — added: ${(result.added||[]).length}, conflicts: ${(result.conflicts||[]).length}`
+  notice.value = t('externaldns.sync_done_stats', { added: (result.added||[]).length, conflicts: (result.conflicts||[]).length })
   load()
 }
 
@@ -115,21 +118,21 @@ onMounted(load)
 <template>
   <Layout>
     <div class="page">
-      <h1>External DNS <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">Cloudflare · Route53 · F5</span></h1>
+      <h1>{{ $t('externaldns.title_external_dns') }} <span style="font-size:14px;color:var(--muted);font-weight:normal;margin-left:8px">{{ $t('externaldns.subtitle_providers') }}</span></h1>
       <div v-if="error"  class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-        <button class="btn primary" @click="addModal=true">➕ Add Provider</button>
+        <button class="btn primary" @click="addModal=true">{{ $t('externaldns.add_provider') }}</button>
       </div>
 
       <!-- Providers list -->
       <div class="card">
-        <h2>DNS Providers</h2>
-        <div v-if="loading" class="muted">Loading…</div>
+        <h2>{{ $t('externaldns.dns_providers') }}</h2>
+        <div v-if="loading" class="muted">{{ $t('externaldns.loading') }}</div>
         <table v-else>
           <thead>
-            <tr><th>Name</th><th>Provider</th><th>Added</th><th>Actions</th></tr>
+            <tr><th>{{ $t('externaldns.th_name') }}</th><th>{{ $t('externaldns.th_provider') }}</th><th>{{ $t('externaldns.th_added') }}</th><th>{{ $t('externaldns.th_actions') }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="p in providers" :key="p.id">
@@ -138,14 +141,14 @@ onMounted(load)
               <td class="text-sm muted">{{ p.created_at?.slice(0,10) }}</td>
               <td style="display:flex;gap:6px;flex-wrap:wrap">
                 <template v-if="p.provider==='cloudflare'">
-                  <button class="btn" @click="openCFRecords(p.id)">Records</button>
-                  <button class="btn primary" @click="openSyncModal(p.id)">Push Sync</button>
+                  <button class="btn" @click="openCFRecords(p.id)">{{ $t('externaldns.btn_records') }}</button>
+                  <button class="btn primary" @click="openSyncModal(p.id)">{{ $t('externaldns.btn_push_sync') }}</button>
                 </template>
-                <button class="btn danger" @click="deleteProvider(p.id, p.name)">Delete</button>
+                <button class="btn danger" @click="deleteProvider(p.id, p.name)">{{ $t('externaldns.btn_delete') }}</button>
               </td>
             </tr>
             <tr v-if="!providers.length">
-              <td colspan="4" class="muted">No providers configured.</td>
+              <td colspan="4" class="muted">{{ $t('externaldns.no_providers') }}</td>
             </tr>
           </tbody>
         </table>
@@ -153,10 +156,10 @@ onMounted(load)
 
       <!-- Sync log -->
       <div class="card" style="margin-top:16px">
-        <h2>Sync Log</h2>
+        <h2>{{ $t('externaldns.sync_log') }}</h2>
         <table>
           <thead>
-            <tr><th>Time</th><th>Provider</th><th>Direction</th><th>Action</th><th>Detail</th></tr>
+            <tr><th>{{ $t('externaldns.th_time') }}</th><th>{{ $t('externaldns.th_provider') }}</th><th>{{ $t('externaldns.th_direction') }}</th><th>{{ $t('externaldns.th_action') }}</th><th>{{ $t('externaldns.th_detail') }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="l in syncLog" :key="l.id">
@@ -166,7 +169,7 @@ onMounted(load)
               <td><span class="badge" :class="actClass(l.action)">{{ l.action }}</span></td>
               <td class="text-sm muted">{{ l.detail || '—' }}</td>
             </tr>
-            <tr v-if="!syncLog.length"><td colspan="5" class="muted">No sync events yet.</td></tr>
+            <tr v-if="!syncLog.length"><td colspan="5" class="muted">{{ $t('externaldns.no_sync_events') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -175,36 +178,36 @@ onMounted(load)
       <Teleport to="body">
         <div v-if="addModal" class="modal-overlay" @click.self="addModal=false">
           <div class="modal" style="max-width:480px">
-            <h3>Add DNS Provider</h3>
-            <label>Name</label>
-            <input v-model="addForm.name" placeholder="cloudflare-main" />
-            <label style="margin-top:10px">Provider</label>
+            <h3>{{ $t('externaldns.add_dns_provider') }}</h3>
+            <label>{{ $t('externaldns.label_name') }}</label>
+            <input v-model="addForm.name" :placeholder="$t('externaldns.placeholder_name')" />
+            <label style="margin-top:10px">{{ $t('externaldns.label_provider') }}</label>
             <select v-model="addForm.provider">
-              <option value="cloudflare">Cloudflare</option>
-              <option value="route53">AWS Route53</option>
+              <option value="cloudflare">{{ $t('externaldns.opt_cloudflare') }}</option>
+              <option value="route53">{{ $t('externaldns.opt_route53') }}</option>
             </select>
 
             <template v-if="addForm.provider==='cloudflare'">
-              <label style="margin-top:10px">API Token</label>
-              <input v-model="cfCreds.api_token" placeholder="CF API Token" type="password" />
-              <label style="margin-top:10px">Zone ID</label>
-              <input v-model="cfCreds.zone_id" placeholder="Zone ID" />
+              <label style="margin-top:10px">{{ $t('externaldns.label_api_token') }}</label>
+              <input v-model="cfCreds.api_token" :placeholder="$t('externaldns.placeholder_api_token')" type="password" />
+              <label style="margin-top:10px">{{ $t('externaldns.label_zone_id') }}</label>
+              <input v-model="cfCreds.zone_id" :placeholder="$t('externaldns.placeholder_zone_id')" />
             </template>
             <template v-else>
-              <label style="margin-top:10px">Access Key</label>
-              <input v-model="r53Creds.access_key" placeholder="AKIA..." />
-              <label style="margin-top:10px">Secret Key</label>
-              <input v-model="r53Creds.secret_key" type="password" placeholder="Secret..." />
-              <label style="margin-top:10px">Region</label>
-              <input v-model="r53Creds.region" placeholder="us-east-1" />
+              <label style="margin-top:10px">{{ $t('externaldns.label_access_key') }}</label>
+              <input v-model="r53Creds.access_key" :placeholder="$t('externaldns.placeholder_access_key')" />
+              <label style="margin-top:10px">{{ $t('externaldns.label_secret_key') }}</label>
+              <input v-model="r53Creds.secret_key" type="password" :placeholder="$t('externaldns.placeholder_secret_key')" />
+              <label style="margin-top:10px">{{ $t('externaldns.label_region') }}</label>
+              <input v-model="r53Creds.region" :placeholder="$t('externaldns.placeholder_region')" />
             </template>
 
             <p class="muted" style="font-size:12px;margin-top:8px">
-              🔐 Credentials are encrypted with AES-256 before storage.
+              {{ $t('externaldns.msg_encrypted') }}
             </p>
             <div style="display:flex;gap:8px;margin-top:14px">
-              <button class="btn primary" @click="createProvider">Save</button>
-              <button class="btn" @click="addModal=false">Cancel</button>
+              <button class="btn primary" @click="createProvider">{{ $t('externaldns.btn_save') }}</button>
+              <button class="btn" @click="addModal=false">{{ $t('externaldns.btn_cancel') }}</button>
             </div>
           </div>
         </div>
@@ -214,10 +217,10 @@ onMounted(load)
       <Teleport to="body">
         <div v-if="cfModal" class="modal-overlay" @click.self="cfModal=false">
           <div class="modal" style="max-width:680px;width:92vw">
-            <h3>Cloudflare DNS Records</h3>
-            <div v-if="cfLoading" class="muted">Loading…</div>
+            <h3>{{ $t('externaldns.cf_dns_records') }}</h3>
+            <div v-if="cfLoading" class="muted">{{ $t('externaldns.loading') }}</div>
             <table v-else>
-              <thead><tr><th>Name</th><th>Type</th><th>Content</th><th>TTL</th><th>Proxied</th></tr></thead>
+              <thead><tr><th>{{ $t('externaldns.th_name') }}</th><th>{{ $t('externaldns.th_type') }}</th><th>{{ $t('externaldns.th_content') }}</th><th>{{ $t('externaldns.th_ttl') }}</th><th>{{ $t('externaldns.th_proxied') }}</th></tr></thead>
               <tbody>
                 <tr v-for="r in cfRecords" :key="r.id">
                   <td class="mono text-sm">{{ r.name }}</td>
@@ -226,10 +229,10 @@ onMounted(load)
                   <td class="text-sm muted">{{ r.ttl }}</td>
                   <td><span class="badge" :class="r.proxied?'ok':''">{{ r.proxied?'✓':'—' }}</span></td>
                 </tr>
-                <tr v-if="!cfRecords.length"><td colspan="5" class="muted">No records.</td></tr>
+                <tr v-if="!cfRecords.length"><td colspan="5" class="muted">{{ $t('externaldns.no_records') }}</td></tr>
               </tbody>
             </table>
-            <button class="btn" style="margin-top:14px" @click="cfModal=false">Close</button>
+            <button class="btn" style="margin-top:14px" @click="cfModal=false">{{ $t('externaldns.btn_close') }}</button>
           </div>
         </div>
       </Teleport>
@@ -238,26 +241,26 @@ onMounted(load)
       <Teleport to="body">
         <div v-if="syncModal" class="modal-overlay" @click.self="syncModal=false">
           <div class="modal" style="max-width:700px;width:94vw">
-            <h3>Push Sync to Cloudflare</h3>
-            <p class="muted" style="font-size:13px;margin-bottom:10px">Records below will be pushed to Cloudflare. Existing conflicting records will NOT be overwritten.</p>
+            <h3>{{ $t('externaldns.push_sync_to_cf') }}</h3>
+            <p class="muted" style="font-size:13px;margin-bottom:10px">{{ $t('externaldns.push_sync_info') }}</p>
             <div v-for="(rec, i) in syncRecs" :key="i" class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap">
-              <input v-model="rec.name"    placeholder="Name" style="flex:2;min-width:80px" />
+              <input v-model="rec.name"    :placeholder="$t('externaldns.placeholder_record_name')" style="flex:2;min-width:80px" />
               <select v-model="rec.type" style="flex:1;min-width:60px">
                 <option v-for="t in ['A','AAAA','CNAME','MX','TXT']" :key="t">{{ t }}</option>
               </select>
-              <input v-model="rec.content"  placeholder="Content" style="flex:3;min-width:100px" />
-              <input v-model.number="rec.ttl" type="number" placeholder="TTL" style="width:65px" />
+              <input v-model="rec.content"  :placeholder="$t('externaldns.placeholder_content')" style="flex:3;min-width:100px" />
+              <input v-model.number="rec.ttl" type="number" :placeholder="$t('externaldns.placeholder_ttl')" style="width:65px" />
               <label style="display:flex;align-items:center;gap:4px;font-size:13px">
-                <input type="checkbox" v-model="rec.proxied" /> Proxy
+                <input type="checkbox" v-model="rec.proxied" /> {{ $t('externaldns.lbl_proxy') }}
               </label>
               <button class="btn danger" style="padding:2px 8px" @click="removeSyncRow(i)" :disabled="syncRecs.length===1">✕</button>
             </div>
-            <button class="btn" style="margin-bottom:12px" @click="addSyncRow">+ Row</button>
+            <button class="btn" style="margin-bottom:12px" @click="addSyncRow">{{ $t('externaldns.btn_add_row') }}</button>
             <div style="display:flex;gap:8px">
               <button class="btn primary" :disabled="syncLoading" @click="doSync">
-                {{ syncLoading ? 'Syncing…' : 'Push to Cloudflare' }}
+                {{ syncLoading ? $t('externaldns.btn_syncing') : $t('externaldns.btn_push_to_cf') }}
               </button>
-              <button class="btn" @click="syncModal=false">Cancel</button>
+              <button class="btn" @click="syncModal=false">{{ $t('externaldns.btn_cancel') }}</button>
             </div>
           </div>
         </div>

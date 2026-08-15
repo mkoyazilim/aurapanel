@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -14,7 +15,7 @@
           <div class="stream-badge-container">
             <div class="stream-badge" :class="connected && !paused ? 'live' : 'paused'">
               <span class="pulse-dot"></span>
-              <span>{{ connected && !paused ? 'CANLI AKIŞ' : (paused ? 'DURAKLATILDI' : 'BAĞLANIYOR...') }}</span>
+              <span>{{ connected && !paused ? $t('logs.stream_live') : (paused ? $t('logs.stream_paused') : $t('logs.stream_connecting')) }}</span>
             </div>
           </div>
         </div>
@@ -23,7 +24,7 @@
         <div class="logs-toolbar">
           <!-- Site Seçimi -->
           <div class="tool-item site-select-wrapper">
-            <label class="tool-label">Site:</label>
+            <label class="tool-label">{{ $t('logs.site_label') }}:</label>
             <select v-model="selectedSite" @change="restartTail" class="custom-select">
               <option value="" disabled>{{ $t('logs.select_site') }}</option>
               <option v-for="s in sites" :key="s.id" :value="s.id">🌐 {{ s.name }}</option>
@@ -38,14 +39,14 @@
                 :class="{ active: logType === 'access' }"
                 @click="switchType('access')"
               >
-                📄 Access Log
+                📄 {{ $t('logs.access_log') }}
               </button>
               <button
                 class="pill-tab"
                 :class="{ active: logType === 'error' }"
                 @click="switchType('error')"
               >
-                ⚠️ Error Log
+                ⚠️ {{ $t('logs.error_log') }}
               </button>
             </div>
           </div>
@@ -57,7 +58,7 @@
               <input
                 v-model="searchQuery"
                 type="text"
-                placeholder="IP, HTTP kod, path veya hata ara..."
+                :placeholder="$t('logs.search_placeholder')"
                 class="search-input"
               />
               <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn">✕</button>
@@ -71,9 +72,9 @@
               class="btn btn-sm"
               :class="autoScroll ? 'primary' : ''"
               @click="autoScroll = !autoScroll"
-              :title="autoScroll ? 'Otomatik Kaydırma Açık' : 'Otomatik Kaydırma Kapalı'"
+              :title="autoScroll ? $t('logs.auto_scroll_on_title') : $t('logs.auto_scroll_off_title')"
             >
-              📌 {{ autoScroll ? 'Oto-Kaydır: Açık' : 'Oto-Kaydır: Kapalı' }}
+              📌 {{ autoScroll ? $t('logs.auto_scroll_on') : $t('logs.auto_scroll_off') }}
             </button>
 
             <!-- Duraklat / Devam Et -->
@@ -91,8 +92,8 @@
             </button>
 
             <!-- İndir -->
-            <button class="btn btn-sm" @click="downloadLogs" title="Görüntülenen logları indir">
-              📥 İndir
+            <button class="btn btn-sm" @click="downloadLogs" :title="$t('logs.download_title')">
+              📥 {{ $t('logs.download') }}
             </button>
           </div>
         </div>
@@ -118,11 +119,11 @@
             <span>{{ selectedSite }}</span>
             <span class="sep">/</span>
             <span>{{ logType }}.log</span>
-            <span class="lines-count">({{ filteredLines.length }} satır)</span>
+            <span class="lines-count">({{ $t('logs.lines_count', { count: filteredLines.length }) }})</span>
           </div>
 
           <div class="terminal-tools">
-            <button class="icon-btn" @click="toggleFullscreen" :title="isFullscreen ? 'Normal Boyut' : 'Tam Ekran'">
+            <button class="icon-btn" @click="toggleFullscreen" :title="isFullscreen ? $t('logs.normal_size') : $t('logs.fullscreen')">
               {{ isFullscreen ? '🗗' : '⛶' }}
             </button>
           </div>
@@ -133,7 +134,7 @@
           <div v-if="filteredLines.length === 0" class="log-empty">
             <div class="spinner-pulse" v-if="connected && !paused && !searchQuery"></div>
             <p class="mono text-sm" style="color: #94a3b8">
-              {{ searchQuery ? 'Aranan kriterle eşleşen log satırı bulunamadı.' : $t('logs.waiting_logs') }}
+              {{ searchQuery ? $t('logs.no_matching_logs') : $t('logs.waiting_logs') }}
             </p>
           </div>
 
@@ -188,7 +189,7 @@ async function fetchSites() {
       }
     }
   } catch (err) {
-    console.error('Siteler alınamadı:', err)
+    console.error(t('logs.sites_fetch_error'), err)
   }
 }
 

@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -13,9 +14,9 @@
         <div class="health-summary">
           <span class="health-indicator" :class="health.overall ? 'status-green' : 'status-yellow'"></span>
           <div>
-            <strong>{{ health.overall ? 'Tüm Sistemler Sağlıklı ve Çalışıyor' : 'Sistemde Dikkat Gerektiren Durumlar Var' }}</strong>
+            <strong>{{ health.overall ? $t('dashboard.all_systems_healthy') : $t('dashboard.system_attention_needed') }}</strong>
             <p class="muted text-sm" style="margin: 2px 0 0 0">
-              Son Kontrol: {{ health.checked_at }}
+              {{ $t('dashboard.last_check') }}: {{ health.checked_at }}
             </p>
           </div>
         </div>
@@ -38,7 +39,7 @@
           <div class="progress-bar-bg" style="height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-top:8px;">
             <div class="progress-bar-fill" :style="{ width: sysStats.cpu.usage + '%', background: sysStats.cpu.usage > 80 ? '#ef4444' : '#3b82f6', height:'100%' }"></div>
           </div>
-          <div class="text-sm muted" style="margin-top:4px;">{{ sysStats.cpu.cores }} Çekirdek</div>
+          <div class="text-sm muted" style="margin-top:4px;">{{ $t('dashboard.n_cores', { n: sysStats.cpu.cores }) }}</div>
         </div>
         <div class="card stat">
           <div class="muted" style="margin-bottom:8px;">{{ $t('dashboard.ram_usage', 'RAM Kullanımı') }}</div>
@@ -75,11 +76,11 @@
           <div class="muted">{{ $t('dashboard.open_drifts') }}</div>
         </div>
         <div class="card stat">
-          <div class="stat-value" style="color: #10b981">Active</div>
+          <div class="stat-value" style="color: #10b981">{{ $t('dashboard.status_active') }}</div>
           <div class="muted">OpenLiteSpeed</div>
         </div>
         <div class="card stat">
-          <div class="stat-value" style="color: #10b981">Ready</div>
+          <div class="stat-value" style="color: #10b981">{{ $t('dashboard.status_ready') }}</div>
           <div class="muted">MariaDB</div>
         </div>
       </div>
@@ -87,17 +88,17 @@
       <!-- Metrics Chart -->
       <div class="card metrics-card">
         <div class="metrics-header">
-          <h2 style="margin: 0">📈 Kaynak Kullanımı (Son 24 Saat)</h2>
+          <h2 style="margin: 0">📈 {{ $t('dashboard.resource_usage_title') }}</h2>
           <select v-model="selectedSiteId" @change="loadMetrics" class="site-select">
             <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
-            <option v-if="!sites.length" value="" disabled>Site bulunamadı</option>
+            <option v-if="!sites.length" value="" disabled>{{ $t('dashboard.no_sites_found') }}</option>
           </select>
         </div>
-        <div v-if="loadingMetrics" class="muted text-sm" style="padding: 20px 0;">Yükleniyor...</div>
+        <div v-if="loadingMetrics" class="muted text-sm" style="padding: 20px 0;">{{ $t('dashboard.loading') }}</div>
         <div v-else-if="chartData.labels && chartData.labels.length" style="position: relative; height: 300px; width: 100%;">
           <Line :data="chartData" :options="chartOptions" />
         </div>
-        <div v-else class="muted text-sm" style="padding: 20px 0;">Bu site için henüz yeterli metrik verisi toplanmamış.</div>
+        <div v-else class="muted text-sm" style="padding: 20px 0;">{{ $t('dashboard.no_metrics_data') }}</div>
       </div>
 
       <!-- Quick Actions -->
@@ -108,42 +109,42 @@
             <span class="action-icon">➕</span>
             <div>
               <strong>{{ $t('dashboard.new_site') }}</strong>
-              <p class="muted text-sm">Site ve domain yönetimi</p>
+              <p class="muted text-sm">{{ $t('dashboard.site_domain_management') }}</p>
             </div>
           </router-link>
           <router-link class="action-btn" to="/files">
             <span class="action-icon">📁</span>
             <div>
               <strong>{{ $t('dashboard.file_manager') }}</strong>
-              <p class="muted text-sm">Monaco editör ve dosya gezgini</p>
+              <p class="muted text-sm">{{ $t('dashboard.file_manager_desc') }}</p>
             </div>
           </router-link>
           <router-link class="action-btn" to="/logs">
             <span class="action-icon">⚡</span>
             <div>
-              <strong>Canlı Loglar</strong>
-              <p class="muted text-sm">Anlık access ve error akışı</p>
+              <strong>{{ $t('dashboard.live_logs') }}</strong>
+              <p class="muted text-sm">{{ $t('dashboard.live_logs_desc') }}</p>
             </div>
           </router-link>
           <router-link class="action-btn" to="/cron">
             <span class="action-icon">⏰</span>
             <div>
-              <strong>Cron Görevleri</strong>
-              <p class="muted text-sm">Zamanlanmış arkaplan işleri</p>
+              <strong>{{ $t('dashboard.cron_jobs') }}</strong>
+              <p class="muted text-sm">{{ $t('dashboard.cron_jobs_desc') }}</p>
             </div>
           </router-link>
           <router-link class="action-btn" to="/security">
             <span class="action-icon">🛡️</span>
             <div>
-              <strong>Güvenlik Profili</strong>
-              <p class="muted text-sm">PHP sertleştirme ve limitler</p>
+              <strong>{{ $t('dashboard.security_profile') }}</strong>
+              <p class="muted text-sm">{{ $t('dashboard.security_profile_desc') }}</p>
             </div>
           </router-link>
           <router-link class="action-btn" to="/drift">
             <span class="action-icon">🕵️</span>
             <div>
               <strong>{{ $t('dashboard.drift_scan') }}</strong>
-              <p class="muted text-sm">İstenen durum kontrolü ve onarım</p>
+              <p class="muted text-sm">{{ $t('dashboard.drift_scan_desc') }}</p>
             </div>
           </router-link>
         </div>
@@ -154,6 +155,7 @@
 
 <script setup>
 import { onMounted, ref, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Layout from '../components/Layout.vue'
 import { api } from '../api'
 
@@ -182,6 +184,8 @@ ChartJS.register(
   Filler
 )
 
+const { t } = useI18n()
+
 const status = ref({})
 const health = ref(null)
 const sysStats = ref(null)
@@ -205,7 +209,7 @@ const chartOptions = {
       type: 'linear',
       display: true,
       position: 'left',
-      title: { display: true, text: 'CPU (%)' },
+      title: { display: true, text: t('dashboard.cpu_axis_label') },
       min: 0,
       max: 100
     },
@@ -213,7 +217,7 @@ const chartOptions = {
       type: 'linear',
       display: true,
       position: 'right',
-      title: { display: true, text: 'RAM (MB)' },
+      title: { display: true, text: t('dashboard.ram_axis_label') },
       min: 0,
       grid: { drawOnChartArea: false }
     }
@@ -238,10 +242,10 @@ const chartOptions = {
 }
 
 function formatCheckName(name) {
-  if (name === 'sqlite') return 'SQLite (Metadata)'
-  if (name === 'mariadb') return 'MariaDB (Veritabanı)'
-  if (name === 'ols') return 'OpenLiteSpeed Servisi'
-  if (name === 'ssl_certs') return 'SSL Sertifikaları'
+  if (name === 'sqlite') return t('dashboard.check_sqlite')
+  if (name === 'mariadb') return t('dashboard.check_mariadb')
+  if (name === 'ols') return t('dashboard.check_ols')
+  if (name === 'ssl_certs') return t('dashboard.check_ssl_certs')
   return name
 }
 
@@ -272,7 +276,7 @@ async function loadMetrics() {
       labels,
       datasets: [
         {
-          label: 'CPU Kullanımı',
+          label: t('dashboard.cpu_usage'),
           data: cpuData,
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -283,7 +287,7 @@ async function loadMetrics() {
           pointHoverRadius: 5
         },
         {
-          label: 'RAM Kullanımı',
+          label: t('dashboard.ram_usage'),
           data: memData,
           borderColor: '#10b981',
           backgroundColor: 'transparent',
@@ -295,7 +299,7 @@ async function loadMetrics() {
       ]
     }
   } catch (e) {
-    console.error('Metrikler alınamadı:', e)
+    console.error('Metrics fetch error:', e)
   } finally {
     loadingMetrics.value = false
   }
@@ -324,7 +328,7 @@ async function loadData() {
       health.value = await res.json()
     }
   } catch (e) {
-    console.error('Sağlık kontrolü alınamadı:', e)
+    console.error('Health check error:', e)
   }
 
   try {
@@ -336,7 +340,7 @@ async function loadData() {
       await loadMetrics()
     }
   } catch (e) {
-    console.error('Siteler alınamadı:', e)
+    console.error('Sites fetch error:', e)
   }
 }
 

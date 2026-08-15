@@ -1,7 +1,8 @@
+
 <template>
   <div class="login-wrap">
     <form class="card login-card" @submit.prevent="submit">
-      <div class="brand"><img src="/logo.png" alt="AuraPanel" height="40" /></div>
+      <div class="brand"><img src="/logo.png" :alt="$t('login.brand_alt')" height="40" /></div>
       <p class="muted">{{ $t('login.subtitle') }}</p>
       <div v-if="error" class="alert error">{{ error }}</div>
       <label>{{ $t('login.username') }}</label>

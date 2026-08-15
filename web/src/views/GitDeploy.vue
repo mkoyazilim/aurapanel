@@ -1,47 +1,47 @@
 <template>
   <div>
-    <h2 class="text-2xl font-bold mb-6">Git Deploy</h2>
+    <h2 class="text-2xl font-bold mb-6">{{ $t('gitdeploy.title') }}</h2>
 
     <div v-if="loading" class="text-gray-500">
-      Loading...
+      {{ $t('gitdeploy.loading') }}
     </div>
 
     <div v-else-if="!gitConfigured" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-      <h3 class="text-lg font-medium mb-4">Setup Git Deployment</h3>
+      <h3 class="text-lg font-medium mb-4">{{ $t('gitdeploy.setup_title') }}</h3>
       <p class="text-gray-600 dark:text-gray-400 mb-6">
-        Connect this site to a Git repository to enable automated deployments.
+        {{ $t('gitdeploy.setup_desc') }}
       </p>
 
       <form @submit.prevent="setupGit" class="space-y-4 max-w-2xl">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Repository URL</label>
-          <input v-model="form.repo_url" type="text" placeholder="https://x-access-token:ghp_xxx@github.com/user/repo.git" required
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.repo_url') }}</label>
+          <input v-model="form.repo_url" type="text" :placeholder="$t('gitdeploy.repo_url_placeholder')" required
                  class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500">
-          <p class="text-xs text-gray-500 mt-1">For private repos, include your Personal Access Token (PAT) in the URL.</p>
+          <p class="text-xs text-gray-500 mt-1">{{ $t('gitdeploy.repo_url_help') }}</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Branch</label>
-          <input v-model="form.branch" type="text" placeholder="main" required
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.branch') }}</label>
+          <input v-model="form.branch" type="text" :placeholder="$t('gitdeploy.branch_placeholder')" required
                  class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500">
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deploy Path</label>
-          <input v-model="form.deploy_path" type="text" placeholder="/" required
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.deploy_path') }}</label>
+          <input v-model="form.deploy_path" type="text" :placeholder="$t('gitdeploy.deploy_path_placeholder')" required
                  class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500">
-          <p class="text-xs text-gray-500 mt-1">Relative to the site's home directory. E.g. "/", "/public_html", "/app"</p>
+          <p class="text-xs text-gray-500 mt-1">{{ $t('gitdeploy.deploy_path_help') }}</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deploy Script</label>
-          <textarea v-model="form.deploy_script" rows="4" placeholder="npm install && npm run build"
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.deploy_script') }}</label>
+          <textarea v-model="form.deploy_script" rows="4" :placeholder="$t('gitdeploy.deploy_script_placeholder')"
                     class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 font-mono text-sm focus:ring-2 focus:ring-blue-500"></textarea>
-          <p class="text-xs text-gray-500 mt-1">Executed in the deploy path after pull/clone.</p>
+          <p class="text-xs text-gray-500 mt-1">{{ $t('gitdeploy.deploy_script_help') }}</p>
         </div>
 
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-          Save Configuration
+          {{ $t('gitdeploy.save_config') }}
         </button>
       </form>
     </div>
@@ -50,78 +50,78 @@
       <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div class="flex justify-between items-start mb-6">
           <div>
-            <h3 class="text-lg font-medium mb-1">Git Deployment Active</h3>
-            <p class="text-sm text-gray-500">Repository: {{ gitInfo.repo_url.replace(/:[^:@]+@/, ':***@') }}</p>
+            <h3 class="text-lg font-medium mb-1">{{ $t('gitdeploy.active_title') }}</h3>
+            <p class="text-sm text-gray-500">{{ $t('gitdeploy.repository') }}: {{ gitInfo.repo_url.replace(/:[^:@]+@/, ':***@') }}</p>
           </div>
           <div class="flex space-x-2">
             <button @click="deploy" :disabled="deploying"
                     class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50">
-              {{ deploying ? 'Deploying...' : 'Deploy Now' }}
+              {{ deploying ? $t('gitdeploy.deploying') : $t('gitdeploy.deploy_now') }}
             </button>
             <button @click="deleteGit" class="bg-red-100 text-red-600 px-4 py-2 rounded-md hover:bg-red-200 transition-colors">
-              Remove
+              {{ $t('gitdeploy.remove') }}
             </button>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 mb-6">
           <div>
-            <span class="block text-sm text-gray-500">Branch</span>
+            <span class="block text-sm text-gray-500">{{ $t('gitdeploy.branch') }}</span>
             <span class="font-medium">{{ gitInfo.branch }}</span>
           </div>
           <div>
-            <span class="block text-sm text-gray-500">Status</span>
+            <span class="block text-sm text-gray-500">{{ $t('gitdeploy.status') }}</span>
             <span :class="{'text-yellow-600': gitInfo.status === 'pending' || gitInfo.status === 'deploying', 'text-green-600': gitInfo.status === 'success', 'text-red-600': gitInfo.status === 'failed'}" class="font-medium capitalize">
               {{ gitInfo.status }}
             </span>
           </div>
           <div>
-            <span class="block text-sm text-gray-500">Deploy Path</span>
+            <span class="block text-sm text-gray-500">{{ $t('gitdeploy.deploy_path') }}</span>
             <span class="font-medium">{{ gitInfo.deploy_path }}</span>
           </div>
           <div>
-            <span class="block text-sm text-gray-500">Last Deployed</span>
-            <span class="font-medium">{{ gitInfo.last_deployed_at || 'Never' }}</span>
+            <span class="block text-sm text-gray-500">{{ $t('gitdeploy.last_deployed') }}</span>
+            <span class="font-medium">{{ gitInfo.last_deployed_at || $t('gitdeploy.never') }}</span>
           </div>
         </div>
 
         <div class="mt-6 border-t pt-4 dark:border-gray-700">
-          <h4 class="text-sm font-medium mb-2">Webhook URL</h4>
-          <p class="text-sm text-gray-500 mb-2">Configure this URL in your Git provider (GitHub, GitLab, etc.) to trigger automatic deployments.</p>
+          <h4 class="text-sm font-medium mb-2">{{ $t('gitdeploy.webhook_url') }}</h4>
+          <p class="text-sm text-gray-500 mb-2">{{ $t('gitdeploy.webhook_desc') }}</p>
           <div class="flex">
             <input type="text" readonly :value="webhookUrl" class="w-full px-3 py-2 bg-gray-100 border rounded-l-md text-sm font-mono dark:bg-gray-900 dark:border-gray-700">
             <button @click="copyWebhook" class="bg-gray-200 px-4 py-2 rounded-r-md hover:bg-gray-300 text-sm font-medium dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
-              Copy
+              {{ $t('gitdeploy.copy') }}
             </button>
           </div>
         </div>
       </div>
       
       <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <h3 class="text-lg font-medium mb-4">Edit Configuration</h3>
+        <h3 class="text-lg font-medium mb-4">{{ $t('gitdeploy.edit_config') }}</h3>
         <form @submit.prevent="setupGit" class="space-y-4 max-w-2xl">
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Repository URL</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.repo_url') }}</label>
             <input v-model="form.repo_url" type="text" required
                    class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Branch</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.branch') }}</label>
             <input v-model="form.branch" type="text" required
                    class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deploy Path</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.deploy_path') }}</label>
             <input v-model="form.deploy_path" type="text" required
                    class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deploy Script</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('gitdeploy.deploy_script') }}</label>
             <textarea v-model="form.deploy_script" rows="4"
                       class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 font-mono text-sm focus:ring-2 focus:ring-blue-500"></textarea>
           </div>
           <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-            Update Configuration
+            {{ $t('gitdeploy.update_config') }}
           </button>
         </form>
       </div>
@@ -132,8 +132,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { api } from '../api'
 
+const { t } = useI18n()
 const route = useRoute()
 const siteId = route.params.id
 
@@ -189,10 +191,10 @@ const fetchGitStatus = async () => {
 const setupGit = async () => {
   try {
     await api.post(`/sites/${siteId}/git`, form.value)
-    alert('Git configuration saved successfully')
+    alert(t('gitdeploy.config_saved'))
     await fetchGitStatus()
   } catch (error) {
-    alert(`Failed to save git configuration: ${error.message}`)
+    alert(`${t('gitdeploy.config_failed')}: ${error.message}`)
   }
 }
 
@@ -202,27 +204,27 @@ const deploy = async () => {
     deploying.value = true
     startPolling()
   } catch (error) {
-    alert(`Deploy failed: ${error.message}`)
+    alert(`${t('gitdeploy.deploy_failed')}: ${error.message}`)
   }
 }
 
 const deleteGit = async () => {
-  if (!confirm('Are you sure you want to remove Git integration for this site?')) return
+  if (!confirm(t('gitdeploy.confirm_remove'))) return
   try {
     await api.delete(`/sites/${siteId}/git`)
     gitConfigured.value = false
     gitInfo.value = {}
   } catch (error) {
-    alert(`Failed to remove Git: ${error.message}`)
+    alert(`${t('gitdeploy.remove_failed')}: ${error.message}`)
   }
 }
 
 const copyWebhook = async () => {
   try {
     await navigator.clipboard.writeText(webhookUrl.value)
-    alert('Webhook URL copied to clipboard')
+    alert(t('gitdeploy.webhook_copied'))
   } catch (e) {
-    alert('Failed to copy. Please manually copy the URL.')
+    alert(t('gitdeploy.copy_failed'))
   }
 }
 

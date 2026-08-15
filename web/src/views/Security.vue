@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -13,7 +14,7 @@
 
       <!-- Site Seçim Kartı -->
       <div class="card">
-        <label style="margin: 0 0 6px 0; font-weight: 600">🌐 Site Seçin</label>
+        <label style="margin: 0 0 6px 0; font-weight: 600">🌐 {{ $t('security.select_site_label') }}</label>
         <select v-model="selectedSite" @change="loadSecurity" style="width: 100%; max-width: 400px">
           <option value="" disabled>{{ $t('security.select_site') }}</option>
           <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }} ({{ s.id }})</option>
@@ -35,8 +36,8 @@
         <!-- WAF Toggle -->
         <div class="card" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
           <div>
-            <h3 style="margin: 0; font-size: 18px;">ModSecurity (WAF)</h3>
-            <p class="muted text-sm" style="margin: 4px 0 0 0;">Etkinleştirildiğinde OWASP CRS kuralları uygulanır.</p>
+            <h3 style="margin: 0; font-size: 18px;">{{ $t('security.modsecurity_title') }}</h3>
+            <p class="muted text-sm" style="margin: 4px 0 0 0;">{{ $t('security.modsecurity_description') }}</p>
           </div>
           <label class="switch">
             <input type="checkbox" v-model="wafEnabled" @change="toggleWAF" :disabled="saving">
@@ -124,7 +125,7 @@ async function fetchSites() {
       await loadSecurity()
     }
   } catch (err) {
-    console.error('Siteler alınamadı:', err)
+    console.error(t('security.fetch_sites_error'), err)
   }
 }
 
@@ -169,7 +170,7 @@ async function toggleWAF() {
     await api.post(`/sites/${selectedSite.value}/security/waf`, {
       enabled: wafEnabled.value
     })
-    notice.value = 'WAF durumu güncellendi. OLS ayarları otomatik yenilenecektir.'
+    notice.value = t('security.waf_status_updated')
     setTimeout(() => { notice.value = '' }, 3000)
   } catch (err) {
     wafEnabled.value = !wafEnabled.value

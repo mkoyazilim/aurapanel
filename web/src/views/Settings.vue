@@ -1,3 +1,4 @@
+
 <template>
   <Layout>
     <div class="page">
@@ -32,14 +33,14 @@
           <div class="card">
             <h2>🛡️ {{ $t('settings.two_factor') }}</h2>
             <template v-if="!me.totp_enabled">
-              <p class="muted text-sm" style="margin-bottom: 12px">Google Authenticator veya Aegis ile hesabınızı çift aşamalı doğrulayın.</p>
+              <p class="muted text-sm" style="margin-bottom: 12px">{{ $t('settings.totp_description') }}</p>
               <button class="btn" @click="mfaStart">{{ $t('settings.setup_totp') }}</button>
               <div v-if="mfaSecret" style="margin-top: 12px">
                 <div class="alert warn">{{ $t('settings.totp_secret_desc') }}</div>
                 <div class="mono" style="padding: 8px; background: rgba(0,0,0,0.04); border-radius: 8px; word-break: break-all">
                   {{ mfaSecret }}
                 </div>
-                <div class="muted text-sm" style="margin: 8px 0">otpauth URL: <span class="mono">{{ mfaUrl }}</span></div>
+                <div class="muted text-sm" style="margin: 8px 0">{{ $t('settings.otpauth_url_label') }} <span class="mono">{{ mfaUrl }}</span></div>
                 <label>{{ $t('settings.verify_code') }}</label>
                 <input v-model="mfaCode" inputmode="numeric" maxlength="6" />
                 <button class="btn primary" style="margin-top: 10px" @click="mfaEnable">{{ $t('settings.verify_enable') }}</button>
@@ -60,14 +61,14 @@
               <label>{{ $t('settings.provider') }}</label>
               <select v-model="captchaProvider">
                 <option value="">{{ $t('settings.provider_disabled') }}</option>
-                <option value="turnstile">Cloudflare Turnstile</option>
-                <option value="recaptcha">Google reCAPTCHA (v2/v3)</option>
+                <option value="turnstile">{{ $t('settings.captcha_turnstile') }}</option>
+                <option value="recaptcha">{{ $t('settings.captcha_recaptcha') }}</option>
               </select>
             </div>
             <template v-if="captchaProvider">
               <div style="margin-top: 10px">
                 <label>{{ $t('settings.site_key') }}</label>
-                <input v-model="captchaSiteKey" placeholder="e.g. 0x4AAAA..." />
+                <input v-model="captchaSiteKey" :placeholder="$t('settings.site_key_placeholder')" />
               </div>
               <div style="margin-top: 10px">
                 <label>{{ $t('settings.secret_key') }}</label>
@@ -95,36 +96,36 @@
             <template v-if="s3Form.enabled">
               <div style="margin-top: 10px">
                 <label>{{ $t('settings.s3_endpoint') }}</label>
-                <input v-model="s3Form.endpoint" placeholder="https://<account_id>.r2.cloudflarestorage.com" />
-                <small class="muted" style="display: block; margin-top: 2px">Cloudflare R2, AWS S3, Wasabi, MinIO</small>
+                <input v-model="s3Form.endpoint" :placeholder="$t('settings.s3_endpoint_placeholder')" />
+                <small class="muted" style="display: block; margin-top: 2px">{{ $t('settings.s3_providers_hint') }}</small>
               </div>
 
               <div class="row" style="margin-top: 10px">
                 <div style="flex: 1">
                   <label>{{ $t('settings.s3_bucket') }}</label>
-                  <input v-model="s3Form.bucket" placeholder="my-backups" />
+                  <input v-model="s3Form.bucket" :placeholder="$t('settings.s3_bucket_placeholder')" />
                 </div>
                 <div style="flex: 1">
                   <label>{{ $t('settings.s3_region') }}</label>
-                  <input v-model="s3Form.region" placeholder="auto (R2) veya eu-central-1" />
+                  <input v-model="s3Form.region" :placeholder="$t('settings.s3_region_placeholder')" />
                 </div>
               </div>
 
               <div style="margin-top: 10px">
                 <label>{{ $t('settings.s3_access_key') }}</label>
-                <input v-model="s3Form.access_key" placeholder="Access Key ID" />
+                <input v-model="s3Form.access_key" :placeholder="$t('settings.s3_access_key_placeholder')" />
               </div>
 
               <div style="margin-top: 10px">
                 <label>{{ $t('settings.s3_secret_key') }}</label>
-                <input v-model="s3Form.secret_key" type="password" :placeholder="s3Form.has_secret ? '•••••••• (Mevcut şifre kayıtlı)' : 'Secret Access Key'" />
+                <input v-model="s3Form.secret_key" type="password" :placeholder="s3Form.has_secret ? $t('settings.s3_secret_existing') : $t('settings.s3_secret_key_placeholder')" />
               </div>
             </template>
 
             <div style="display: flex; gap: 10px; margin-top: 14px">
               <button class="btn primary" @click="saveS3Settings">{{ $t('settings.save_settings') }}</button>
               <button v-if="s3Form.enabled" class="btn" @click="testS3Connection" :disabled="testingS3">
-                {{ testingS3 ? 'Test ediliyor...' : '🔌 ' + $t('settings.s3_test_btn') }}
+                {{ testingS3 ? $t('settings.s3_testing') : '🔌 ' + $t('settings.s3_test_btn') }}
               </button>
             </div>
           </div>
@@ -148,7 +149,7 @@
                   <td class="muted">{{ p.last_used_at || '—' }}</td>
                   <td style="text-align: right"><button class="btn danger btn-sm" @click="patDelete(p.id)">{{ $t('common.delete') }}</button></td>
                 </tr>
-                <tr v-if="!pats.length"><td colspan="4" class="muted">{{ $t('settings.no_pats') || 'Henüz token yok.' }}</td></tr>
+                <tr v-if="!pats.length"><td colspan="4" class="muted">{{ $t('settings.no_pats') }}</td></tr>
               </tbody>
             </table>
           </div>
@@ -280,7 +281,7 @@ async function loadS3Settings() {
       }
     }
   } catch (err) {
-    console.error('S3 ayarları okunamadı:', err)
+    console.error('S3 settings read error:', err)
   }
 }
 
@@ -319,7 +320,7 @@ async function testS3Connection() {
       notice.value = t('settings.s3_test_success')
     } else {
       const data = await res.json()
-      error.value = t('settings.s3_test_failed') + ': ' + (data.error || 'Bağlantı kurulamadı')
+      error.value = t('settings.s3_test_failed') + ': ' + (data.error || t('settings.s3_connection_failed'))
     }
   } catch (e) {
     error.value = e.message
@@ -359,7 +360,7 @@ onMounted(async () => {
     captchaSiteKey.value = s.captcha_sitekey || ''
     captchaSecret.value = s.captcha_secret || ''
   } catch (e) {
-    console.error('Ayarlar okunamadı', e)
+    console.error('Settings read error', e)
   }
   await loadS3Settings()
   await loadPats()

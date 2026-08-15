@@ -1,7 +1,8 @@
+
 <template>
   <Layout>
     <div class="page">
-      <h1>{{ $t('menu.files') }} <span style="font-size: 14px; color: var(--muted); font-weight: normal; margin-left: 8px;">Modern File Manager</span></h1>
+      <h1>{{ $t('menu.files') }} <span style="font-size: 14px; color: var(--muted); font-weight: normal; margin-left: 8px;">{{ $t('filemanager.modern_file_manager') }}</span></h1>
       <div v-if="error" class="alert error">{{ error }}</div>
       <div v-if="notice" class="alert ok">{{ notice }}</div>
 
@@ -17,7 +18,7 @@
           
           <!-- Breadcrumb -->
           <div class="breadcrumb" style="flex: 1; display: flex; align-items: center; padding: 0 16px; background: var(--bg); border-radius: 6px; height: 38px; border: 1px solid var(--border);">
-            <span class="clickable" @click="goToPath('')">🏠 Root</span>
+            <span class="clickable" @click="goToPath('')">🏠 {{ $t('filemanager.root') }}</span>
             <span v-for="(p, i) in pathParts" :key="i">
               <span style="margin: 0 8px; color: var(--muted);">/</span>
               <span class="clickable" @click="goToPath(pathParts.slice(0, i+1).join('/'))">{{ p }}</span>
@@ -27,7 +28,7 @@
 
         <div class="row" style="border-top: 1px solid var(--border); padding-top: 16px;">
           <button class="btn" @click="promptMkdir">📁 {{ $t('files.folder') }}</button>
-          <button class="btn" @click="promptNewFile">📄 New File</button>
+          <button class="btn" @click="promptNewFile">📄 {{ $t('filemanager.new_file') }}</button>
           <div class="spacer"></div>
           <button class="btn" @click="uploadInput.click()">⬆️ {{ $t('files.upload') }}</button>
           <input ref="uploadInput" type="file" multiple style="display: none" @change="upload" />
@@ -36,16 +37,16 @@
 
       <!-- File List -->
       <div class="card" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="handleDrop" :class="{'drag-active': dragOver}">
-        <div v-if="dragOver" class="drag-overlay">Drop files to upload...</div>
+        <div v-if="dragOver" class="drag-overlay">{{ $t('filemanager.drop_files_to_upload') }}</div>
         
-        <div v-if="loading" class="muted">Loading directory...</div>
+        <div v-if="loading" class="muted">{{ $t('filemanager.loading_directory') }}</div>
         <table v-else class="file-table">
           <thead>
             <tr>
               <th style="width: 50%">{{ $t('files.name') }}</th>
               <th style="width: 15%">{{ $t('files.size') }}</th>
               <th style="width: 20%">{{ $t('files.perms') }}</th>
-              <th style="width: 15%; text-align: right;">Actions</th>
+              <th style="width: 15%; text-align: right;">{{ $t('filemanager.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -63,13 +64,13 @@
                 <div class="dropdown">
                   <button class="btn btn-sm">⋮</button>
                   <div class="dropdown-menu">
-                    <a v-if="!e.IsDir" @click.prevent="openEditor(e.path)">✏️ Edit</a>
-                    <a @click.prevent="promptRename(e.path)">📝 Rename</a>
-                    <a @click.prevent="promptCopy(e.path)">📄 Copy</a>
-                    <a @click.prevent="promptMove(e.path)">🚚 Move</a>
-                    <a v-if="!e.IsDir && isArchive(e.name)" @click.prevent="extract(e.path)">📦 Extract</a>
-                    <a v-if="e.IsDir" @click.prevent="archiveDir(e.path)">📦 Zip</a>
-                    <a class="text-danger" @click.prevent="remove(e.path)">🗑️ Delete</a>
+                    <a v-if="!e.IsDir" @click.prevent="openEditor(e.path)">✏️ {{ $t('filemanager.edit') }}</a>
+                    <a @click.prevent="promptRename(e.path)">📝 {{ $t('filemanager.rename') }}</a>
+                    <a @click.prevent="promptCopy(e.path)">📄 {{ $t('filemanager.copy') }}</a>
+                    <a @click.prevent="promptMove(e.path)">🚚 {{ $t('filemanager.move') }}</a>
+                    <a v-if="!e.IsDir && isArchive(e.name)" @click.prevent="extract(e.path)">📦 {{ $t('filemanager.extract') }}</a>
+                    <a v-if="e.IsDir" @click.prevent="archiveDir(e.path)">📦 {{ $t('filemanager.zip') }}</a>
+                    <a class="text-danger" @click.prevent="remove(e.path)">🗑️ {{ $t('filemanager.delete') }}</a>
                   </div>
                 </div>
               </td>
@@ -186,7 +187,7 @@ async function promptMkdir() {
 }
 
 async function promptNewFile() {
-  const n = prompt('Enter new file name:')
+  const n = prompt(t('filemanager.enter_new_file_name'))
   if (!n) return
   try {
     const relPath = getRelPath(n)
@@ -202,7 +203,7 @@ async function promptNewFile() {
 }
 
 async function promptRename(oldPath) {
-  const newName = prompt('Enter new name:', oldPath.split('/').pop())
+  const newName = prompt(t('filemanager.enter_new_name'), oldPath.split('/').pop())
   if (!newName) return
   const toPath = getRelPath(newName)
   try {
@@ -214,7 +215,7 @@ async function promptRename(oldPath) {
 }
 
 async function promptCopy(oldPath) {
-  const newName = prompt('Copy to:', oldPath + '-copy')
+  const newName = prompt(t('filemanager.copy_to'), oldPath + '-copy')
   if (!newName) return
   try {
     await api(`/sites/${siteId.value}/files/copy`, { method: 'POST', body: { from: oldPath, to: newName } })
@@ -225,7 +226,7 @@ async function promptCopy(oldPath) {
 }
 
 async function promptMove(oldPath) {
-  const toPath = prompt('Move to path:', oldPath)
+  const toPath = prompt(t('filemanager.move_to_path'), oldPath)
   if (!toPath || toPath === oldPath) return
   try {
     await api(`/sites/${siteId.value}/files/rename`, { method: 'POST', body: { from: oldPath, to: toPath } })
@@ -236,14 +237,14 @@ async function promptMove(oldPath) {
 }
 
 async function extract(relPath) {
-  if (!confirm(`Extract ${relPath} to current directory?`)) return
+  if (!confirm(t('filemanager.extract_confirm', { name: relPath }))) return
   try {
     const format = relPath.endsWith('.tar.gz') ? 'tar.gz' : 'zip'
     await api(`/sites/${siteId.value}/archive`, { 
       method: 'POST', 
       body: { action: 'extract', format: format, target: `${relPath}|${path.value}` } 
     })
-    notice.value = `Extracted ${relPath} successfully.`
+    notice.value = t('filemanager.extracted_successfully', { name: relPath })
     await loadDir()
   } catch (e) {
     error.value = e.message
@@ -256,7 +257,7 @@ async function archiveDir(relPath) {
       method: 'POST', 
       body: { action: 'create', format: 'zip', target: relPath + '.zip', sources: [relPath] } 
     })
-    notice.value = `Zipped ${relPath} successfully.`
+    notice.value = t('filemanager.zipped_successfully', { name: relPath })
     await loadDir()
   } catch (e) {
     error.value = e.message
@@ -302,7 +303,7 @@ async function processUpload(file) {
       })
     }
     await api('/upload/finalize', { method: 'POST', body: { upload_id: init.upload_id } })
-    notice.value = `Uploaded ${file.name} successfully.`
+    notice.value = t('filemanager.uploaded_successfully', { name: file.name })
   } catch (e) {
     error.value = e.message
   }
