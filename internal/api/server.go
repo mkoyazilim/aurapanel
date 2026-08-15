@@ -305,6 +305,12 @@ func (s *Server) routes() {
 	// Sunucu Yönetimi
 	m.HandleFunc("GET /api/v1/server/metrics", s.handleServerMetrics)
 	m.HandleFunc("GET /api/v1/server/services", s.handleServerServices)
+	m.HandleFunc("POST /api/v1/server/action", s.handleServerAction)
+	m.HandleFunc("GET /api/v1/server/firewall", s.handleFirewallList)
+	m.HandleFunc("POST /api/v1/server/firewall", s.handleFirewallRuleAdd)
+	m.HandleFunc("DELETE /api/v1/server/firewall", s.handleFirewallRuleDelete)
+	m.HandleFunc("PUT /api/v1/server/ssh-port", s.handleSSHPortChange)
+	m.HandleFunc("PUT /api/v1/server/panel-port", s.handlePanelPortChange)
 
 	// Reseller yönetimi (admin tarafı)
 	m.HandleFunc("GET /api/v1/resellers", s.handleResellerList)

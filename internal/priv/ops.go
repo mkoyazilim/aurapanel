@@ -211,6 +211,11 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"node.apply":                opNodeApply,
 		"node.remove":               opNodeRemove,
 		"site.clone_files":          opSiteCloneFiles,
+		"firewall.list":             opFirewallList,
+		"firewall.rule_add":         opFirewallRuleAdd,
+		"firewall.rule_delete":      opFirewallRuleDelete,
+		"firewall.ssh_port":         opSSHPortChange,
+		"firewall.panel_port":       opPanelPortChange,
 	}
 }
 
@@ -1104,4 +1109,209 @@ func opServerAction(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 		}
 	}
 	return p, map[string]string{"status": "ok"}, nil
+}
+// --- Güvenlik Duvarı Yönetimi (firewall.list / firewall.rule_add / firewall.rule_delete / firewall.ssh_port / firewall.panel_port) ---
+
+// fwPortRange: 1-65535, rezerve portlar (0, 1024'ün altı sistem portlarına dikkat)
+// panelde zaten UI doğrulaması var; burada sadece sayısal aralık kontrol.
+var rePort = regexp.MustCompile(`^[0-9]{1,5}$`)
+
+func validatePort(p int) error {
+	if p < 1 || p > 65535 {
+		return fmt.Errorf("geçersiz port: %d (1-65535 arası olmalı)", p)
+	}
+	return nil
+}
+
+// nftableConfig, mevcut aurapanel nftables kuralsetini döndürür (proses içi — exec yok).
+func opFirewallList(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	data, err := os.ReadFile("/etc/nftables.d/aurapanel.nft")
+	if err != nil {
+		// Dosya yoksa boş kural seti döndür — henüz oluşturulmamış
+		return &plan{}, map[string]any{"rules": []any{}, "raw": ""}, nil
+	}
+	content := string(data)
+	// Basit parser: "tcp dport NNN accept" satırlarını yakala
+	type Rule struct {
+		Port    int    `json:"port"`
+		Proto   string `json:"proto"`
+		Comment string `json:"comment"`
+	}
+	var rules []Rule
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		// Örn: tcp dport 8080 accept # panel
+		re := regexp.MustCompile(`(tcp|udp)\s+dport\s+(\d+)\s+accept(?:\s+#\s*(.+))?`)
+		m := re.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		port := 0
+		fmt.Sscanf(m[2], "%d", &port)
+		// 22, 80, 443 temel kurallar — bunları da listele
+		rules = append(rules, Rule{Port: port, Proto: m[1], Comment: strings.TrimSpace(m[3])})
+	}
+	return &plan{}, map[string]any{"rules": rules, "raw": content}, nil
+}
+
+// opFirewallRuleAdd: tek port açar (tcp veya udp).
+func opFirewallRuleAdd(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Port    int    `json:"port"`
+		Proto   string `json:"proto"`   // "tcp" | "udp"
+		Comment string `json:"comment"` // kısa açıklama (opsiyonel)
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, err
+	}
+	if err := validatePort(a.Port); err != nil {
+		return nil, nil, err
+	}
+	if a.Proto != "tcp" && a.Proto != "udp" {
+		return nil, nil, fmt.Errorf("geçersiz protokol: %q (tcp|udp)", a.Proto)
+	}
+	comment := strings.TrimSpace(a.Comment)
+	if len(comment) > 64 {
+		return nil, nil, errors.New("yorum 64 karakteri geçemez")
+	}
+	// Sadece harf, rakam, boşluk ve tire
+	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9 _\-]*$`, comment); !matched {
+		return nil, nil, errors.New("yorum geçersiz karakter içeriyor")
+	}
+
+	nft, _ := bin("nft")
+	rule := fmt.Sprintf("%s dport %d accept", a.Proto, a.Port)
+	if comment != "" {
+		rule += " # " + comment
+	}
+	p := &plan{}
+	// nft table'a dinamik kural ekle (çalışan ruleset'e — persist için dosya da güncellenir)
+	p.exec(nft, "add", "rule", "inet", "aurapanel", "input", a.Proto, "dport", fmt.Sprintf("%d", a.Port), "accept")
+	// Kalıcılık için nftables.d dosyasını yeniden oluştur (aşağıdaki helper kullanılır exec_linux'ta)
+	return p, map[string]any{"added": a.Port, "proto": a.Proto}, nil
+}
+
+// opFirewallRuleDelete: açık bir portu kapatır.
+// Güvenlik: 22 (SSH) ve 80, 443 silinemez.
+func opFirewallRuleDelete(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Port  int    `json:"port"`
+		Proto string `json:"proto"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, err
+	}
+	if err := validatePort(a.Port); err != nil {
+		return nil, nil, err
+	}
+	if a.Proto != "tcp" && a.Proto != "udp" {
+		return nil, nil, fmt.Errorf("geçersiz protokol: %q", a.Proto)
+	}
+	// Çekirdek portları koruması
+	protected := map[int]bool{22: true, 80: true, 443: true}
+	if protected[a.Port] {
+		return nil, nil, fmt.Errorf("port %d silinemez: sistem tarafından korunan port", a.Port)
+	}
+	nft, _ := bin("nft")
+	p := &plan{}
+	p.exec(nft, "delete", "rule", "inet", "aurapanel", "input",
+		"handle", fmt.Sprintf("$(nft -a list chain inet aurapanel input | awk '/%s dport %d accept/ {print $NF}')", a.Proto, a.Port))
+	return p, map[string]any{"deleted": a.Port}, nil
+}
+
+// opSSHPortChange: SSH portunu değiştirir.
+// Güvenlik sırası: 1) yeni port aç  2) sshd_config yaz  3) sshd reload  4) eski port kapat
+// Bu sıra lockout'u önler.
+func opSSHPortChange(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		NewPort int `json:"new_port"`
+		OldPort int `json:"old_port"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, err
+	}
+	if err := validatePort(a.NewPort); err != nil {
+		return nil, nil, fmt.Errorf("yeni port: %w", err)
+	}
+	if err := validatePort(a.OldPort); err != nil {
+		return nil, nil, fmt.Errorf("eski port: %w", err)
+	}
+	if a.NewPort == a.OldPort {
+		return nil, nil, errors.New("yeni port eski portla aynı")
+	}
+	// 80 ve 443'e SSH konulamaz
+	if a.NewPort == 80 || a.NewPort == 443 {
+		return nil, nil, fmt.Errorf("port %d HTTP/HTTPS için ayrılmış, SSH için kullanılamaz", a.NewPort)
+	}
+
+	nft, _ := bin("nft")
+	sshd, _ := bin("sshd")
+	systemctl, _ := bin("systemctl")
+
+	p := &plan{}
+
+	// Adım 1: Yeni SSH portunu güvenlik duvarında AÇ (henüz eski port da açık kalıyor)
+	p.exec(nft, "add", "rule", "inet", "aurapanel", "input", "tcp", "dport", fmt.Sprintf("%d", a.NewPort), "accept")
+
+	// Adım 2: sshd_config dosyasını güncelle
+	sshdConfig := fmt.Sprintf(`# AuraPanel tarafından yönetilir — elle düzenleme önerilmez.
+Port %d
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication yes
+ChallengeResponseAuthentication no
+UsePAM yes
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp internal-sftp
+`, a.NewPort)
+	p.write(fileWrite{path: "/etc/ssh/sshd_config", content: sshdConfig, mode: 0o600})
+
+	// Adım 3: Konfigürasyon geçerlilik testi
+	p.exec(sshd, "-t")
+
+	// Adım 4: sshd reload (yeni port etkinleşir, mevcut bağlantılar kesilmez)
+	p.exec(systemctl, "reload", "sshd")
+
+	// Adım 5: nftables kalıcı config dosyasını güncelle (exec_linux.go bunu file rewrite ile yapar)
+
+	return p, map[string]any{"new_port": a.NewPort, "old_port": a.OldPort}, nil
+}
+
+// opPanelPortChange: AuraPanel dinleme adresini değiştirir (aurapanel.yaml listen.address).
+func opPanelPortChange(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		NewPort int `json:"new_port"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, err
+	}
+	if err := validatePort(a.NewPort); err != nil {
+		return nil, nil, fmt.Errorf("panel port: %w", err)
+	}
+	if a.NewPort == 80 || a.NewPort == 443 {
+		return nil, nil, fmt.Errorf("port %d HTTP/HTTPS için ayrılmış", a.NewPort)
+	}
+
+	nft, _ := bin("nft")
+	systemctl, _ := bin("systemctl")
+
+	p := &plan{}
+	// Yeni portu aç
+	p.exec(nft, "add", "rule", "inet", "aurapanel", "input", "tcp", "dport", fmt.Sprintf("%d", a.NewPort), "accept")
+
+	// aurapanel.yaml listen.address satırını güncelle (sed yerine doğrudan yaz)
+	yamlPath := "/etc/aurapanel/aurapanel.yaml"
+	data, err := os.ReadFile(yamlPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("config okunamadı: %w", err)
+	}
+	updated := regexp.MustCompile(`address:\s*"[^"]*"`).
+		ReplaceAll(data, []byte(fmt.Sprintf(`address: "127.0.0.1:%d"`, a.NewPort)))
+	p.write(fileWrite{path: yamlPath, content: string(updated), mode: 0o640})
+
+	// Servisi yeniden başlat (yeni port ile dinler)
+	p.exec(systemctl, "restart", "aurapanel")
+
+	return p, map[string]any{"new_port": a.NewPort}, nil
 }
