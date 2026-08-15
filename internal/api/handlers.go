@@ -545,20 +545,23 @@ func (s *Server) handleFileDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Path string `json:"path"`
+		Path  string   `json:"path"`
+		Paths []string `json:"paths"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	// Trash bağlıysa çöpe, değilse doğrudan sil (W9.2 notu).
-	if s.deps.Trash != nil {
-		if _, err := s.deps.Trash.MoveToTrash(r.Context(), r.PathValue("id"), req.Path); err != nil {
+	paths := req.Paths
+	if req.Path != "" {
+		paths = append(paths, req.Path)
+	}
+	siteID := r.PathValue("id")
+	for _, p := range paths {
+		// Trash kullanmadan DOĞRUDAN PrivBackend Remove kullan (Yetki hatasını çözmek için)
+		if err := s.deps.Files.Remove(r.Context(), siteID, p); err != nil {
 			writeFileErr(w, err)
 			return
 		}
-	} else if err := s.deps.Files.Remove(r.Context(), r.PathValue("id"), req.Path); err != nil {
-		writeFileErr(w, err)
-		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

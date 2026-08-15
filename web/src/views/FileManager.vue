@@ -39,21 +39,33 @@
       <div class="card" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="handleDrop" :class="{'drag-active': dragOver}">
         <div v-if="dragOver" class="drag-overlay">{{ $t('filemanager.drop_files_to_upload') }}</div>
         
-        <div v-if="loading" class="muted">{{ $t('filemanager.loading_directory') }}</div>
-        <table v-else class="file-table">
+        <!-- Toplu İşlem Çubuğu -->
+        <div v-if="selected.length" style="padding: 12px; background: rgba(0,0,0,0.03); border-radius: 8px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+          <span class="muted text-sm">{{ selected.length }} {{ $t('files.selected') || 'seçili' }}</span>
+          <div class="spacer"></div>
+          <button class="btn btn-sm btn-danger" @click="bulkRemove">🗑️ {{ $t('filemanager.delete') }}</button>
+        </div>
+        <table v-if="!loading" class="file-table">
           <thead>
             <tr>
-              <th style="width: 50%">{{ $t('files.name') }}</th>
+              <th style="width: 40px; text-align: center;">
+                <input type="checkbox" v-model="allSelected" />
+              </th>
+              <th style="width: 45%">{{ $t('files.name') }}</th>
               <th style="width: 15%">{{ $t('files.size') }}</th>
               <th style="width: 20%">{{ $t('files.perms') }}</th>
               <th style="width: 15%; text-align: right;">{{ $t('filemanager.actions') }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="path !== ''" @click="goToPath(pathParts.slice(0, -1).join('/'))" class="clickable-row">
-              <td colspan="4">📁 ..</td>
+            <tr v-if="path !== ''" class="file-row">
+              <td></td>
+              <td colspan="4" class="clickable" @click="goToPath(pathParts.slice(0, -1).join('/'))">📁 ..</td>
             </tr>
             <tr v-for="e in entries" :key="e.Path || e.path" class="file-row">
+              <td style="text-align: center;">
+                <input type="checkbox" :value="e.Path || e.path" v-model="selected" />
+              </td>
               <td>
                 <span v-if="e.IsDir" class="clickable" @click="enter(e)">📁 <strong>{{ e.Name || e.name }}</strong></span>
                 <span v-else>{{ iconFor(e.Name || e.name) }} {{ e.Name || e.name }}</span>
@@ -75,7 +87,7 @@
                 </div>
               </td>
             </tr>
-            <tr v-if="!entries.length && path === ''"><td colspan="4" class="muted">{{ $t('files.empty') }}</td></tr>
+            <tr v-if="!entries.length && path === ''"><td colspan="5" class="muted">{{ $t('files.empty') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -100,7 +112,18 @@ import Layout from '../components/Layout.vue'
 import { api, b64decode, b64encode } from '../api'
 import { useI18n } from 'vue-i18n'
 
-const { t } = useI18n()
+const selected = ref([])
+
+const allSelected = computed({
+  get() {
+    return entries.value.length > 0 && selected.value.length === entries.value.length
+  },
+  set(val) {
+    if (val) selected.value = entries.value.map(e => e.Path || e.path)
+    else selected.value = []
+  }
+})
+
 
 const sites = ref([])
 const siteId = ref('')
@@ -145,10 +168,10 @@ async function loadSites() {
     siteId.value = sites.value[0].id
     await loadDir()
   }
-}
 
 async function loadDir() {
   if (!siteId.value) return
+  selected.value = []
   error.value = ''
   notice.value = ''
   loading.value = true
@@ -359,6 +382,17 @@ async function remove(relPath) {
   if (!confirm(t('files.delete_confirm', { name: relPath }))) return
   try {
     await api(`/sites/${siteId.value}/files/delete`, { method: 'POST', body: { path: relPath } })
+    await loadDir()
+  } catch (e) {
+    error.value = e.message
+  }
+
+async function bulkRemove() {
+  if (!selected.value.length) return
+  if (!confirm(`Seçili ${selected.value.length} öğeyi silmek istediğinize emin misiniz?`)) return
+  try {
+    await api(`/sites/${siteId.value}/files/delete`, { method: 'POST', body: { paths: selected.value } })
+    selected.value = []
     await loadDir()
   } catch (e) {
     error.value = e.message
