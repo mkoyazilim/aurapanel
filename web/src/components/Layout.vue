@@ -62,8 +62,8 @@ function toggleSidebar() {
   localStorage.setItem('sidebar_collapsed', collapsed.value ? '1' : '0')
 }
 
-const isAdmin = computed(() => auth.user?.role_id === 1)
-const isReseller = computed(() => auth.user?.role_id === 3)
+const isAdmin = computed(() => auth.user?.role === 'admin' || auth.user?.role_id === 1)
+const isReseller = computed(() => auth.user?.role === 'reseller' || auth.user?.role_id === 3)
 
 const menu = computed(() => [
   {
