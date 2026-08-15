@@ -386,6 +386,7 @@ async function remove(relPath) {
   } catch (e) {
     error.value = e.message
   }
+}
 
 async function bulkRemove() {
   if (!selected.value.length) return
