@@ -3,26 +3,26 @@
     <div class="page">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <h1 style="margin: 0; display: flex; align-items: center; gap: 8px;">
-          🖥️ Sunucu Yönetimi
+          🖥️ {{ $t('server.title') }}
         </h1>
       </div>
 
-      <div v-if="loading" class="muted">Yükleniyor...</div>
+      <div v-if="loading" class="muted">{{ $t('servers.loading') }}</div>
       <div v-else class="dashboard-grid">
         <!-- Sol kolon: Metrikler + Firewall -->
         <div style="flex: 2; display: flex; flex-direction: column; gap: 16px;">
 
           <!-- Kaynak Metrikleri -->
           <div class="card">
-            <h2>📊 Anlık Kaynak Tüketimi</h2>
+            <h2>📊 {{ $t('server.metrics') }}</h2>
             <div class="metrics-row">
               <div class="metric-box">
-                <div class="metric-title">CPU Kullanımı</div>
+                <div class="metric-title">{{ $t('servers.cpu') }}</div>
                 <div class="metric-value">{{ metrics.cpu_percent.toFixed(1) }}%</div>
                 <div class="progress-bar"><div class="fill" :style="{width: metrics.cpu_percent + '%', background: metrics.cpu_percent > 85 ? '#ef4444' : metrics.cpu_percent > 60 ? '#f59e0b' : 'var(--primary)'}"></div></div>
               </div>
               <div class="metric-box">
-                <div class="metric-title">RAM ({{ metrics.ram_used_mb }}MB / {{ metrics.ram_total_mb }}MB)</div>
+                <div class="metric-title">{{ $t('servers.ram') }} ({{ metrics.ram_used_mb }}MB / {{ metrics.ram_total_mb }}MB)</div>
                 <div class="metric-value">{{ metrics.ram_percent.toFixed(1) }}%</div>
                 <div class="progress-bar"><div class="fill" :style="{width: metrics.ram_percent + '%', background: metrics.ram_percent > 90 ? '#ef4444' : metrics.ram_percent > 70 ? '#f59e0b' : 'var(--primary)'}"></div></div>
               </div>
@@ -32,31 +32,31 @@
                 <div class="progress-bar"><div class="fill" :style="{width: metrics.disk_percent + '%', background: metrics.disk_percent > 90 ? '#ef4444' : 'var(--primary)'}"></div></div>
               </div>
             </div>
-            <div class="muted text-sm" style="margin-top: 16px;">Uptime: {{ formatUptime(metrics.uptime_sec) }}</div>
+            <div class="muted text-sm" style="margin-top: 16px;">{{ $t('server.uptime') }}: {{ formatUptime(metrics.uptime_sec) }}</div>
           </div>
 
           <!-- Güvenlik Duvarı -->
           <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <h2 style="margin: 0;">🛡️ Güvenlik Duvarı (nftables)</h2>
-              <button class="btn btn-sm" @click="showAddRule = true">+ Port Ekle</button>
+              <h2 style="margin: 0;">🛡️ {{ $t('server.firewall_title') }}</h2>
+              <button class="btn btn-sm" @click="showAddRule = true">{{ $t('server.fw_add_btn') }}</button>
             </div>
 
-            <div v-if="fwLoading" class="muted text-sm" style="margin-top: 12px;">Kurallar yükleniyor...</div>
+            <div v-if="fwLoading" class="muted text-sm" style="margin-top: 12px;">{{ $t('server.fw_loading') }}</div>
             <div v-else>
               <!-- Açık Port Listesi -->
               <table class="fw-table" style="margin-top: 16px;">
                 <thead>
                   <tr>
-                    <th>Port</th>
-                    <th>Protokol</th>
-                    <th>Açıklama</th>
-                    <th>İşlem</th>
+                    <th>{{ $t('server.fw_port') }}</th>
+                    <th>{{ $t('server.fw_proto') }}</th>
+                    <th>{{ $t('server.fw_desc') }}</th>
+                    <th>{{ $t('server.fw_action') }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!fwRules.length">
-                    <td colspan="4" class="muted text-sm" style="text-align:center; padding: 12px;">Kural bulunamadı.</td>
+                    <td colspan="4" class="muted text-sm" style="text-align:center; padding: 12px;">{{ $t('server.fw_no_rules') }}</td>
                   </tr>
                   <tr v-for="rule in fwRules" :key="rule.port + rule.proto">
                     <td><strong>{{ rule.port }}</strong></td>
@@ -68,8 +68,8 @@
                         class="btn btn-sm btn-danger"
                         @click="deleteRule(rule)"
                         :disabled="fwBusy"
-                      >Kapat</button>
-                      <span v-else class="muted text-sm">Korumalı</span>
+                      >{{ $t('server.fw_close_btn') }}</button>
+                      <span v-else class="muted text-sm">{{ $t('server.fw_protected') }}</span>
                     </td>
                   </tr>
                 </tbody>
@@ -79,22 +79,22 @@
               <div v-if="showAddRule" class="add-rule-form">
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end;">
                   <div>
-                    <label class="form-label">Port</label>
+                    <label class="form-label">{{ $t('server.fw_port_label') }}</label>
                     <input v-model.number="newPort" type="number" class="input" min="1" max="65535" placeholder="8080" style="width: 100px;" />
                   </div>
                   <div>
-                    <label class="form-label">Protokol</label>
+                    <label class="form-label">{{ $t('server.fw_proto_label') }}</label>
                     <select v-model="newProto" class="input">
                       <option value="tcp">TCP</option>
                       <option value="udp">UDP</option>
                     </select>
                   </div>
                   <div style="flex: 1;">
-                    <label class="form-label">Açıklama (opsiyonel)</label>
+                    <label class="form-label">{{ $t('server.fw_comment_label') }}</label>
                     <input v-model="newComment" type="text" class="input" maxlength="64" placeholder="ör. node-app" />
                   </div>
-                  <button class="btn" @click="addRule" :disabled="fwBusy || !newPort">{{ fwBusy ? 'Ekleniyor...' : 'Ekle' }}</button>
-                  <button class="btn btn-secondary" @click="showAddRule = false">İptal</button>
+                  <button class="btn" @click="addRule" :disabled="fwBusy || !newPort">{{ fwBusy ? $t('server.fw_adding') : $t('server.fw_add') }}</button>
+                  <button class="btn btn-secondary" @click="showAddRule = false">{{ $t('server.fw_cancel') }}</button>
                 </div>
               </div>
             </div>
@@ -102,21 +102,21 @@
 
           <!-- SSH Port Değiştir -->
           <div class="card">
-            <h2>🔑 SSH Port Değiştir</h2>
+            <h2>🔑 {{ $t('server.ssh_title') }}</h2>
             <div class="alert warn text-sm" style="margin-bottom: 16px;">
-              ⚠️ <strong>Dikkat:</strong> Bu işlem SSH bağlantı portunu değiştirir. Yeni port güvenlik duvarında önce açılır, sonra sshd yeniden yüklenir. İşlem sonrası yeni portla bağlanın.
+              ⚠️ <strong>Dikkat:</strong> {{ $t('server.ssh_warn') }}
             </div>
             <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
               <div>
-                <label class="form-label">Mevcut SSH Portu</label>
+                <label class="form-label">{{ $t('server.ssh_old_port') }}</label>
                 <input v-model.number="sshOldPort" type="number" class="input" style="width: 100px;" />
               </div>
               <div>
-                <label class="form-label">Yeni SSH Portu</label>
+                <label class="form-label">{{ $t('server.ssh_new_port') }}</label>
                 <input v-model.number="sshNewPort" type="number" class="input" min="1" max="65535" placeholder="2244" style="width: 100px;" />
               </div>
               <button class="btn btn-danger" @click="changeSSHPort" :disabled="sshBusy || !sshNewPort">
-                {{ sshBusy ? 'Değiştiriliyor...' : '🔄 SSH Portunu Değiştir' }}
+                {{ sshBusy ? $t('server.ssh_changing') : $t('server.ssh_change_btn') }}
               </button>
             </div>
             <div v-if="sshMsg" class="text-sm" :class="sshOk ? 'text-success' : 'text-error'" style="margin-top: 8px;">{{ sshMsg }}</div>
@@ -124,17 +124,17 @@
 
           <!-- Panel Port Değiştir -->
           <div class="card">
-            <h2>⚙️ Panel Port Değiştir</h2>
+            <h2>⚙️ {{ $t('server.panel_title') }}</h2>
             <div class="alert info text-sm" style="margin-bottom: 16px;">
-              Panel şu an <strong>127.0.0.1:8080</strong> adresinde dinleniyor. Port değiştirirseniz sayfa erişilemez olur — yeni portla gidin.
+              {{ $t('server.panel_info') }}
             </div>
             <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
               <div>
-                <label class="form-label">Yeni Panel Portu</label>
+                <label class="form-label">{{ $t('server.panel_new_port') }}</label>
                 <input v-model.number="panelNewPort" type="number" class="input" min="1" max="65535" placeholder="9090" style="width: 100px;" />
               </div>
               <button class="btn btn-danger" @click="changePanelPort" :disabled="panelBusy || !panelNewPort">
-                {{ panelBusy ? 'Değiştiriliyor...' : '🔄 Panel Portunu Değiştir' }}
+                {{ panelBusy ? $t('server.panel_changing') : $t('server.panel_change_btn') }}
               </button>
             </div>
             <div v-if="panelMsg" class="text-sm" :class="panelOk ? 'text-success' : 'text-error'" style="margin-top: 8px;">{{ panelMsg }}</div>
@@ -145,7 +145,7 @@
         <!-- Sağ kolon: Servisler -->
         <div style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
           <div class="card">
-            <h2>⚙️ Servis Durumları</h2>
+            <h2>⚙️ {{ $t('server.services') }}</h2>
             <div class="service-list">
               <div class="service-item" v-for="(status, name) in services" :key="name">
                 <span style="text-transform: capitalize; font-weight: 500;">{{ name }}</span>
@@ -162,7 +162,7 @@
 
           <!-- Hızlı Bilgi -->
           <div class="card">
-            <h2>ℹ️ Sunucu Bilgisi</h2>
+            <h2>ℹ️ {{ $t('server.server_info') }}</h2>
             <div class="info-row"><span class="muted text-sm">IP Adresi</span><strong>185.190.140.62</strong></div>
             <div class="info-row"><span class="muted text-sm">SSH Portu</span><strong>{{ sshOldPort }}</strong></div>
             <div class="info-row"><span class="muted text-sm">Panel Portu</span><strong>8080</strong></div>
