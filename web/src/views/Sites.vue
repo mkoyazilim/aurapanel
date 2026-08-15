@@ -40,34 +40,42 @@
               <td><strong>{{ s.name }}</strong></td>
               <td class="mono">{{ s.linux_user }}</td>
               <td><span class="badge" :class="s.status === 'active' ? 'ok' : 'warn'">{{ s.status }}</span></td>
-              <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end">
-                <button class="btn btn-sm" @click="openWpModal(s)" title="WordPress Kur">
-                  ⚡ {{ $t('sites.install_wp') }}
-                </button>
-                <router-link :to="'/sites/' + s.id + '/git'" class="btn btn-sm" :title="$t('menu.git_deploy', 'Git Webhook')">
-                  🐙 Git
-                </router-link>
-                <router-link :to="'/sites/' + s.id + '/nodejs'" class="btn btn-sm" :title="$t('menu.nodejs', 'Node.js')">
-                  🟢 Node
-                </router-link>
-                <router-link :to="'/sites/' + s.id + '/staging'" class="btn btn-sm" :title="$t('menu.staging', 'Staging')">
-                  🧪 Staging
-                </router-link>
-                <router-link :to="'/sites/' + s.id + '/cloudflare'" class="btn btn-sm" :title="$t('menu.cloudflare', 'Cloudflare')">
-                  ☁️ CF
-                </router-link>
-                <router-link :to="'/sites/' + s.id + '/mail'" class="btn btn-sm" :title="$t('menu.mail', 'Mail Sunucusu')">
-                  📧 Mail
-                </router-link>
-                <router-link :to="'/sites/' + s.id + '/waf'" class="btn btn-sm" title="Advanced WAF">
-                  🛡️ WAF
-                </router-link>
-                <router-link :to="'/sites/' + s.id + '/cdn'" class="btn btn-sm" title="CDN Management">
-                  ⚡ CDN
-                </router-link>
-                <button class="btn btn-sm danger" @click="remove(s.id)" title="Siteyi Sil">
-                  🗑️ {{ $t('common.delete') }}
-                </button>
+              <td style="text-align: right; position: relative;">
+                <div class="action-dropdown" @click.stop>
+                  <button class="btn btn-sm action-btn" @click="toggleDropdown(s.id)">
+                    {{ $t('common.actions', 'İşlemler') }} ▾
+                  </button>
+                  <div class="dropdown-menu" v-if="activeDropdown === s.id">
+                    <button class="dropdown-item" @click="openWpModal(s); activeDropdown = null">
+                      <span>⚡</span> {{ $t('sites.install_wp') }}
+                    </button>
+                    <router-link :to="'/sites/' + s.id + '/git'" class="dropdown-item">
+                      <span>🐙</span> Git
+                    </router-link>
+                    <router-link :to="'/sites/' + s.id + '/nodejs'" class="dropdown-item">
+                      <span>🟢</span> Node
+                    </router-link>
+                    <router-link :to="'/sites/' + s.id + '/staging'" class="dropdown-item">
+                      <span>🧪</span> Staging
+                    </router-link>
+                    <router-link :to="'/sites/' + s.id + '/cloudflare'" class="dropdown-item">
+                      <span>☁️</span> CF
+                    </router-link>
+                    <router-link :to="'/sites/' + s.id + '/mail'" class="dropdown-item">
+                      <span>📧</span> Mail
+                    </router-link>
+                    <router-link :to="'/sites/' + s.id + '/waf'" class="dropdown-item">
+                      <span>🛡️</span> WAF
+                    </router-link>
+                    <router-link :to="'/sites/' + s.id + '/cdn'" class="dropdown-item">
+                      <span>⚡</span> CDN
+                    </router-link>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item danger" @click="remove(s.id); activeDropdown = null">
+                      <span>🗑️</span> {{ $t('common.delete') }}
+                    </button>
+                  </div>
+                </div>
               </td>
             </tr>
             <tr v-if="!sites.length"><td colspan="5" class="muted">{{ $t('sites.no_sites') }}</td></tr>
@@ -131,7 +139,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { api } from '../api'
 import { useI18n } from 'vue-i18n'
@@ -143,6 +151,15 @@ const error = ref('')
 const notice = ref('')
 const busy = ref(false)
 const newSite = reactive({ domain: '', php: '8.3' })
+
+const activeDropdown = ref(null)
+function toggleDropdown(id) {
+  activeDropdown.value = activeDropdown.value === id ? null : id
+}
+
+function closeDropdown() {
+  activeDropdown.value = null
+}
 
 const wpModal = reactive({
   open: false,
@@ -227,6 +244,10 @@ async function remove(id) {
 }
 
 onMounted(load)
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdown)
+})
 </script>
 
 <style scoped>
@@ -251,3 +272,59 @@ onMounted(load)
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
 </style>
+
+.action-dropdown {
+  display: inline-block;
+  position: relative;
+  text-align: left;
+}
+.action-btn {
+  padding: 6px 12px;
+  font-weight: 500;
+}
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  min-width: 150px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-color, #1e293b);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+.dropdown-item:hover {
+  background: var(--bg-body, #f8fafc);
+}
+.dropdown-item.danger {
+  color: #ef4444;
+}
+.dropdown-item.danger:hover {
+  background: #fef2f2;
+}
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-color, #e2e8f0);
+  margin: 4px 0;
+}
+
