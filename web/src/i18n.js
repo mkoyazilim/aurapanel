@@ -496,6 +496,7 @@ const messages = {
       quota_mb: 'Kota (MB)',
     },
     menu: {
+      server: 'Sunucu',
       backups: 'Yedekler',
       cluster: 'Küme Yönetimi',
       cluster_dashboard: 'Küme Panosu',
@@ -1399,6 +1400,7 @@ const messages = {
       quota_mb: 'Quota (MB)',
     },
     menu: {
+      server: 'Server',
       backups: 'Backups',
       cluster: 'Cluster',
       cluster_dashboard: 'Cluster Dashboard',
