@@ -69,7 +69,7 @@ func cleanDesired(t *testing.T, st *store.Store) *desiredState {
 	t.Helper()
 	s, php := seedSite(t, st)
 	domains, _ := st.ListDomainsBySite(context.Background(), s.ID)
-	d, err := desiredFor(s, domains, php, tSitesRoot, tCertsRoot)
+	d, err := desiredFor(s, domains, php, nil, tSitesRoot, tCertsRoot)
 	if err != nil {
 		t.Fatal(err)
 	}

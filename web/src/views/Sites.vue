@@ -14,10 +14,29 @@
             <input v-model="newSite.domain" :placeholder="$t('sites.placeholder_domain')" />
           </div>
           <div style="flex: 1">
+            <label>{{ $t('sites.app_type', 'Proje Tipi') }}</label>
+            <select v-model="newSite.appType">
+              <option value="php">{{ $t('sites.app_php', 'Standart (PHP / HTML)') }}</option>
+              <option value="nodejs">{{ $t('sites.app_node', 'Node.js Uygulaması') }}</option>
+            </select>
+          </div>
+          <div style="flex: 1" v-if="newSite.appType === 'php'">
             <label>{{ $t('sites.php_version') }}</label>
             <select v-model="newSite.php">
               <option>8.2</option><option selected>8.3</option><option>8.4</option>
             </select>
+          </div>
+          <div style="flex: 1" v-if="newSite.appType === 'nodejs'">
+            <label>{{ $t('nodejs.node_version_label', 'Node Versiyonu') }}</label>
+            <select v-model="newSite.nodeVersion">
+              <option value="18">18.x</option>
+              <option value="20">20.x</option>
+              <option value="22">22.x</option>
+            </select>
+          </div>
+          <div style="flex: 1" v-if="newSite.appType === 'nodejs'">
+            <label>{{ $t('nodejs.port_label', 'Çalışma Portu') }}</label>
+            <input v-model.number="newSite.nodePort" type="number" placeholder="3000" />
           </div>
           <button class="btn primary" @click="create" :disabled="busy">{{ $t('sites.create') }}</button>
         </div>
@@ -53,7 +72,7 @@
                     <router-link :to="'/sites/' + s.id + '/git'" class="dropdown-item">
                       <span>🐙</span> {{ $t('sites.dropdown_git') }}
                     </router-link>
-                    <router-link :to="'/sites/' + s.id + '/nodejs'" class="dropdown-item">
+                    <router-link v-if="s.app_type === 'nodejs'" :to="'/sites/' + s.id + '/nodejs'" class="dropdown-item">
                       <span>🟢</span> {{ $t('sites.dropdown_node') }}
                     </router-link>
                     <router-link :to="'/sites/' + s.id + '/staging'" class="dropdown-item">
@@ -151,7 +170,13 @@ const sites = ref([])
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const newSite = reactive({ domain: '', php: '8.3' })
+const newSite = reactive({ 
+  domain: '', 
+  appType: 'php', 
+  php: '8.3',
+  nodeVersion: '20',
+  nodePort: 3000
+})
 
 const activeDropdown = ref(null)
 function toggleDropdown(id) {
@@ -221,7 +246,15 @@ async function create() {
   try {
     await api('/sites', {
       method: 'POST',
-      body: { domain: newSite.domain, php_version: newSite.php, aliases: [], limits: {} },
+      body: { 
+        domain: newSite.domain, 
+        app_type: newSite.appType,
+        php_version: newSite.php, 
+        node_version: newSite.nodeVersion,
+        node_port: newSite.nodePort,
+        aliases: [], 
+        limits: {} 
+      },
     })
     newSite.domain = ''
     await load()

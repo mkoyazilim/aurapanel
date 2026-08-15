@@ -77,7 +77,11 @@ func (s *Scanner) scanSite(ctx context.Context, st *store.Site) (int, error) {
 			return 0, err
 		}
 	}
-	desired, err := desiredFor(st, domains, phpVersion, s.sitesRoot, s.certsRoot)
+	nodeApps, err := s.store.ListNodeApps(ctx, st.ID)
+	if err != nil {
+		return 0, err
+	}
+	desired, err := desiredFor(st, domains, phpVersion, nodeApps, s.sitesRoot, s.certsRoot)
 	if err != nil {
 		return 0, err
 	}

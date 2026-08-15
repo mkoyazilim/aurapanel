@@ -11,8 +11,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
-
 	"github.com/mkoyazilim/aurapanel/internal/audit"
+	"github.com/mkoyazilim/aurapanel/internal/auth"
 	"github.com/mkoyazilim/aurapanel/internal/ols"
 	"github.com/mkoyazilim/aurapanel/internal/store"
 )
@@ -77,7 +77,10 @@ func (l Limits) validateComplete() error {
 type CreateRequest struct {
 	Domain       string
 	Aliases      []string
+	AppType      string
 	PHPVersion   string
+	NodeVersion  string
+	NodePort     int
 	UserID       int64
 	ServerID     string
 	Limits       Limits
@@ -148,9 +151,14 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 	if err != nil {
 		return "", err
 	}
+	appType := req.AppType
+	if appType == "" {
+		appType = "php"
+	}
+
 	st := store.Site{
 		ID: siteID, Name: req.Domain, LinuxUser: user, HomeDir: home,
-		Status: "creating", FeatureFlags: `{}`, Limits: string(limitsJSON),
+		Status: "creating", AppType: appType, FeatureFlags: `{}`, Limits: string(limitsJSON),
 	}
 	if req.UserID > 0 {
 		st.UserID = sql.NullInt64{Valid: true, Int64: req.UserID}
@@ -185,24 +193,49 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 		})
 	}
 
-	// PHP sürüm + pool kaydı (W6): desired state'in parçası. Runtime'a
-	// henüz dokunulmadığı için başarısızlıkta telafi gerekmez — site
-	// "failed" işaretlenir, drift onarımıyla yinelenebilir.
-	phpID, err := m.store.GetPHPVersionID(ctx, req.PHPVersion)
-	if err != nil {
-		m.store.SetSiteStatus(ctx, siteID, "failed")
-		auditSite("failed", map[string]any{"step": "php.bind", "error": err.Error()})
-		return "", fmt.Errorf("php sürüm bağlama: %w", err)
+	if appType == "php" {
+		// PHP sürüm + pool kaydı (W6): desired state'in parçası.
+		phpID, err := m.store.GetPHPVersionID(ctx, req.PHPVersion)
+		if err != nil {
+			m.store.SetSiteStatus(ctx, siteID, "failed")
+			auditSite("failed", map[string]any{"step": "php.bind", "error": err.Error()})
+			return "", fmt.Errorf("php sürüm bağlama: %w", err)
+		}
+		if err := m.store.SetSitePHPVersion(ctx, siteID, phpID); err != nil {
+			m.store.SetSiteStatus(ctx, siteID, "failed")
+			auditSite("failed", map[string]any{"step": "php.bind", "error": err.Error()})
+			return "", fmt.Errorf("php sürüm bağlama: %w", err)
+		}
+		if err := m.store.UpsertPHPool(ctx, siteID, phpID, `{}`); err != nil {
+			m.store.SetSiteStatus(ctx, siteID, "failed")
+			auditSite("failed", map[string]any{"step": "php.pool", "error": err.Error()})
+			return "", fmt.Errorf("php pool kaydı: %w", err)
+		}
 	}
-	if err := m.store.SetSitePHPVersion(ctx, siteID, phpID); err != nil {
-		m.store.SetSiteStatus(ctx, siteID, "failed")
-		auditSite("failed", map[string]any{"step": "php.bind", "error": err.Error()})
-		return "", fmt.Errorf("php sürüm bağlama: %w", err)
-	}
-	if err := m.store.UpsertPHPool(ctx, siteID, phpID, `{}`); err != nil {
-		m.store.SetSiteStatus(ctx, siteID, "failed")
-		auditSite("failed", map[string]any{"step": "php.pool", "error": err.Error()})
-		return "", fmt.Errorf("php pool kaydı: %w", err)
+
+	var proxyApps []ols.ProxyApp
+	if appType == "nodejs" {
+		app := &store.NodeApp{
+			ID:            auth.NewRequestID(),
+			SiteID:        siteID,
+			AppName:       "app",
+			AppPath:       "/",
+			StartupScript: "npm start",
+			Port:          req.NodePort,
+			NodeVersion:   req.NodeVersion,
+			EnvVars:       "{}",
+			Status:        "active",
+		}
+		if err := m.store.InsertNodeApp(ctx, app); err != nil {
+			m.store.SetSiteStatus(ctx, siteID, "failed")
+			auditSite("failed", map[string]any{"step": "nodejs.app", "error": err.Error()})
+			return "", fmt.Errorf("node app kaydı: %w", err)
+		}
+		proxyApps = append(proxyApps, ols.ProxyApp{
+			Name: app.AppName,
+			Path: app.AppPath,
+			Port: app.Port,
+		})
 	}
 
 	auditSite("", map[string]any{"domain": req.Domain})
@@ -231,6 +264,7 @@ func (m *Manager) Create(ctx context.Context, req CreateRequest) (string, error)
 				Aliases:    req.Aliases,
 				PHPVersion: req.PHPVersion,
 				IndexFiles: []string{"index.php", "index.html"},
+				ProxyApps:  proxyApps,
 			})
 		}},
 	}

@@ -18,7 +18,7 @@ const (
 
 // desiredFor, site kaydından istek hâlini üretir. Docroot ve diğer
 // türetilmiş değerler kullanıcıdan alınmaz — ols.RenderVhost üretir.
-func desiredFor(st *store.Site, domains []store.Domain, phpVersion, sitesRoot, certsRoot string) (*desiredState, error) {
+func desiredFor(st *store.Site, domains []store.Domain, phpVersion string, nodeApps []store.NodeApp, sitesRoot, certsRoot string) (*desiredState, error) {
 	aliases := []string{}
 	for _, d := range domains {
 		if d.Kind == "alias" {
@@ -36,6 +36,15 @@ func desiredFor(st *store.Site, domains []store.Domain, phpVersion, sitesRoot, c
 		PHPVersion: phpVersion,
 		IndexFiles: []string{"index.php", "index.html"},
 		WAF:        wafEnabled,
+	}
+	for _, app := range nodeApps {
+		if app.Status == "active" {
+			v.ProxyApps = append(v.ProxyApps, ols.ProxyApp{
+				Name: app.AppName,
+				Path: app.AppPath,
+				Port: app.Port,
+			})
+		}
 	}
 	artifacts, err := ols.RenderVhost(sitesRoot, certsRoot, v)
 	if err != nil {

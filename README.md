@@ -37,7 +37,7 @@ Most control panels are heavy, expose a large attack surface, and treat the web 
 - **Advanced Features (Phase 2)**
   - WordPress 1-Click Installer
   - Git Deploy (Webhook-driven deployments)
-  - Node.js Application Manager (PM2 integrated)
+  - **Native Node.js App Management:** Smart project type selection (PHP vs Node.js) during site creation with automatic internal port allocation and built-in OpenLiteSpeed Reverse Proxy context routing.
   - Staging Environments (Clone & Push to Production)
   - Isolated Mail Server Integration
 

@@ -359,10 +359,13 @@ func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Domain     string      `json:"domain"`
-		Aliases    []string    `json:"aliases"`
-		PHPVersion string      `json:"php_version"`
-		Limits     site.Limits `json:"limits"`
+		Domain      string      `json:"domain"`
+		Aliases     []string    `json:"aliases"`
+		AppType     string      `json:"app_type"`
+		PHPVersion  string      `json:"php_version"`
+		NodeVersion string      `json:"node_version"`
+		NodePort    int         `json:"node_port"`
+		Limits      site.Limits `json:"limits"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
@@ -370,7 +373,10 @@ func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
 	creq := site.CreateRequest{
 		Domain:       req.Domain,
 		Aliases:      req.Aliases,
+		AppType:      req.AppType,
 		PHPVersion:   req.PHPVersion,
+		NodeVersion:  req.NodeVersion,
+		NodePort:     req.NodePort,
 		Limits:       req.Limits,
 	}
 

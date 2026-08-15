@@ -51,16 +51,17 @@ extprocessor {{ .LSAPIName }} {
   phpIniOverride          {{ .IniPath }}
 }
 
-{{- if .TLSRedirect }}
 rewrite  {
   enable                  1
+  autoLoadHtaccess        1
+{{- if .TLSRedirect }}
   rules                   <<<END_rules
 RewriteCond %{HTTPS} !=on
 RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
 RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]
 END_rules
-}
 {{- end }}
+}
 
 {{- range .ProxyApps }}
 extprocessor {{ .Name }} {
