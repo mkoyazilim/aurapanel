@@ -110,10 +110,8 @@ func (s *Service) SetProfile(ctx context.Context, siteID, profile string) error 
 
 	// php.ini'yi priv üzerinden güncelle.
 	iniContent := buildIni(siteID, profile, s.sitesRoot)
-	iniPath := fmt.Sprintf("%s/%s/conf/php.ini", s.sitesRoot, siteID)
 	_, err := s.priv.Call(ctx, "php.install_ini", map[string]any{
 		"site":    siteID,
-		"path":    iniPath,
 		"content": iniContent,
 	})
 	return err

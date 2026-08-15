@@ -1007,7 +1007,7 @@ func opPHPDetect(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 // Değer karakter kümesi DAR tutulur (harf/rakam/./ /:+_- ve boşluk):
 // allowlist anahtarlarımızın (boyutlar, tam sayılar, On/Off, zaman dilimi)
 // ihtiyaç duyduğu küme budur; `;`, tırnak, parantez vb. YASAKTIR.
-var reIniLine = regexp.MustCompile(`^[a-zA-Z0-9_.\[\]-]+\s*=\s*[a-zA-Z0-9./:+_\- ]{0,255}$`)
+var reIniLine = regexp.MustCompile(`^[a-zA-Z0-9_.\[\]-]+\s*=\s*[a-zA-Z0-9./:+_\-, ]{0,255}$`)
 
 // validateIniContent, php.ini içeriğini satır satır denetler. Yorum (#)
 // ve boş satırlar serbesttir; diğer her satır reIniLine'a uymalıdır.
