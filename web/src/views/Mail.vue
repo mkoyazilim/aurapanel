@@ -45,7 +45,7 @@
               <div style="padding-top: 32px">@</div>
               <div style="flex: 1">
                 <label>{{ $t('mail.domain') }}</label>
-                <input v-model="form.domain" type="text" required :placeholder="$t('mail.placeholder_domain')" />
+                <input v-model="form.domain" type="text" disabled style="background: rgba(0,0,0,0.05); color: #666; cursor: not-allowed;" />
               </div>
             </div>
             <label>{{ $t('mail.password') }}</label>
@@ -128,7 +128,16 @@ const deleteAccount = async (email) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const sites = await api('/sites')
+    const currentSite = sites.find(s => s.id === siteId)
+    if (currentSite) {
+      form.value.domain = currentSite.name
+    }
+  } catch (e) {
+    console.error('Sitel listesi alınamadı', e)
+  }
   fetchAccounts()
 })
 </script>

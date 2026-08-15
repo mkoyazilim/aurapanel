@@ -15,6 +15,7 @@ const routes = [
   { path: '/backups', component: () => import('./views/Backups.vue') },
   { path: '/drift', component: () => import('./views/Drift.vue') },
   { path: '/settings', component: () => import('./views/Settings.vue') },
+  { path: '/sites/:id/dashboard', component: () => import('./views/SiteDashboard.vue') },
   { path: '/sites/:id/git', component: () => import('./views/GitDeploy.vue') },
   { path: '/sites/:id/nodejs', component: () => import('./views/Nodejs.vue') },
   { path: '/sites/:id/staging', component: () => import('./views/Staging.vue') },

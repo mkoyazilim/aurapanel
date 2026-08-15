@@ -60,10 +60,11 @@
               <td><strong>{{ s.name }}</strong></td>
               <td class="mono">{{ s.linux_user }}</td>
               <td><span class="badge" :class="s.status === 'active' ? 'ok' : 'warn'">{{ s.status }}</span></td>
-              <td style="text-align: right; position: relative;">
+              <td style="text-align: right; position: relative; display: flex; justify-content: flex-end; gap: 8px;">
+                <router-link :to="'/sites/' + s.id + '/dashboard'" class="btn btn-sm primary">Yönet ➡</router-link>
                 <div class="action-dropdown" @click.stop>
                   <button class="btn btn-sm action-btn" @click="toggleDropdown(s.id)">
-                    {{ $t('common.actions', 'İşlemler') }} ▾
+                    {{ $t('common.actions', 'Hızlı İşlemler') }} ▾
                   </button>
                   <div class="dropdown-menu" v-if="activeDropdown === s.id">
                     <button class="dropdown-item" @click="openWpModal(s); activeDropdown = null">
