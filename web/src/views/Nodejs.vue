@@ -12,7 +12,7 @@
         
         <p class="muted" style="margin-bottom: 24px">{{ $t('nodejs.description') }}</p>
 
-        <div v-if="apps.length > 0" style="display: flex; flex-direction: column; gap: 16px;">
+        <div v-if="(apps || []).length > 0" style="display: flex; flex-direction: column; gap: 16px;">
           <div v-for="app in apps" :key="app.id" class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3>{{ app.app_name }}</h3>
@@ -104,7 +104,7 @@ const form = ref({
 
 const fetchApps = async () => {
   try {
-    apps.value = await api.get(`/sites/${siteId}/nodejs`)
+    apps.value = await api.get(`/sites/${siteId}/nodejs`) || []
   } catch (err) {
     error.value = err.message
   } finally {

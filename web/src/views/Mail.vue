@@ -3,7 +3,7 @@
     <div class="page">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <h1 style="margin: 0">{{ $t('mail.mail_server') }}</h1>
-        <button class="btn primary" @click="showAddModal = true">{{ $t('mail.add_email_account_btn') }}</button>
+        <button class="btn primary" @click="showCreateModal = true">{{ $t('mail.add_email_account_btn') }}</button>
       </div>
 
       <div v-if="loading" class="muted">{{ $t('mail.loading') }}</div>
@@ -11,7 +11,7 @@
         <div v-if="error" class="alert error">{{ error }}</div>
         
         <div class="card">
-          <table v-if="accounts.length > 0">
+          <table v-if="(accounts || []).length > 0">
             <thead>
               <tr>
                 <th>{{ $t('mail.email_address') }}</th>
@@ -33,7 +33,7 @@
         </div>
       </div>
 
-      <div v-if="showAddModal" class="modal-backdrop">
+      <div v-if="showCreateModal" class="modal-backdrop">
         <div class="modal-card">
           <h2>{{ $t('mail.add_email_account_title') }}</h2>
           <form @submit.prevent="createAccount">
@@ -52,10 +52,10 @@
             <input v-model="form.password" type="password" required :placeholder="$t('mail.placeholder_password')" />
             
             <label style="margin-top: 16px">{{ $t('mail.quota_mb') }} (0 = Limitsiz)</label>
-            <input v-model.number="form.quota" type="number" min="0" />
+            <input v-model.number="form.quota_mb" type="number" min="0" />
 
             <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px;">
-              <button type="button" class="btn" @click="showAddModal = false">{{ $t('mail.cancel') }}</button>
+              <button type="button" class="btn" @click="showCreateModal = false">{{ $t('mail.cancel') }}</button>
               <button type="submit" class="btn primary" :disabled="submitting">
                 {{ submitting ? $t('mail.adding') : $t('mail.add_account') }}
               </button>
@@ -95,7 +95,7 @@ const form = ref({
 const fetchAccounts = async () => {
   loading.value = true
   try {
-    accounts.value = await api.get(`/sites/${siteId}/mail`)
+    accounts.value = await api.get(`/sites/${siteId}/mail`) || []
   } catch (err) {
     error.value = err.message
   } finally {

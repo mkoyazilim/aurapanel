@@ -6,7 +6,7 @@
       <div v-else>
         <div v-if="error" class="alert error">{{ error }}</div>
         
-        <div v-if="!config.repo_url" class="card text-center">
+        <div v-if="!gitConfigured" class="card text-center">
           <h2>{{ $t('gitdeploy.setup_title') }}</h2>
           <p class="muted" style="margin-bottom: 24px">{{ $t('gitdeploy.setup_desc') }}</p>
           <form @submit.prevent="saveConfig" style="text-align: left; max-width: 500px; margin: 0 auto;">
@@ -27,11 +27,11 @@
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
             <div>
               <h2>{{ $t('gitdeploy.active_title') }}</h2>
-              <p><strong>{{ $t('gitdeploy.repository') }}:</strong> <span class="mono">{{ config.repo_url }}</span></p>
-              <p><strong>{{ $t('gitdeploy.branch') }}:</strong> <span class="mono">{{ config.branch }}</span></p>
-              <p><strong>{{ $t('gitdeploy.last_deployed') }}:</strong> {{ config.last_deployed_at ? new Date(config.last_deployed_at).toLocaleString() : $t('gitdeploy.never') }}</p>
+              <p><strong>{{ $t('gitdeploy.repository') }}:</strong> <span class="mono">{{ gitInfo.repo_url }}</span></p>
+              <p><strong>{{ $t('gitdeploy.branch') }}:</strong> <span class="mono">{{ gitInfo.branch }}</span></p>
+              <p><strong>{{ $t('gitdeploy.last_deployed') }}:</strong> {{ gitInfo.last_deployed_at ? new Date(gitInfo.last_deployed_at).toLocaleString() : $t('gitdeploy.never') }}</p>
             </div>
-            <span class="badge" :class="config.status === 'active' ? 'ok' : 'error'">{{ config.status || 'active' }}</span>
+            <span class="badge" :class="gitInfo.status === 'active' ? 'ok' : 'error'">{{ gitInfo.status || 'active' }}</span>
           </div>
 
           <div style="background: var(--bg-body, #f8fafc); padding: 16px; border-radius: 6px; margin-bottom: 24px;">
