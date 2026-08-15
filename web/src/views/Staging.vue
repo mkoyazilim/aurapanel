@@ -1,76 +1,60 @@
 <template>
-  <div>
-    <h2 class="text-2xl font-bold mb-6">{{ $t('staging.title') }}</h2>
+  <Layout>
+    <div class="page">
+      <h1>{{ $t('staging.title') }}</h1>
+      <div v-if="loading" class="muted">{{ $t('staging.loading') }}</div>
+      <div v-else>
+        <div v-if="error" class="alert error">{{ error }}</div>
+        
+        <div class="card">
+          <h2>{{ $t('staging.active_staging') }}</h2>
+          <p class="muted text-sm" style="margin-bottom: 24px">{{ $t('staging.staging_description') }}</p>
 
-    <div v-if="loading" class="text-gray-500">
-      {{ $t('staging.loading') }}
-    </div>
-    <div v-else>
-      <div v-if="error" class="bg-red-100 text-red-600 p-3 rounded-md mb-4">{{ error }}</div>
-
-      <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <h3 class="text-lg font-bold mb-2">{{ $t('staging.active_staging') }}</h3>
-        <p class="text-gray-600 dark:text-gray-400 mb-6 text-sm">
-          {{ $t('staging.staging_description') }}
-        </p>
-
-        <div v-if="envs.length > 0" class="space-y-4">
-          <div v-for="env in envs" :key="env.id" class="border p-4 rounded-md flex justify-between items-center dark:border-gray-700">
-            <div>
-              <p class="font-bold">{{ $t('staging.staging_site_id') }}: {{ env.staging_site_id }}</p>
-              <p class="text-xs text-gray-500">{{ $t('staging.created_at') }}: {{ new Date(env.created_at).toLocaleString() }}</p>
-              <span class="inline-block mt-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full uppercase font-semibold">
-                {{ env.status }}
-              </span>
+          <div v-if="envs.length > 0" style="display: flex; flex-direction: column; gap: 16px;">
+            <div v-for="env in envs" :key="env.id" style="border: 1px solid var(--border-color, #e2e8f0); padding: 16px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <p><strong>{{ $t('staging.staging_site_id') }}:</strong> <span class="mono">{{ env.staging_site_id }}</span></p>
+                <p class="muted text-sm">{{ $t('staging.created_at') }}: {{ new Date(env.created_at).toLocaleString() }}</p>
+                <span class="badge" :class="env.status === 'active' ? 'ok' : 'warn'" style="margin-top: 8px; display: inline-block;">{{ env.status }}</span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button @click="pushToProduction(env.id)" class="btn primary">{{ $t('staging.push_to_production') }}</button>
+                <button @click="deleteStaging(env.id)" class="btn danger">{{ $t('staging.delete_staging') }}</button>
+              </div>
             </div>
-            <div class="space-x-3">
-              <button @click="pushToProduction(env.id)" class="btn bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
-                {{ $t('staging.push_to_production') }}
-              </button>
-              <button @click="deleteStaging(env.id)" class="btn danger px-4 py-2">
-                {{ $t('staging.delete_staging') }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="text-center py-8">
-          <p class="text-gray-500 mb-4">{{ $t('staging.no_staging_environment') }}</p>
-          <button @click="showCreateModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
-            {{ $t('staging.create_staging_environment') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create Modal -->
-    <div v-if="showCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl">
-        <h3 class="text-lg font-bold mb-4">{{ $t('staging.create_staging_environment') }}</h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          {{ $t('staging.create_modal_desc') }}
-        </p>
-        <form @submit.prevent="createStaging" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">{{ $t('staging.staging_domain_label') }}</label>
-            <input v-model="form.domain" type="text" required :placeholder="$t('staging.staging_domain_placeholder')"
-                   class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
           </div>
           
-          <div class="flex justify-end space-x-3 mt-6">
-            <button type="button" @click="showCreateModal = false" class="px-4 py-2 border rounded-md">{{ $t('staging.cancel') }}</button>
-            <button type="submit" :disabled="submitting" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50">
-              {{ submitting ? $t('staging.creating') : $t('staging.create') }}
-            </button>
+          <div v-else>
+            <p class="muted" style="margin-bottom: 24px;">{{ $t('staging.no_staging_environment') }}</p>
+            <button @click="showAddModal = true" class="btn primary">{{ $t('staging.create_staging_environment') }}</button>
           </div>
-        </form>
+        </div>
+      </div>
+
+      <div v-if="showAddModal" class="modal-backdrop">
+        <div class="modal-card">
+          <h2>{{ $t('staging.create_staging_environment') }}</h2>
+          <p class="muted text-sm" style="margin-bottom: 16px;">{{ $t('staging.create_modal_desc') }}</p>
+          <form @submit.prevent="createStaging">
+            <label>{{ $t('staging.staging_domain_label') }}</label>
+            <input v-model="stagingDomain" type="text" required :placeholder="$t('staging.staging_domain_placeholder')" />
+            
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px;">
+              <button type="button" class="btn" @click="showAddModal = false">{{ $t('staging.cancel') }}</button>
+              <button type="submit" class="btn primary" :disabled="submitting">
+                {{ submitting ? $t('staging.creating') : $t('staging.create') }}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-
-  </div>
+  </Layout>
 </template>
 
+
 <script setup>
+import Layout from '../components/Layout.vue'
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -136,3 +120,17 @@ onMounted(() => {
   fetchStaging()
 })
 </script>
+
+
+<style scoped>
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px); display: flex; align-items: center;
+  justify-content: center; z-index: 1000;
+}
+.modal-card {
+  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px; width: 100%; max-width: 520px; padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+</style>

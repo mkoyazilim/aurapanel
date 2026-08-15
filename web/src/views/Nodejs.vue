@@ -1,108 +1,83 @@
 <template>
-  <div>
-    <h2 class="text-2xl font-bold mb-6">{{ $t('nodejs.title') }}</h2>
-
-    <div v-if="loading" class="text-gray-500">
-      {{ $t('nodejs.loading') }}
-    </div>
-    <div v-else>
-      <div v-if="error" class="bg-red-100 text-red-600 p-3 rounded-md mb-4">{{ error }}</div>
-      
-      <div class="mb-6 flex justify-between items-center">
-        <p class="text-gray-600 dark:text-gray-400">{{ $t('nodejs.description') }}</p>
-        <button @click="showAddModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-          {{ $t('nodejs.new_app') }}
-        </button>
+  <Layout>
+    <div class="page">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h1 style="margin: 0">{{ $t('nodejs.title') }}</h1>
+        <button @click="showAddModal = true" class="btn primary">{{ $t('nodejs.new_app') }}</button>
       </div>
 
-      <div class="grid gap-4">
-        <div v-for="app in apps" :key="app.id" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-          <div class="flex justify-between items-start mb-4">
+      <div v-if="loading" class="muted">{{ $t('nodejs.loading') }}</div>
+      <div v-else>
+        <div v-if="error" class="alert error">{{ error }}</div>
+        
+        <p class="muted" style="margin-bottom: 24px">{{ $t('nodejs.description') }}</p>
+
+        <div v-if="apps.length > 0" style="display: flex; flex-direction: column; gap: 16px;">
+          <div v-for="app in apps" :key="app.id" class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ app.app_name }}</h3>
-              <p class="text-sm text-gray-500">{{ $t('nodejs.path_label') }}: {{ app.app_path }} • {{ $t('nodejs.port_label') }}: {{ app.port }}</p>
+              <h3>{{ app.app_name }}</h3>
+              <p class="muted text-sm" style="margin-top: 4px;">
+                {{ $t('nodejs.path_label') }}: <span class="mono">{{ app.app_path }}</span> • 
+                {{ $t('nodejs.port_label') }}: <span class="mono">{{ app.port }}</span>
+              </p>
             </div>
-            <div class="flex items-center space-x-2">
-              <span :class="{'bg-green-100 text-green-800': app.status === 'active', 'bg-red-100 text-red-800': app.status !== 'active'}" class="px-2 py-1 text-xs font-semibold rounded-full capitalize">
-                {{ app.status }}
-              </span>
-              <button @click="restartApp(app.id)" class="text-gray-600 hover:text-blue-600 ml-2" :title="$t('nodejs.restart_title')">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-              </button>
-              <button @click="deleteApp(app.id)" class="text-gray-600 hover:text-red-600" :title="$t('nodejs.delete_title')">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
-              </button>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="badge" :class="app.status === 'active' ? 'ok' : 'error'">{{ app.status }}</span>
+              <button @click="restartApp(app.id)" class="btn" :title="$t('nodejs.restart_title')">🔄</button>
+              <button @click="deleteApp(app.id)" class="btn danger" :title="$t('nodejs.delete_title')">🗑️</button>
             </div>
-          </div>
-          <div class="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded-md font-mono border dark:border-gray-700">
-            {{ $t('nodejs.node_label') }} {{ app.node_version }} • {{ app.startup_script }}
           </div>
         </div>
+        <div v-else class="muted">{{ $t('nodejs.no_apps') }}</div>
+      </div>
 
-        <div v-if="apps.length === 0" class="text-center py-12 text-gray-500 border-2 border-dashed rounded-lg dark:border-gray-700">
-          {{ $t('nodejs.no_apps') }}
+      <div v-if="showAddModal" class="modal-backdrop">
+        <div class="modal-card">
+          <h2>{{ $t('nodejs.create_app_title') }}</h2>
+          <form @submit.prevent="createApp">
+            <label>{{ $t('nodejs.app_name_label') }}</label>
+            <input v-model="form.app_name" type="text" required :placeholder="$t('nodejs.app_name_placeholder')" />
+            
+            <label style="margin-top: 16px">{{ $t('nodejs.path_label') }}</label>
+            <input v-model="form.app_path" type="text" required placeholder="/app" />
+            
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <div style="flex: 1">
+                <label>{{ $t('nodejs.port_label') }}</label>
+                <input v-model.number="form.port" type="number" required />
+              </div>
+              <div style="flex: 1">
+                <label>{{ $t('nodejs.node_version_label') }}</label>
+                <select v-model="form.node_version">
+                  <option value="18">18.x</option>
+                  <option value="20">20.x</option>
+                  <option value="22">22.x</option>
+                </select>
+              </div>
+            </div>
+
+            <label style="margin-top: 16px">{{ $t('nodejs.startup_script_label') }}</label>
+            <input v-model="form.startup_script" type="text" required :placeholder="$t('nodejs.startup_script_placeholder')" />
+            
+            <label style="margin-top: 16px">{{ $t('nodejs.env_vars_label') }}</label>
+            <textarea v-model="form.env_vars" rows="3" placeholder='{"NODE_ENV": "production"}'></textarea>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px;">
+              <button type="button" class="btn" @click="showAddModal = false">{{ $t('nodejs.cancel') }}</button>
+              <button type="submit" class="btn primary" :disabled="submitting">
+                {{ submitting ? $t('nodejs.creating_app') : $t('nodejs.create_app_btn') }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
-
-    <!-- Modal for adding App -->
-    <div v-if="showAddModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full p-6 shadow-xl">
-        <h3 class="text-lg font-bold mb-4">{{ $t('nodejs.create_app_title') }}</h3>
-        <form @submit.prevent="createApp" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">{{ $t('nodejs.app_name_label') }}</label>
-            <input v-model="form.app_name" type="text" required :placeholder="$t('nodejs.app_name_placeholder')"
-                   class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium mb-1">{{ $t('nodejs.path_label') }}</label>
-              <input v-model="form.app_path" type="text" required placeholder="/"
-                     class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">{{ $t('nodejs.port_label') }}</label>
-              <input v-model.number="form.port" type="number" required placeholder="3000" min="1024" max="65535"
-                     class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-             <div>
-              <label class="block text-sm font-medium mb-1">{{ $t('nodejs.node_version_label') }}</label>
-              <select v-model="form.node_version" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-                <option value="18">18.x</option>
-                <option value="20">20.x</option>
-                <option value="22">22.x</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">{{ $t('nodejs.startup_script_label') }}</label>
-              <input v-model="form.startup_script" type="text" required :placeholder="$t('nodejs.startup_script_placeholder')"
-                     class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">{{ $t('nodejs.env_vars_label') }}</label>
-            <textarea v-model="form.env_vars" rows="3" placeholder='{"NODE_ENV": "production", "API_KEY": "secret"}'
-                      class="w-full px-3 py-2 border rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600"></textarea>
-          </div>
-          
-          <div class="flex justify-end space-x-3 mt-6">
-            <button type="button" @click="showAddModal = false" class="px-4 py-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">
-              {{ $t('nodejs.cancel') }}
-            </button>
-            <button type="submit" :disabled="submitting" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-              {{ submitting ? $t('nodejs.creating_app') : $t('nodejs.create_app_btn') }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+  </Layout>
 </template>
 
+
 <script setup>
+import Layout from '../components/Layout.vue'
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -186,3 +161,17 @@ onMounted(() => {
   fetchApps()
 })
 </script>
+
+
+<style scoped>
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px); display: flex; align-items: center;
+  justify-content: center; z-index: 1000;
+}
+.modal-card {
+  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px; width: 100%; max-width: 520px; padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+</style>
