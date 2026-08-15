@@ -168,6 +168,7 @@ async function loadSites() {
     siteId.value = sites.value[0].id
     await loadDir()
   }
+}
 
 async function loadDir() {
   if (!siteId.value) return
