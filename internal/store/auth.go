@@ -111,10 +111,12 @@ func (s *Store) ListUsers(ctx context.Context, parentID int64) ([]User, error) {
 	var out []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.RoleID, &u.Status,
-			&u.MustChangePassword, &u.TOTPSecretEnc, &u.LastLoginAt, &u.ParentID, &u.CreatedAt, &u.UpdatedAt); err != nil {
-			return nil, err
-		}
+			var must int
+			if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.RoleID, &u.TOTPSecretEnc,
+				&must, &u.Status, &u.LastLoginAt, &u.ParentID, &u.CreatedAt, &u.UpdatedAt); err != nil {
+				return nil, err
+			}
+			u.MustChangePassword = must == 1
 		out = append(out, u)
 	}
 	return out, nil
