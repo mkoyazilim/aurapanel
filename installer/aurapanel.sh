@@ -15,9 +15,13 @@ set -euo pipefail
 # --- Sabitler (bu satırlar release ile birlikte versiyonlanır) ---
 PANEL_VERSION="${AP_PANEL_VERSION:-0.1.0}"
 PANEL_SHA256="${AP_PANEL_SHA256:-}"
-OLS_VERSION="${AP_OLS_VERSION:-}"
-OLS_SHA256="${AP_OLS_SHA256:-}"
+OLS_VERSION="${AP_OLS_VERSION:-1.9.2-1.noble}"
+OLS_SHA256="${AP_OLS_SHA256:-8efb81d547a8f605d341c5ab20da35355cf7c4c742990aae698c00c322399515}"
 LSPHP_VERSIONS="${AP_LSPHP_VERSIONS:-8.2 8.3 8.4}"
+LSPHP82_VER="${AP_LSPHP82_VER:-8.2.33-1.noble}"
+LSPHP83_VER="${AP_LSPHP83_VER:-8.3.33-1.noble}"
+LSPHP84_VER="${AP_LSPHP84_VER:-8.4.24-1.noble}"
+PHP_MODULES="${AP_PHP_MODULES:-common curl intl mysql opcache redis}"
 DOWNLOAD_BASE="${AP_DOWNLOAD_BASE:-https://github.com/mkoyazilim/downloadaurapanel/releases/download/v${PANEL_VERSION}}"
 PANEL_BASE="${AP_PANEL_BASE:-https://github.com/mkoyazilim/aurapanel/releases/download/v${PANEL_VERSION}}"
 PANEL_PORT=8080
@@ -64,16 +68,27 @@ if [[ $SKIP_OLS -eq 0 ]]; then
     apt-get install -y -qq /tmp/$OLS_DEB 2>&1 | tail -2 || apt-get install -y -qq -f
     rm -f /tmp/$OLS_DEB
 
-    # LSPHP sürümleri (bizim derlediğimiz paketler).
+    # LSPHP sürümleri ve temel modüller (WordPress vb. için zorunlu)
     for v in $LSPHP_VERSIONS; do
       dig=${v//./}
-      DEB="lsphp${dig}_${OLS_VERSION}_amd64.deb"
+      if [ "$dig" = "82" ]; then VER=$LSPHP82_VER; fi
+      if [ "$dig" = "83" ]; then VER=$LSPHP83_VER; fi
+      if [ "$dig" = "84" ]; then VER=$LSPHP84_VER; fi
+      
+      log "LSPHP ${v} ve modülleri indiriliyor…"
+      CORE_DEB="lsphp${dig}_${VER}_amd64.deb"
+      curl -fsSL -o /tmp/$CORE_DEB "${DOWNLOAD_BASE}/${CORE_DEB}" || log "UYARI: $CORE_DEB atlanıyor"
+      
+      for mod in $PHP_MODULES; do
+        if [ "$mod" = "common" ]; then ARCH="all"; else ARCH="amd64"; fi
+        if [ "$mod" = "redis" ]; then MOD_VER="6.3.0-1.noble"; else MOD_VER=$VER; fi
+        MOD_DEB="lsphp${dig}-${mod}_${MOD_VER}_${ARCH}.deb"
+        curl -fsSL -o /tmp/$MOD_DEB "${DOWNLOAD_BASE}/${MOD_DEB}" || true
+      done
+      
       log "LSPHP ${v} kuruluyor…"
-      curl -fsSL -o /tmp/$DEB "${DOWNLOAD_BASE}/${DEB}" || log "UYARI: $DEB bulunamadı, atlanıyor"
-      if [[ -f /tmp/$DEB ]]; then
-        apt-get install -y -qq /tmp/$DEB 2>&1 | tail -1 || true
-        rm -f /tmp/$DEB
-      fi
+      apt-get install -y -qq /tmp/lsphp${dig}*.deb 2>&1 | tail -1 || apt-get install -y -qq -f
+      rm -f /tmp/lsphp${dig}*.deb
     done
   fi
 fi
