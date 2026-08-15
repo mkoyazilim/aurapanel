@@ -223,23 +223,25 @@ func TestFirewallApplyRejects(t *testing.T) {
 func TestSshdInstallOrder(t *testing.T) {
 	cfg := testCfg()
 	fn := newRegistry(cfg)["sshd.install_config"]
-	raw, _ := json.Marshal(map[string]any{"config": "/var/lib/aurapanel/stage/sshd-sites.conf"})
+	raw, _ := json.Marshal(map[string]any{"content": "test content"})
 	p, _, err := fn(cfg, raw)
 	if err != nil {
 		t.Fatalf("sshd.install_config: %v", err)
 	}
 	assertPlanBins(t, p)
-	// Sıra kritik: sshd -t (doğrula) → copy → systemctl reload.
-	if p.actions[0].kind != actExec || p.actions[0].exec.bin != binPaths["sshd"] {
-		t.Fatal("ilk eylem sshd -t doğrulaması olmalı")
+	// Sıra kritik: mkdir -> write -> sshd -t (doğrula) → copy → systemctl reload.
+	if len(p.actions) < 5 {
+		t.Fatalf("yetersiz action")
 	}
-	if p.actions[1].kind != actCopy || p.actions[1].copy.dst != "/etc/ssh/sshd_config.d/aurapanel-sites.conf" {
-		t.Fatal("ikinci eylem hedefe kopyalama olmalı")
+	if p.actions[2].kind != actExec || p.actions[2].exec.bin != binPaths["sshd"] {
+		t.Fatal("üçüncü eylem sshd -t doğrulaması olmalı")
 	}
-	if p.actions[2].kind != actExec || p.actions[2].exec.bin != binPaths["systemctl"] {
-		t.Fatal("üçüncü eylem systemctl reload olmalı")
+	if p.actions[3].kind != actCopy || p.actions[3].copy.dst != "/etc/ssh/sshd_config.d/aurapanel-sites.conf" {
+		t.Fatal("dördüncü eylem hedefe kopyalama olmalı")
 	}
-	// Stage dışı kaynak reddedilmeli.
+	if p.actions[4].kind != actExec || p.actions[4].exec.bin != binPaths["systemctl"] {
+		t.Fatal("beşinci eylem systemctl reload olmalı")
+	}
 	bad, _ := json.Marshal(map[string]any{"config": "/etc/ssh/sshd_config"})
 	if _, _, err := fn(cfg, bad); err == nil {
 		t.Fatal("stage dışı config kabul edildi")
@@ -410,7 +412,7 @@ func TestAllOpsHappyPathBins(t *testing.T) {
 		"cgroup.limits":             {"site": "site001", "cpu_max": "max"},
 		"quota.set":                 {"user": "www-site001", "disk_mb": 1024},
 		"firewall.apply":            {"ruleset": "/etc/aurapanel/nftables/rules.nft"},
-		"sshd.install_config":       {"config": "/var/lib/aurapanel/stage/sshd-sites.conf"},
+		"sshd.install_config":       {"content": "test content"},
 		"logrotate.install_config":  {"config": "/var/lib/aurapanel/stage/logrotate-sites.conf"},
 		"ols.test":                  {},
 		"ols.read_bundle":           {"site": "site001"},

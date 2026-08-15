@@ -554,26 +554,22 @@ func opFirewallApply(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 
 func opSshdInstall(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	var a struct {
-		Config string `json:"config"`
+		Content string `json:"content"`
 	}
 	if err := strictDecode(raw, &a); err != nil {
 		return nil, nil, fmt.Errorf("sshd.install_config: %w", err)
 	}
-	src, err := cleanUnder(cfg.stageDir, a.Config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("sshd.install_config: %w", err)
-	}
-	if !reFileName.MatchString(path.Base(src)) {
-		return nil, nil, errors.New("sshd.install_config: dosya adı geçersiz")
-	}
+	tmp := path.Join(cfg.stageDir, "sshd-sites.conf.tmp")
 
 	sshd, _ := bin("sshd")
 	systemctl, _ := bin("systemctl")
 	dst := "/etc/ssh/sshd_config.d/aurapanel-sites.conf"
 	p := &plan{}
-	// Önce kaynak doğrulanır, sonra kopyalanır, sonra reload — sıra önemli.
-	p.exec(sshd, "-t", "-f", src)
-	p.copy(fileCopy{src: src, dst: dst, mode: 0o600})
+	// Önce staging dizini oluşturulur, içerik temp'e yazılır, doğrulanır, kopyalanır.
+	p.mkdirMode(cfg.stageDir, 0o755)
+	p.write(fileWrite{path: tmp, content: a.Content, mode: 0o600})
+	p.exec(sshd, "-t", "-f", tmp)
+	p.copy(fileCopy{src: tmp, dst: dst, mode: 0o600})
 	p.exec(systemctl, "reload", "ssh")
 	return p, map[string]any{"config": dst}, nil
 }
