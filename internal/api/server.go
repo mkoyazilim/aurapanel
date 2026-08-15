@@ -302,6 +302,9 @@ func (s *Server) routes() {
 	
 	// Webhook (NO AUTH REQUIRED)
 	m.HandleFunc("POST /api/v1/webhooks/git/{secret}", s.handleGitWebhook)
+	// Sunucu Yönetimi
+	m.HandleFunc("GET /api/v1/server/metrics", s.handleServerMetrics)
+	m.HandleFunc("GET /api/v1/server/services", s.handleServerServices)
 
 	// Reseller yönetimi (admin tarafı)
 	m.HandleFunc("GET /api/v1/resellers", s.handleResellerList)

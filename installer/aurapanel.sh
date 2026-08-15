@@ -277,6 +277,16 @@ fi
 systemctl enable --now lsws >/dev/null 2>&1 || true
 systemctl start aurapanel.service 2>/dev/null || true
 
+sleep 2 # Logların yazılması için kısa bir bekleme süresi
+
+AP_USERNAME=$(journalctl -u aurapanel -n 50 | grep -i "Kullanıcı Adı" | awk '{print $NF}' | tail -1)
+AP_PASSWORD=$(journalctl -u aurapanel -n 50 | grep -i "Şifre" | awk '{print $NF}' | tail -1)
+
+if [[ -z "$AP_USERNAME" ]]; then
+  AP_USERNAME="admin"
+  AP_PASSWORD="[Şifre loglarda üretiliyor: journalctl -u aurapanel]"
+fi
+
 # --- 11) Özet ---
 PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || echo "<SUNUCU-IP>")
 echo
@@ -291,7 +301,9 @@ else
   echo " Bağlantı: bilgisayarınızdan SSH tunnel:"
   echo "   ssh -L ${PANEL_PORT}:127.0.0.1:${PANEL_PORT} root@${PUBLIC_IP}"
 fi
-echo " İlk giriş bilgileri panel servis logunda ÜRETİLİR:"
-echo "   journalctl -u aurapanel | grep -A3 'ilk kurulum'"
+echo " --- İLK GİRİŞ BİLGİLERİ (TEK KULLANIMLIK) ---"
+echo " Kullanıcı Adı: ${AP_USERNAME}"
+echo " Şifre:         ${AP_PASSWORD}"
+echo " "
 echo " İLK GİRİŞTE ŞİFRE DEĞİŞTİRMEK ZORUNLUDUR."
 echo "=================================================="

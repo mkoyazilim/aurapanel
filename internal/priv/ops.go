@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path"
 	"regexp"
@@ -184,6 +185,8 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"user.delete":               opUserDelete,
 		"user.exists":               opUserExists,
 		"cgroup.bootstrap":          opCgroupBootstrap,
+		"server.services":           opServerServices,
+		"server.action":             opServerAction,
 		"cgroup.limits":             opCgroupLimits,
 		"quota.set":                 opQuotaSet,
 		"firewall.apply":            opFirewallApply,
@@ -1068,4 +1071,37 @@ func opPHPReadIni(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 		return nil, nil, fmt.Errorf("php.read_ini: %w", err)
 	}
 	return &plan{}, map[string]any{"site": a.Site, "content": string(b)}, nil
+}
+
+func opServerServices(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	p := &plan{}
+	out := map[string]string{}
+	services := []string{"lsws", "mariadb", "fail2ban", "sshd"}
+	for _, svc := range services {
+		cmd := exec.Command("systemctl", "is-active", svc)
+		if err := cmd.Run(); err == nil {
+			out[svc] = "active"
+		} else {
+			out[svc] = "inactive"
+		}
+	}
+	return p, out, nil
+}
+
+func opServerAction(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Action string `json:"action"`
+		Target string `json:"target"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, err
+	}
+	p := &plan{}
+	if a.Action == "restart" || a.Action == "stop" || a.Action == "start" {
+		if a.Target == "fail2ban" || a.Target == "lsws" || a.Target == "mariadb" {
+			systemctl, _ := bin("systemctl")
+			p.exec(systemctl, a.Action, a.Target)
+		}
+	}
+	return p, map[string]string{"status": "ok"}, nil
 }
