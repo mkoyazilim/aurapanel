@@ -41,7 +41,7 @@ func (s *Store) SaveCloudflareAccount(ctx context.Context, a *CloudflareAccount)
 	for _, kv := range [][2]string{{"cf_email", a.Email}, {"cf_api_token", a.APIToken}} {
 		_, err := s.db.ExecContext(ctx,
 			`INSERT INTO system_settings (key, value) VALUES (?, ?)
-			 ON DUPLICATE KEY UPDATE value = VALUES(value)`,
+			 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 			kv[0], kv[1])
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func (s *Store) SaveCloudflareSettings(ctx context.Context, c *CloudflareSetting
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO cloudflare_settings (site_id, api_token, zone_id, proxy_enabled)
 		 VALUES (?, ?, ?, ?)
-		 ON DUPLICATE KEY UPDATE api_token = VALUES(api_token), zone_id = VALUES(zone_id), proxy_enabled = VALUES(proxy_enabled)`,
+		 ON CONFLICT(site_id) DO UPDATE SET api_token = excluded.api_token, zone_id = excluded.zone_id, proxy_enabled = excluded.proxy_enabled`,
 		c.SiteID, c.APIToken, c.ZoneID, c.ProxyEnabled)
 	return err
 }
