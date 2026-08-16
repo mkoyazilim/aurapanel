@@ -497,6 +497,7 @@ const messages = {
     },
     menu: {
       server: 'Sunucu',
+      mail: 'E-posta',
       backups: 'Yedekler',
       cloudflare: 'Cloudflare',
       cluster: 'Küme Yönetimi',
@@ -1438,6 +1439,7 @@ const messages = {
     },
     menu: {
       server: 'Server',
+      mail: 'Email',
       backups: 'Backups',
       cloudflare: 'Cloudflare',
       cluster: 'Cluster',
