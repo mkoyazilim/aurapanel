@@ -18,8 +18,8 @@ func verifyCaptcha(provider, secret, token, ip string) (bool, error) {
 	}
 
 	data := url.Values{
-		"secret":   {secret},
-		"response": {token},
+		"secret":   []string{secret},
+		"response": []string{token},
 	}
 	if ip != "" {
 		data.Set("remoteip", ip)

@@ -225,6 +225,8 @@ func (s *Server) routes() {
 	// Yedekler.
 	m.HandleFunc("POST /api/v1/sites/{id}/backups/run", s.handleBackupRun)
 	m.HandleFunc("GET /api/v1/sites/{id}/backups", s.handleBackupList)
+	m.HandleFunc("GET /api/v1/sites/{id}/backup-schedule", s.handleSiteBackupScheduleGet)
+	m.HandleFunc("POST /api/v1/sites/{id}/backup-schedule", s.handleSiteBackupScheduleSave)
 
 	// Drift.
 	m.HandleFunc("GET /api/v1/drift", s.handleDriftList)

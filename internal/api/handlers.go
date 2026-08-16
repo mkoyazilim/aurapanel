@@ -1176,13 +1176,16 @@ func (s *Server) handleSFTPDelete(w http.ResponseWriter, r *http.Request) {
 
 // Settings Endpoints
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
-	provider, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_provider")
-	siteKey, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_sitekey")
-	secretKey, _, _ := s.deps.Store.GetSetting(r.Context(), "captcha_secret")
+	ctx := r.Context()
+	get := func(k string) string { v, _, _ := s.deps.Store.GetSetting(ctx, k); return v }
 	writeJSON(w, http.StatusOK, map[string]string{
-		"captcha_provider": provider,
-		"captcha_sitekey":  siteKey,
-		"captcha_secret":   secretKey,
+		"captcha_provider":        get("captcha_provider"),
+		"captcha_sitekey":         get("captcha_sitekey"),
+		"captcha_secret":          get("captcha_secret"),
+		"backup_global_enabled":   get("backup_global_enabled"),
+		"backup_global_time":      get("backup_global_time"),
+		"backup_global_frequency": get("backup_global_frequency"),
+		"backup_global_kind":      get("backup_global_kind"),
 	})
 }
 
@@ -1194,7 +1197,11 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	allowed := []string{"captcha_provider", "captcha_sitekey", "captcha_secret"}
+	allowed := []string{
+		"captcha_provider", "captcha_sitekey", "captcha_secret",
+		"backup_global_enabled", "backup_global_time",
+		"backup_global_frequency", "backup_global_kind",
+	}
 	for _, k := range allowed {
 		if v, ok := req[k]; ok {
 			s.deps.Store.SetSetting(r.Context(), k, v)
@@ -1210,4 +1217,38 @@ func (s *Server) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 		"captcha_provider": provider,
 		"captcha_sitekey":  siteKey,
 	})
+}
+
+// GET /api/v1/sites/{id}/backup-schedule  — site bazlı yedekleme zamanını döndürür
+func (s *Server) handleSiteBackupScheduleGet(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	ctx := r.Context()
+	get := func(k string) string { v, _, _ := s.deps.Store.GetSetting(ctx, k+siteID); return v }
+	writeJSON(w, http.StatusOK, map[string]string{
+		"enabled":   get("site_backup_enabled_"),
+		"time":      get("site_backup_time_"),
+		"frequency": get("site_backup_frequency_"),
+		"kind":      get("site_backup_kind_"),
+	})
+}
+
+// POST /api/v1/sites/{id}/backup-schedule  — site bazlı yedekleme zamanını kaydeder
+func (s *Server) handleSiteBackupScheduleSave(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	ctx := r.Context()
+	var req struct {
+		Enabled   string `json:"enabled"`
+		Time      string `json:"time"`
+		Frequency string `json:"frequency"`
+		Kind      string `json:"kind"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	set := func(suffix, val string) { s.deps.Store.SetSetting(ctx, suffix+siteID, val) }
+	set("site_backup_enabled_", req.Enabled)
+	set("site_backup_time_", req.Time)
+	set("site_backup_frequency_", req.Frequency)
+	set("site_backup_kind_", req.Kind)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

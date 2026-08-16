@@ -55,6 +55,53 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Site Bazlı Otomatik Yedekleme -->
+      <div class="card" v-if="siteId">
+        <h2>⏱️ Otomatik Yedekleme Zamanla</h2>
+        <p class="muted text-sm" style="margin-bottom:12px">Bu site için bağımsız otomatik yedekleme zamanı belirleyin. Global ayardan bağımsız çalışır.</p>
+
+        <div style="margin-bottom:12px">
+          <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" v-model="siteSchedule.enabled" style="width:auto" />
+            <strong>Bu site için otomatik yedekleme aktif</strong>
+          </label>
+        </div>
+
+        <template v-if="siteSchedule.enabled">
+          <div class="row" style="gap:12px;margin-top:10px">
+            <div style="flex:1">
+              <label>Saat</label>
+              <input type="time" v-model="siteSchedule.time" />
+            </div>
+            <div style="flex:1">
+              <label>Sıklık</label>
+              <select v-model="siteSchedule.frequency">
+                <option value="daily">Her gün</option>
+                <option value="monday">Pazartesi</option>
+                <option value="tuesday">Salı</option>
+                <option value="wednesday">Çarşamba</option>
+                <option value="thursday">Perşembe</option>
+                <option value="friday">Cuma</option>
+                <option value="saturday">Cumartesi</option>
+                <option value="sunday">Pazar</option>
+              </select>
+            </div>
+            <div style="flex:1">
+              <label>Yedek Türü</label>
+              <select v-model="siteSchedule.kind">
+                <option value="full">Tam (Dosya + DB)</option>
+                <option value="files">Sadece Dosyalar</option>
+                <option value="db">Sadece Veritabanı</option>
+              </select>
+            </div>
+          </div>
+        </template>
+
+        <div style="margin-top:14px">
+          <button class="btn primary" @click="saveSiteSchedule">Kaydet</button>
+        </div>
+      </div>
     </div>
   </Layout>
 </template>
@@ -80,6 +127,7 @@ async function load() {
   if (!siteId.value) return
   try {
     backups.value = await api(`/sites/${siteId.value}/backups`)
+    await loadSiteSchedule()
   } catch (e) {
     error.value = e.message
   }
@@ -104,11 +152,45 @@ async function run() {
   }
 }
 
+// ── Site Bazlı Zamanlama ─────────────────────────────────────────────────────
+const siteSchedule = ref({ enabled: false, time: '02:00', frequency: 'daily', kind: 'full' })
+
+async function loadSiteSchedule() {
+  if (!siteId.value) return
+  try {
+    const s = await api(`/sites/${siteId.value}/backup-schedule`)
+    siteSchedule.value = {
+      enabled: s.enabled === '1',
+      time: s.time || '02:00',
+      frequency: s.frequency || 'daily',
+      kind: s.kind || 'full',
+    }
+  } catch (e) { console.error('Site schedule read error', e) }
+}
+
+async function saveSiteSchedule() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await api(`/sites/${siteId.value}/backup-schedule`, {
+      method: 'POST',
+      body: {
+        enabled: siteSchedule.value.enabled ? '1' : '0',
+        time: siteSchedule.value.time,
+        frequency: siteSchedule.value.frequency,
+        kind: siteSchedule.value.kind,
+      },
+    })
+    notice.value = 'Site yedekleme zamanlaması kaydedildi.'
+  } catch (e) { error.value = e.message }
+}
+
 onMounted(async () => {
   sites.value = await api('/sites').catch(() => [])
   if (sites.value.length) {
     siteId.value = sites.value[0].id
     await load()
+    await loadSiteSchedule()
   }
 })
 </script>

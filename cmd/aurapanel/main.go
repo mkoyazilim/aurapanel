@@ -50,6 +50,7 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/extdns"
 	"github.com/mkoyazilim/aurapanel/internal/git"
 	"github.com/mkoyazilim/aurapanel/internal/reseller"
+	"github.com/mkoyazilim/aurapanel/internal/scheduler"
 )
 
 var (
@@ -303,6 +304,12 @@ func main() {
 
 	resellerSvc := reseller.New(st)
 	extdnsSvc   := extdns.New(st, cipher)
+
+	// Zamanlanmış yedekleme servisi — global (admin) ve site bazlı (kullanıcı)
+	schedSvc := scheduler.New(st, bkSvc, log)
+	schedSvc.Start()
+	defer schedSvc.Stop()
+
 	srv := api.New(api.Deps{
 		Store: st, Audit: au, Sessions: sessions, Cipher: cipher, Cfg: cfg, Log: log,
 		Priv:  privC,

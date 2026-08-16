@@ -281,6 +281,16 @@ type fakeRepairOps struct {
 	fail  string
 }
 
+func (f *fakeRepairOps) UserExists(ctx context.Context, name string) (bool, error) {
+	f.calls = append(f.calls, "user.exists")
+	return false, nil
+}
+
+func (f *fakeRepairOps) UserCreate(ctx context.Context, name, shell string) error {
+	f.calls = append(f.calls, "user.create")
+	return nil
+}
+
 func (f *fakeRepairOps) SitePrepare(ctx context.Context, siteID, user string) error {
 	f.calls = append(f.calls, "site.prepare")
 	if f.fail == "prepare" {

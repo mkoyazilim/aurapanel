@@ -130,6 +130,53 @@
             </div>
           </div>
 
+          <!-- Global Otomatik Yedekleme (Admin) -->
+          <div class="card">
+            <h2>🕐 Otomatik Yedekleme (Global)</h2>
+            <p class="muted text-sm" style="margin-bottom:12px">Tüm siteleri belirtilen saatte otomatik olarak yedekler. Her site için ayrıca site bazlı zamanlama da yapılabilir.</p>
+
+            <div style="margin-bottom:12px">
+              <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" v-model="globalBackup.enabled" style="width:auto" />
+                <strong>Global otomatik yedeklemeyi aktif et</strong>
+              </label>
+            </div>
+
+            <template v-if="globalBackup.enabled">
+              <div class="row" style="margin-top:10px;gap:12px">
+                <div style="flex:1">
+                  <label>Yedekleme Saati</label>
+                  <input type="time" v-model="globalBackup.time" />
+                </div>
+                <div style="flex:1">
+                  <label>Sıklık</label>
+                  <select v-model="globalBackup.frequency">
+                    <option value="daily">Her gün</option>
+                    <option value="monday">Pazartesi</option>
+                    <option value="tuesday">Salı</option>
+                    <option value="wednesday">Çarşamba</option>
+                    <option value="thursday">Perşembe</option>
+                    <option value="friday">Cuma</option>
+                    <option value="saturday">Cumartesi</option>
+                    <option value="sunday">Pazar</option>
+                  </select>
+                </div>
+                <div style="flex:1">
+                  <label>Yedek Türü</label>
+                  <select v-model="globalBackup.kind">
+                    <option value="full">Tam (Dosya + DB)</option>
+                    <option value="files">Sadece Dosyalar</option>
+                    <option value="db">Sadece Veritabanı</option>
+                  </select>
+                </div>
+              </div>
+            </template>
+
+            <div style="margin-top:14px">
+              <button class="btn primary" @click="saveGlobalBackup">Kaydet</button>
+            </div>
+          </div>
+
           <!-- Personal Access Tokens (PAT) -->
           <div class="card">
             <h2>🔑 {{ $t('settings.pat') }}</h2>
@@ -347,10 +394,42 @@ async function patDelete(id) {
     error.value = e.message
   }
 }
-
 async function loadPats() {
   pats.value = await api('/auth/pat').catch(() => [])
 }
+
+// ── Global Otomatik Yedekleme ────────────────────────────────────────────────
+const globalBackup = ref({ enabled: false, time: '03:00', frequency: 'daily', kind: 'full' })
+
+async function loadGlobalBackup() {
+  try {
+    const s = await api('/settings')
+    globalBackup.value = {
+      enabled: s.backup_global_enabled === '1',
+      time: s.backup_global_time || '03:00',
+      frequency: s.backup_global_frequency || 'daily',
+      kind: s.backup_global_kind || 'full',
+    }
+  } catch (e) { console.error('Global backup settings read error', e) }
+}
+
+async function saveGlobalBackup() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await api('/settings', {
+      method: 'POST',
+      body: {
+        backup_global_enabled: globalBackup.value.enabled ? '1' : '0',
+        backup_global_time: globalBackup.value.time,
+        backup_global_frequency: globalBackup.value.frequency,
+        backup_global_kind: globalBackup.value.kind,
+      },
+    })
+    notice.value = 'Global yedekleme ayarları kaydedildi.'
+  } catch (e) { error.value = e.message }
+}
+
 
 onMounted(async () => {
   me.value = await api('/auth/me').catch(() => ({}))
@@ -363,6 +442,7 @@ onMounted(async () => {
     console.error('Settings read error', e)
   }
   await loadS3Settings()
+  await loadGlobalBackup()
   await loadPats()
 })
 </script>
