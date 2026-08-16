@@ -7,7 +7,11 @@
 
       <!-- Global Hesap Kartı -->
       <div class="card" style="margin-bottom:20px">
-        <h2>🔑 Global Hesap Ayarları</h2>
+        <h2 style="display:flex;align-items:center;gap:12px;margin:0">
+          🔑 Global Hesap Ayarları 
+          <span v-if="isConnected" class="badge ok" style="font-size:12px;font-weight:normal">✅ Bağlı</span>
+          <span v-else class="badge err" style="font-size:12px;font-weight:normal">🔴 Bağlı Değil</span>
+        </h2>
         <p class="muted text-sm" style="margin-bottom:12px">
           Tüm siteler bu hesap üzerinden yönetilir. Belirli bir site için ayrı token tanımlamak mümkündür.
         </p>
@@ -25,11 +29,14 @@
           <button class="btn primary" @click="saveAccount" :disabled="saving">
             {{ saving ? 'Kaydediliyor…' : '💾 Kaydet' }}
           </button>
-          <button class="btn" @click="verifyToken" :disabled="verifying">
+          <button v-if="isConnected" class="btn" @click="verifyToken" :disabled="verifying">
             {{ verifying ? 'Doğrulanıyor…' : '✅ Token Doğrula' }}
           </button>
-          <button class="btn" @click="loadZones" :disabled="loadingZones">
-            {{ loadingZones ? 'Yükleniyor…' : '🌐 Zone Listesi' }}
+          <button v-if="isConnected" class="btn" @click="loadZones" :disabled="loadingZones">
+            {{ loadingZones ? 'Yükleniyor…' : '🌐 Zone Listesi Yenile' }}
+          </button>
+          <button v-if="isConnected" class="btn danger" style="margin-left:auto" @click="disconnectAccount" :disabled="saving">
+            Bağlantıyı Kes
           </button>
         </div>
 
@@ -384,6 +391,7 @@ const purgeURLsText = ref('')
 const analyticsPeriod = ref('-1440')
 
 const account = ref({ email: '', api_token: '' })
+const isConnected = computed(() => account.value.api_token.startsWith('••••') || account.value.api_token.length > 10)
 const siteCF  = ref({ zone_id: '', proxy_enabled: true, api_token: '' })
 
 const importModal = ref({
@@ -443,6 +451,18 @@ async function loadAccount() {
     const a = await api('/cloudflare/account')
     account.value = { email: a.email || '', api_token: a.api_token || '' }
   } catch (e) { /* henüz kaydedilmemiş */ }
+}
+
+
+async function disconnectAccount() {
+  if (!confirm('Cloudflare API bağlantısını kesmek istediğinize emin misiniz?')) return
+  clear(); saving.value = true
+  try {
+    await api('/cloudflare/account', { method: 'POST', body: { email: '', api_token: '' } })
+    account.value = { email: '', api_token: '' }
+    zones.value = []
+    notice.value = 'Bağlantı kesildi.'
+  } catch (e) { error.value = e.message } finally { saving.value = false }
 }
 
 async function saveAccount() {
@@ -675,6 +695,9 @@ async function loadAnalytics(period) {
 onMounted(async () => {
   sites.value = await api('/sites').catch(() => [])
   await loadAccount()
+  if (isConnected.value) {
+    await loadZones()
+  }
 })
 </script>
 
