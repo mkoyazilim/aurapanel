@@ -73,7 +73,10 @@
             </select>
           </div>
           <div v-if="siteId" style="flex:2">
-            <label>Zone ID</label>
+            <label style="display:flex;justify-content:space-between">
+              Zone ID
+              <a v-if="!siteCF.zone_id && isConnected" href="#" @click.prevent="findAndMapZone" style="font-size:12px;text-decoration:none">🔍 Bul ve Eşleştir</a>
+            </label>
             <input v-model="siteCF.zone_id" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
           </div>
           <div v-if="siteId" style="flex:1;display:flex;align-items:center;gap:8px;padding-top:18px">
@@ -483,8 +486,27 @@ async function verifyToken() {
 
 async function loadZones() {
   clear(); loadingZones.value = true
-  try { zones.value = await api('/cloudflare/zones') }
+  try { 
+    zones.value = await api('/cloudflare/zones')
+    if (siteId.value && !siteCF.value.zone_id) {
+      findAndMapZone()
+    }
+  }
   catch (e) { error.value = e.message } finally { loadingZones.value = false }
+}
+
+async function findAndMapZone() {
+  if (!siteId.value || zones.value.length === 0) return
+  const currentSite = sites.value.find(st => st.id === siteId.value)
+  if (!currentSite) return
+
+  const matchedZone = zones.value.find(z => currentSite.domain === z.name || currentSite.domain.endsWith('.' + z.name))
+  if (matchedZone) {
+    siteCF.value.zone_id = matchedZone.id
+    await saveSiteCF()
+  } else {
+    notice.value = "Bulunamadı: Bu alan adı (veya root domaini) Cloudflare hesabınızda yok."
+  }
 }
 
 function getSiteByDomain(domain) {
