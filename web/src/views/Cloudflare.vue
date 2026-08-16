@@ -350,9 +350,9 @@
               <div style="flex:1" v-if="importModal.app_type === 'php'">
                 <label>PHP Sürümü</label>
                 <select v-model="importModal.php_version">
-                  <option value="82">8.2</option>
-                  <option value="83">8.3</option>
-                  <option value="84">8.4</option>
+                  <option value="8.2">8.2</option>
+                  <option value="8.3">8.3</option>
+                  <option value="8.4">8.4</option>
                 </select>
               </div>
               <div style="flex:1" v-if="importModal.app_type === 'node'">
@@ -402,7 +402,7 @@ const importModal = ref({
   busy: false,
   zone: null,
   app_type: 'php',
-  php_version: '83',
+  php_version: '8.3',
   node_version: '20'
 })
 
