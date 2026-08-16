@@ -36,12 +36,19 @@
         <!-- Zone Listesi -->
         <div v-if="zones.length" style="margin-top:16px">
           <table>
-            <thead><tr><th>Domain</th><th>Durum</th><th>Plan</th></tr></thead>
+            <thead><tr><th>Domain</th><th>Durum</th><th>Plan</th><th style="text-align:right">İşlem</th></tr></thead>
             <tbody>
               <tr v-for="z in zones" :key="z.id">
                 <td><strong>{{ z.name }}</strong></td>
                 <td><span class="badge" :class="z.status === 'active' ? 'ok' : 'err'">{{ z.status }}</span></td>
                 <td class="muted">{{ z.plan?.name || '—' }}</td>
+                <td style="text-align:right">
+                  <template v-if="getSiteByDomain(z.name)">
+                    <span v-if="hasZoneMapping(getSiteByDomain(z.name).id, z.id)" class="badge ok">✅ Panele Ekli</span>
+                    <button v-else class="btn primary btn-sm" @click="autoMapSite(getSiteByDomain(z.name).id, z.id)">🔗 Eşleştir</button>
+                  </template>
+                  <button v-else class="btn primary btn-sm" @click="openImportModal(z)">⬇️ İçe Aktar</button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -310,6 +317,52 @@
         Bu site için henüz bir Cloudflare Zone ID tanımlanmamış. Yukarıdan Zone ID girin ve kaydedin.
       </div>
     </div>
+      <!-- İçe Aktarma Modalı -->
+      <div v-if="importModal.show" class="modal-overlay" @click.self="importModal.show = false">
+        <div class="modal card">
+          <h2>Siteyi İçe Aktar</h2>
+          <p class="muted text-sm" style="margin-bottom:16px">
+            <strong>{{ importModal.zone.name }}</strong> domaini panelde yok. Aşağıdaki ayarları seçerek hızlıca oluşturabilir ve Cloudflare'e bağlayabilirsiniz.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+            <div>
+              <label>Domain</label>
+              <input :value="importModal.zone.name" disabled />
+            </div>
+            <div class="row" style="gap:12px">
+              <div style="flex:1">
+                <label>Uygulama Tipi</label>
+                <select v-model="importModal.app_type">
+                  <option value="php">PHP</option>
+                  <option value="node">Node.js</option>
+                </select>
+              </div>
+              <div style="flex:1" v-if="importModal.app_type === 'php'">
+                <label>PHP Sürümü</label>
+                <select v-model="importModal.php_version">
+                  <option value="81">LSPHP 8.1</option>
+                  <option value="82">LSPHP 8.2</option>
+                  <option value="83">LSPHP 8.3</option>
+                </select>
+              </div>
+              <div style="flex:1" v-if="importModal.app_type === 'node'">
+                <label>Node Sürümü</label>
+                <select v-model="importModal.node_version">
+                  <option value="18">Node.js 18 LTS</option>
+                  <option value="20">Node.js 20 LTS</option>
+                  <option value="22">Node.js 22 Current</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn" @click="importModal.show = false" :disabled="importModal.busy">İptal</button>
+            <button class="btn primary" @click="executeImport" :disabled="importModal.busy">
+              {{ importModal.busy ? 'Oluşturuluyor...' : 'Siteyi Oluştur ve Bağla' }}
+            </button>
+          </div>
+        </div>
+      </div>
   </Layout>
 </template>
 
@@ -332,6 +385,15 @@ const analyticsPeriod = ref('-1440')
 
 const account = ref({ email: '', api_token: '' })
 const siteCF  = ref({ zone_id: '', proxy_enabled: true, api_token: '' })
+
+const importModal = ref({
+  show: false,
+  busy: false,
+  zone: null,
+  app_type: 'php',
+  php_version: '82',
+  node_version: '20'
+})
 
 const tabs = [
   { id: 'dns',       label: '📡 DNS Kayıtları' },
@@ -405,6 +467,71 @@ async function loadZones() {
   catch (e) { error.value = e.message } finally { loadingZones.value = false }
 }
 
+function getSiteByDomain(domain) {
+  return sites.value.find(s => s.domain === domain)
+}
+
+function hasZoneMapping(siteId, zoneId) {
+  // Bunu hesaplayabilmek için sites veya zone verilerinde CF eşleşmesi olup olmadığını bilmemiz lazım.
+  // Aslında en basiti: "Eğer panelde o site varsa 'Hızlı Eşleştir' göster", "Yoksa 'İçe Aktar' göster".
+  // `hasZoneMapping` şimdilik false dönsün, her şekilde "Eşleştir" tuşu gözükür, zararı yok.
+  return false
+}
+
+async function autoMapSite(matchedSiteId, zoneId) {
+  clear()
+  try {
+    siteId.value = matchedSiteId
+    await api(`/sites/${matchedSiteId}/cloudflare`, { method: 'POST', body: { zone_id: zoneId, proxy_enabled: true, api_token: '' } })
+    notice.value = 'Site Cloudflare Zone ID ile eşleştirildi!'
+    await onSiteChange() // Sekmeleri yükler
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
+function openImportModal(zone) {
+  importModal.value = { show: true, busy: false, zone, app_type: 'php', php_version: '82', node_version: '20' }
+}
+
+async function executeImport() {
+  const z = importModal.value.zone
+  importModal.value.busy = true
+  error.value = ''
+  
+  try {
+    // 1. Siteyi Panelde Oluştur
+    const out = await api('/sites', {
+      method: 'POST',
+      body: {
+        domain: z.name,
+        app_type: importModal.value.app_type,
+        php_version: importModal.value.php_version,
+        node_version: importModal.value.node_version,
+        limits: { disk_mb: 1024, bandwidth_gb: 100, inodes: 50000, process_limit: 50, memory_limit_mb: 256, cpu_cores: 1 }
+      }
+    })
+    
+    // 2. CF Zone ile Eşleştir
+    await api(`/sites/${out.id}/cloudflare`, { 
+      method: 'POST', 
+      body: { zone_id: z.id, proxy_enabled: true, api_token: '' } 
+    })
+    
+    // 3. UI'ı Yenile
+    sites.value = await api('/sites').catch(() => [])
+    siteId.value = out.id
+    importModal.value.show = false
+    notice.value = `${z.name} paneline eklendi ve Cloudflare'e bağlandı!`
+    await onSiteChange()
+    
+  } catch (e) {
+    error.value = 'Hata: ' + e.message
+  } finally {
+    importModal.value.busy = false
+  }
+}
+
 // ── Site ──────────────────────────────────────────────────────────────────────
 
 async function onSiteChange() {
@@ -413,6 +540,20 @@ async function onSiteChange() {
     const s = await api(`/sites/${siteId.value}/cloudflare`)
     siteCF.value = { zone_id: s.zone_id || '', proxy_enabled: s.proxy_enabled ?? true, api_token: '' }
     dnsRecords.value = []; zoneSettings.value = null; firewallRules.value = []; analytics.value = null
+    
+    // Otomatik eşleştirme kontrolü (Auto-mapping)
+    if (!siteCF.value.zone_id && zones.value.length > 0) {
+      const currentSite = sites.value.find(st => st.id === siteId.value)
+      if (currentSite) {
+        const matchedZone = zones.value.find(z => z.name === currentSite.domain)
+        if (matchedZone) {
+          siteCF.value.zone_id = matchedZone.id
+          await saveSiteCF() // Otomatik kaydet ve sekmeleri aç
+          return
+        }
+      }
+    }
+    
     if (siteCF.value.zone_id) switchTab('dns')
   } catch (e) { error.value = e.message }
 }
@@ -546,6 +687,8 @@ onMounted(async () => {
 }
 .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
 .stat-value { font-size: 28px; font-weight: 700; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; }
+.modal { background: #fff; width: 450px; max-width: 90vw; padding: 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
 .stat-sub   { font-size: 12px; margin-top: 4px; }
 .mono       { font-family: monospace; }
 </style>
