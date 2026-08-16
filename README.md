@@ -1,5 +1,8 @@
 # AuraPanel
 
+<img width="1171" height="675" alt="panel2" src="https://github.com/user-attachments/assets/7fcefdc2-2f94-4f57-8713-6b5ba00acdbc" />
+<img width="1861" height="648" alt="panel1" src="https://github.com/user-attachments/assets/9a9c9cb4-51b5-48a2-96e1-5f7e35a30b1b" />
+
 **A lightweight, security-first control panel for OpenLiteSpeed.**
 
 AuraPanel is a modern hosting control panel purpose-built for [OpenLiteSpeed](https://openlitespeed.org/). It combines real per-site isolation, a hardened single-binary architecture, and a clean, professional web UI — designed perfectly for **Ubuntu 24.04 LTS** and **Debian 12 (Bookworm)** servers.
