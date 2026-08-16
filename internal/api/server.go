@@ -284,10 +284,38 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/sites/{id}/staging/push", s.handleStagingPush)
 	m.HandleFunc("DELETE /api/v1/sites/{id}/staging/{envId}", s.handleStagingDelete)
 
-	// Cloudflare
+	// Cloudflare — Global hesap yönetimi
+	m.HandleFunc("GET /api/v1/cloudflare/account", s.handleCFAccountGet)
+	m.HandleFunc("POST /api/v1/cloudflare/account", s.handleCFAccountSave)
+	m.HandleFunc("POST /api/v1/cloudflare/verify", s.handleCFVerifyToken)
+	m.HandleFunc("GET /api/v1/cloudflare/zones", s.handleCFListZones)
+
+	// Cloudflare — Site bazlı zone bağlaması
 	m.HandleFunc("GET /api/v1/sites/{id}/cloudflare", s.handleCloudflareGet)
 	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare", s.handleCloudflareSave)
+
+	// Cloudflare — DNS kayıtları
+	m.HandleFunc("GET /api/v1/sites/{id}/cloudflare/dns", s.handleCFDNSList)
+	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare/dns", s.handleCFDNSCreate)
+	m.HandleFunc("PATCH /api/v1/sites/{id}/cloudflare/dns/{recid}", s.handleCFDNSUpdate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/cloudflare/dns/{recid}", s.handleCFDNSDelete)
+
+	// Cloudflare — Zone ayarları
+	m.HandleFunc("GET /api/v1/sites/{id}/cloudflare/settings", s.handleCFSettingsGet)
+	m.HandleFunc("PATCH /api/v1/sites/{id}/cloudflare/settings/{key}", s.handleCFSettingUpdate)
+
+	// Cloudflare — Cache
 	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare/purge", s.handleCloudflarePurge)
+	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare/purge-urls", s.handleCFPurgeURLs)
+
+	// Cloudflare — Firewall kuralları
+	m.HandleFunc("GET /api/v1/sites/{id}/cloudflare/firewall", s.handleCFFirewallList)
+	m.HandleFunc("POST /api/v1/sites/{id}/cloudflare/firewall", s.handleCFFirewallCreate)
+	m.HandleFunc("DELETE /api/v1/sites/{id}/cloudflare/firewall/{ruleid}", s.handleCFFirewallDelete)
+
+	// Cloudflare — Analytics
+	m.HandleFunc("GET /api/v1/sites/{id}/cloudflare/analytics", s.handleCFAnalytics)
+
 
 	// Mail
 	m.HandleFunc("GET /api/v1/sites/{id}/mail", s.handleMailList)
