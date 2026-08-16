@@ -4,7 +4,7 @@
 
 AuraPanel is a modern hosting control panel purpose-built for [OpenLiteSpeed](https://openlitespeed.org/). It combines real per-site isolation, a hardened single-binary architecture, and a clean, professional web UI — designed specifically for Ubuntu 24.04 LTS servers.
 
-> ⚠️ **Status:** **Phase 3 Completed.** Active development continues. The installer goes live with the first tagged release (`v1.0.0`).
+> 🚀 **Status: Production Ready (Canlı Kullanıma Hazır).** AuraPanel v1.0 tamamlanmış, tüm güvenlik/izolasyon testlerinden geçmiş ve açık kaynak olarak kullanıma sunulmuştur. Kurulum adımları aşağıdadır.
 
 ## Why AuraPanel?
 
