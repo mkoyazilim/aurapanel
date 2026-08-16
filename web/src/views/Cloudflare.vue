@@ -136,7 +136,11 @@
         <!-- ── Zone Ayarları ── -->
         <div v-if="activeTab === 'settings'" class="card">
           <h2>⚙️ Zone Ayarları</h2>
-          <div v-if="!zoneSettings" class="muted">Yükleniyor…</div>
+          <div v-if="zoneSettings && zoneSettings.error" class="alert error">
+            <strong>Ayarlar Çekilemedi:</strong> {{ zoneSettings.error }} <br><br>
+            Not: Cloudflare API Token yetkileriniz arasında <b>"Zone Settings (Edit)"</b> izni eksik olabilir. Lütfen Cloudflare panelinizden API Token'ınızı düzenleyip bu yetkiyi eklediğinizden emin olun.
+          </div>
+          <div v-else-if="!zoneSettings" class="muted">Yükleniyor…</div>
           <div v-else style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div>
               <label>SSL Modu</label>
@@ -618,8 +622,10 @@ async function switchTab(tab) {
   try {
     if (tab === 'dns' && !dnsRecords.value.length)
       dnsRecords.value = await api(`/sites/${siteId.value}/cloudflare/dns`)
-    if (tab === 'settings' && !zoneSettings.value)
-      zoneSettings.value = await api(`/sites/${siteId.value}/cloudflare/settings`)
+    if (tab === 'settings' && !zoneSettings.value) {
+      try { zoneSettings.value = await api(`/sites/${siteId.value}/cloudflare/settings`) }
+      catch (err) { zoneSettings.value = { error: err.message } }
+    }
     if (tab === 'firewall' && !firewallRules.value.length)
       firewallRules.value = await api(`/sites/${siteId.value}/cloudflare/firewall`)
     if (tab === 'analytics')
