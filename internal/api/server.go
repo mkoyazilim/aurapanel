@@ -321,6 +321,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/v1/sites/{id}/mail", s.handleMailList)
 	m.HandleFunc("POST /api/v1/sites/{id}/mail", s.handleMailCreate)
 	m.HandleFunc("DELETE /api/v1/sites/{id}/mail/{email}", s.handleMailDelete)
+	m.HandleFunc("GET /api/v1/mail/status", s.handleMailStatus)
+	m.HandleFunc("POST /api/v1/mail/setup", s.handleMailSetup)
+	m.HandleFunc("POST /api/v1/sites/{id}/mail/dkim", s.handleMailDKIM)
+	m.HandleFunc("GET /api/v1/sites/{id}/mail/dkim", s.handleMailDKIMGet)
+	m.HandleFunc("PUT /api/v1/sites/{id}/mail/{email}/password", s.handleMailPasswordChange)
 
 	// Phase 3 (Cluster)
 	m.HandleFunc("GET /api/v1/servers", s.handlePhase3Servers)

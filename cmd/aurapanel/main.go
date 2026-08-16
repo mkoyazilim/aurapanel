@@ -290,6 +290,7 @@ func main() {
 	mailSvc := mail.NewService(mail.Dependencies{
 		Store: st,
 		Audit: au,
+		Priv:  privC,
 	})
 
 	// Güncelleme merkezi: manifest, ikili dağıtım reposundan (pinned).

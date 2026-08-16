@@ -5,7 +5,12 @@ package priv
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -48,9 +53,11 @@ var binPaths = map[string]string{
 	"logrotate": "/usr/sbin/logrotate",
 	"systemctl": "/usr/bin/systemctl",
 	"setquota":  "/usr/sbin/setquota",
-	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
-	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
 	"rsync":     "/usr/bin/rsync",
+	"postmap":   "/usr/sbin/postmap",
+	"postconf":  "/usr/sbin/postconf",
+	"dovecot":   "/usr/sbin/dovecot",
+	"opendkim":  "/usr/sbin/opendkim",
 }
 
 func bin(name string) (string, error) {
@@ -216,6 +223,9 @@ func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 		"firewall.rule_delete":      opFirewallRuleDelete,
 		"firewall.ssh_port":         opSSHPortChange,
 		"firewall.panel_port":       opPanelPortChange,
+		"mail.setup":                opMailSetup,
+		"mail.provision":            opMailProvision,
+		"mail.dkim_generate":        opMailDKIMGenerate,
 	}
 }
 
@@ -1314,4 +1324,344 @@ func opPanelPortChange(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error)
 	p.exec(systemctl, "restart", "aurapanel")
 
 	return p, map[string]any{"new_port": a.NewPort}, nil
+}
+
+// --- Mail operasyonları (Postfix + Dovecot + OpenDKIM) ---
+
+// reMailDomain: basit domain doğrulaması (RFC 952 alt kümesi).
+var reMailDomain = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,253}[a-z0-9])?$`)
+
+// reMailLocal: yerel kısım (@ öncesi).
+var reMailLocal = regexp.MustCompile(`^[a-z0-9][a-z0-9._+-]{0,63}$`)
+
+// opMailSetup: tek seferlik Postfix/Dovecot/OpenDKIM yapılandırması.
+// Args: {} (boş JSON).
+func opMailSetup(_ *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct{}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("mail.setup: %w", err)
+	}
+
+	// hostname oku (süreç içi)
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "localhost"
+	}
+
+	systemctl, _ := bin("systemctl")
+	chown, _ := bin("chown")
+
+	p := &plan{}
+
+	// --- /var/vmail ---
+	p.mkdirMode("/var/vmail", 0o755)
+	p.exec(chown, "5000:5000", "/var/vmail")
+
+	// --- Postfix ---
+	postfixMainCf := `# AuraPanel managed - virtual mailbox config
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_security_level = may
+smtp_tls_security_level = may
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+smtpd_recipient_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_unauth_destination
+virtual_mailbox_domains = /etc/postfix/virtual_domains
+virtual_mailbox_base = /var/vmail
+virtual_mailbox_maps = hash:/etc/postfix/virtual_mailboxes
+virtual_uid_maps = static:5000
+virtual_gid_maps = static:5000
+milter_protocol = 6
+milter_default_action = accept
+smtpd_milters = unix:/run/opendkim/opendkim.sock
+non_smtpd_milters = unix:/run/opendkim/opendkim.sock
+myhostname = ` + hostname + "\n"
+
+	p.write(fileWrite{path: "/etc/postfix/main.cf", content: postfixMainCf, mode: 0o644})
+	p.write(fileWrite{path: "/etc/postfix/virtual_domains", content: "", mode: 0o644})
+	p.write(fileWrite{path: "/etc/postfix/virtual_mailboxes", content: "", mode: 0o644})
+
+	// --- Dovecot ---
+	dovecotMailConf := `# AuraPanel managed
+mail_location = maildir:/var/vmail/%d/%n
+mail_uid = 5000
+mail_gid = 5000
+mail_privileged_group = mail
+first_valid_uid = 5000
+last_valid_uid = 5000
+`
+	dovecotAuthConf := `# AuraPanel managed
+disable_plaintext_auth = yes
+auth_mechanisms = plain login
+
+passdb {
+  driver = passwd-file
+  args = scheme=BLF-CRYPT username_format=%u /etc/dovecot/users
+}
+
+userdb {
+  driver = passwd-file
+  args = username_format=%u /etc/dovecot/users
+}
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+`
+	dovecotSSLConf := `# AuraPanel managed
+ssl = yes
+ssl_cert = </etc/ssl/certs/ssl-cert-snakeoil.pem
+ssl_key = </etc/ssl/private/ssl-cert-snakeoil.key
+ssl_min_protocol = TLSv1.2
+`
+	dovecotLMTPConf := `# AuraPanel managed
+protocol lmtp {
+  mail_plugins = $mail_plugins
+}
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+`
+
+	p.mkdir("/etc/dovecot/conf.d")
+	p.write(fileWrite{path: "/etc/dovecot/conf.d/10-mail.conf", content: dovecotMailConf, mode: 0o644})
+	p.write(fileWrite{path: "/etc/dovecot/conf.d/10-auth.conf", content: dovecotAuthConf, mode: 0o644})
+	p.write(fileWrite{path: "/etc/dovecot/conf.d/10-ssl.conf", content: dovecotSSLConf, mode: 0o644})
+	p.write(fileWrite{path: "/etc/dovecot/conf.d/20-lmtp.conf", content: dovecotLMTPConf, mode: 0o644})
+	p.write(fileWrite{path: "/etc/dovecot/users", content: "", mode: 0o640})
+
+	// --- OpenDKIM ---
+	opendkimConf := `# AuraPanel managed
+Syslog          yes
+SyslogSuccess   yes
+LogWhy          yes
+Canonicalization relaxed/simple
+Mode            sv
+SubDomains      no
+AutoRestart     yes
+AutoRestartRate 10/1M
+Background      yes
+DNSTimeout      5
+SignatureAlgorithm rsa-sha256
+
+KeyTable        /etc/opendkim/KeyTable
+SigningTable    refile:/etc/opendkim/SigningTable
+ExternalIgnoreList /etc/opendkim/TrustedHosts
+InternalHosts   /etc/opendkim/TrustedHosts
+
+OversignHeaders From
+Socket          local:/run/opendkim/opendkim.sock
+PidFile         /run/opendkim/opendkim.pid
+UMask           007
+UserID          opendkim
+`
+
+	p.mkdir("/etc/opendkim")
+	p.mkdir("/etc/opendkim/keys")
+	p.write(fileWrite{path: "/etc/opendkim.conf", content: opendkimConf, mode: 0o644})
+	p.write(fileWrite{path: "/etc/opendkim/KeyTable", content: "", mode: 0o644})
+	p.write(fileWrite{path: "/etc/opendkim/SigningTable", content: "", mode: 0o644})
+	p.write(fileWrite{path: "/etc/opendkim/TrustedHosts", content: "127.0.0.1\nlocalhost\n", mode: 0o644})
+
+	// --- Servisleri etkinleştir ---
+	p.exec(systemctl, "enable", "--now", "postfix")
+	p.exec(systemctl, "enable", "--now", "dovecot")
+	p.exec(systemctl, "enable", "--now", "opendkim")
+
+	return p, map[string]any{"hostname": hostname}, nil
+}
+
+// opMailProvision: sanal haritaları ve dovecot kullanıcılarını yeniden üretir.
+func opMailProvision(_ *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Domains  []string `json:"domains"`
+		Accounts []struct {
+			Email        string `json:"email"`
+			PasswordHash string `json:"password_hash"`
+			QuotaMB      int    `json:"quota_mb"`
+			Domain       string `json:"domain"`
+		} `json:"accounts"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("mail.provision: %w", err)
+	}
+
+	// Doğrulama
+	for _, d := range a.Domains {
+		if !reMailDomain.MatchString(d) {
+			return nil, nil, fmt.Errorf("mail.provision: geçersiz domain: %q", d)
+		}
+	}
+
+	domainSet := make(map[string]struct{}, len(a.Domains))
+	for _, d := range a.Domains {
+		domainSet[d] = struct{}{}
+	}
+
+	for _, acc := range a.Accounts {
+		parts := strings.SplitN(acc.Email, "@", 2)
+		if len(parts) != 2 {
+			return nil, nil, fmt.Errorf("mail.provision: geçersiz e-posta: %q", acc.Email)
+		}
+		local, domain := parts[0], parts[1]
+		if !reMailLocal.MatchString(local) {
+			return nil, nil, fmt.Errorf("mail.provision: geçersiz yerel kısım: %q", local)
+		}
+		if !reMailDomain.MatchString(domain) {
+			return nil, nil, fmt.Errorf("mail.provision: geçersiz domain: %q", domain)
+		}
+		if _, ok := domainSet[domain]; !ok {
+			return nil, nil, fmt.Errorf("mail.provision: hesap domain'i listede yok: %q", domain)
+		}
+		if acc.Domain != domain {
+			return nil, nil, fmt.Errorf("mail.provision: domain alanı uyumsuz: %q != %q", acc.Domain, domain)
+		}
+		if acc.PasswordHash == "" {
+			return nil, nil, fmt.Errorf("mail.provision: boş parola hash'i: %q", acc.Email)
+		}
+		if acc.QuotaMB < 0 {
+			return nil, nil, fmt.Errorf("mail.provision: geçersiz kota: %d", acc.QuotaMB)
+		}
+	}
+
+	postmap, _ := bin("postmap")
+	systemctl, _ := bin("systemctl")
+	chown, _ := bin("chown")
+
+	p := &plan{}
+
+	// 1. virtual_domains
+	var domBuf strings.Builder
+	for _, d := range a.Domains {
+		domBuf.WriteString(d)
+		domBuf.WriteByte('\n')
+	}
+	p.write(fileWrite{path: "/etc/postfix/virtual_domains", content: domBuf.String(), mode: 0o644})
+
+	// 2. virtual_mailboxes
+	var mboxBuf strings.Builder
+	for _, acc := range a.Accounts {
+		parts := strings.SplitN(acc.Email, "@", 2)
+		local, domain := parts[0], parts[1]
+		fmt.Fprintf(&mboxBuf, "%s\t%s/%s/\n", acc.Email, domain, local)
+	}
+	p.write(fileWrite{path: "/etc/postfix/virtual_mailboxes", content: mboxBuf.String(), mode: 0o644})
+
+	// 3. postmap
+	p.exec(postmap, "/etc/postfix/virtual_mailboxes")
+
+	// 4. dovecot users
+	var usersBuf strings.Builder
+	for _, acc := range a.Accounts {
+		parts := strings.SplitN(acc.Email, "@", 2)
+		local, domain := parts[0], parts[1]
+		quotaRule := ""
+		if acc.QuotaMB > 0 {
+			quotaRule = fmt.Sprintf("userdb_quota_rule=*:storage=%dM", acc.QuotaMB)
+		}
+		fmt.Fprintf(&usersBuf, "%s:{BLF-CRYPT}%s:5000:5000::/var/vmail/%s/%s::%s\n",
+			acc.Email, acc.PasswordHash, domain, local, quotaRule)
+	}
+	p.write(fileWrite{path: "/etc/dovecot/users", content: usersBuf.String(), mode: 0o640})
+
+	// 5. maildir dizinlerini oluştur
+	for _, acc := range a.Accounts {
+		parts := strings.SplitN(acc.Email, "@", 2)
+		local, domain := parts[0], parts[1]
+		maildir := fmt.Sprintf("/var/vmail/%s/%s", domain, local)
+		p.mkdirMode(maildir, 0o700)
+		p.exec(chown, "5000:5000", maildir)
+	}
+	// domain dizinlerinin sahipliği
+	for _, d := range a.Domains {
+		domDir := "/var/vmail/" + d
+		p.mkdirMode(domDir, 0o755)
+		p.exec(chown, "5000:5000", domDir)
+	}
+
+	// 6-7. servisleri yeniden yükle
+	p.exec(systemctl, "reload", "postfix")
+	p.exec(systemctl, "reload", "dovecot")
+
+	return p, map[string]any{"domains": len(a.Domains), "accounts": len(a.Accounts)}, nil
+}
+
+// opMailDKIMGenerate: domain için DKIM anahtar çifti üretir (Go crypto, dış binary yok).
+// KeyTable/SigningTable/TrustedHosts dosyaları süreç içi okunup güncellenir.
+func opMailDKIMGenerate(_ *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
+	var a struct {
+		Domain string `json:"domain"`
+	}
+	if err := strictDecode(raw, &a); err != nil {
+		return nil, nil, fmt.Errorf("mail.dkim_generate: %w", err)
+	}
+	if !reMailDomain.MatchString(a.Domain) {
+		return nil, nil, fmt.Errorf("mail.dkim_generate: geçersiz domain: %q", a.Domain)
+	}
+
+	// RSA 2048-bit anahtar çifti üret (süreç içi)
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, fmt.Errorf("mail.dkim_generate: anahtar üretme hatası: %w", err)
+	}
+
+	privPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+	})
+
+	pubDER, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("mail.dkim_generate: public key marshal hatası: %w", err)
+	}
+	pubB64 := base64.StdEncoding.EncodeToString(pubDER)
+
+	chown, _ := bin("chown")
+	systemctl, _ := bin("systemctl")
+
+	keyDir := "/etc/opendkim/keys/" + a.Domain
+
+	// Mevcut tablo dosyalarını oku (süreç içi) ve yeni satırları ekle
+	keyTableLine := fmt.Sprintf("mail._domainkey.%s %s:mail:%s/mail.private\n",
+		a.Domain, a.Domain, keyDir)
+	signingTableLine := fmt.Sprintf("*@%s mail._domainkey.%s\n", a.Domain, a.Domain)
+	trustedLine := a.Domain + "\n"
+
+	keyTable, _ := os.ReadFile("/etc/opendkim/KeyTable")
+	signingTable, _ := os.ReadFile("/etc/opendkim/SigningTable")
+	trustedHosts, _ := os.ReadFile("/etc/opendkim/TrustedHosts")
+
+	newKeyTable := string(keyTable) + keyTableLine
+	newSigningTable := string(signingTable) + signingTableLine
+	newTrustedHosts := string(trustedHosts)
+	if !strings.Contains(newTrustedHosts, trustedLine) {
+		newTrustedHosts += trustedLine
+	}
+
+	p := &plan{}
+
+	// Anahtar dizini ve dosyaları
+	p.mkdirMode(keyDir, 0o700)
+	p.write(fileWrite{path: keyDir + "/mail.private", content: string(privPEM), mode: 0o600})
+	p.exec(chown, "-R", "opendkim:opendkim", keyDir)
+
+	// Tablo dosyalarını güncelle
+	p.write(fileWrite{path: "/etc/opendkim/KeyTable", content: newKeyTable, mode: 0o644})
+	p.write(fileWrite{path: "/etc/opendkim/SigningTable", content: newSigningTable, mode: 0o644})
+	p.write(fileWrite{path: "/etc/opendkim/TrustedHosts", content: newTrustedHosts, mode: 0o644})
+
+	// opendkim yeniden yükle
+	p.exec(systemctl, "restart", "opendkim")
+
+	return p, map[string]any{"public_key": pubB64, "domain": a.Domain}, nil
 }

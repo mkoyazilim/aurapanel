@@ -52,7 +52,7 @@ log "Paketler kuruluyor…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq curl ca-certificates quota openssh-server nftables fail2ban \
-  mariadb-server logrotate cron 2>&1 | tail -2
+  mariadb-server logrotate cron postfix dovecot-imapd dovecot-lmtpd opendkim opendkim-tools 2>&1 | tail -2
 
 # --- 2) OpenLiteSpeed (pinned .deb, değiştirilmeden) ---
 if [[ $SKIP_OLS -eq 0 ]]; then
@@ -98,6 +98,26 @@ log "Kullanıcı ve dizinler…"
 id -u aurapanel >/dev/null 2>&1 || useradd --system --home /var/lib/aurapanel --shell /usr/sbin/nologin aurapanel
 install -d -o aurapanel -g aurapanel -m 750 /var/lib/aurapanel /var/lib/aurapanel/keys /var/lib/aurapanel/state /var/lib/aurapanel/state/certs /var/lib/aurapanel/uploads /var/lib/aurapanel/trash
 install -d -o aurapanel -g aurapanel -m 755 /srv/aurapanel /srv/aurapanel/sites /srv/aurapanel/backups
+
+# --- 3.1) Mail sistemi: vmail kullanıcı ve dizinler ---
+log "Mail sistemi hazırlanıyor (vmail)…"
+groupadd -g 5000 vmail 2>/dev/null || true
+id -u vmail >/dev/null 2>&1 || useradd -u 5000 -g 5000 -s /usr/sbin/nologin -d /var/vmail -m vmail
+install -d -o vmail -g vmail -m 700 /var/vmail
+install -d -m 750 /etc/opendkim /etc/opendkim/keys
+chown opendkim:opendkim /etc/opendkim/keys
+usermod -aG opendkim postfix 2>/dev/null || true
+
+# --- 3.2) SnappyMail (webmail) ---
+SNAPPY_DIR="/usr/local/lsws/Example/html/snappymail"
+if [[ ! -d "$SNAPPY_DIR" ]]; then
+  log "SnappyMail kuruluyor…"
+  SNAPPY_VER="2.38.2"
+  SNAPPY_URL="https://github.com/the-djmaze/snappymail/releases/download/v${SNAPPY_VER}/snappymail-${SNAPPY_VER}.tar.gz"
+  mkdir -p "$SNAPPY_DIR"
+  curl -fsSL "$SNAPPY_URL" | tar -xz -C "$SNAPPY_DIR" 2>/dev/null || log "UYARI: SnappyMail indirilemedi, webmail manuel kurulabilir."
+  chown -R nobody:nogroup "$SNAPPY_DIR" 2>/dev/null || true
+fi
 install -d -m 750 /run/aurapanel && chown root:aurapanel /run/aurapanel
 install -d -m 750 /var/log/aurapanel && chown root:aurapanel /var/log/aurapanel
 # /run tmpfs'tir: reboot'ta silinir. tmpfiles.d, priv socket dizinini her açılışta
@@ -247,8 +267,13 @@ table inet aurapanel {
     ct state established,related accept
     iif lo accept
     tcp dport 22 accept
+    tcp dport 25 accept
     tcp dport 80 accept
     tcp dport 443 accept
+    tcp dport 465 accept
+    tcp dport 587 accept
+    tcp dport 993 accept
+    tcp dport 995 accept
     ip protocol icmp accept
     ip6 nexthdr icmpv6 accept
     ${PANEL_RULE}
@@ -266,6 +291,12 @@ apt-mark hold mariadb-server 2>/dev/null || true
 dpkg -l | awk '/openlitespeed|lsphp/ {print $2}' | xargs -r apt-mark hold 2>/dev/null || true
 
 systemctl enable --now mariadb >/dev/null 2>&1 || true
+
+# --- 10.1) Mail servisleri etkinleştirme ---
+log "Mail servisleri başlatılıyor…"
+systemctl enable --now postfix >/dev/null 2>&1 || true
+systemctl enable --now dovecot >/dev/null 2>&1 || true
+systemctl enable --now opendkim >/dev/null 2>&1 || true
 
 # --- 10.5) OLS VirtualHost Include Hook ---
 if [[ -f /usr/local/lsws/conf/httpd_config.conf ]]; then
