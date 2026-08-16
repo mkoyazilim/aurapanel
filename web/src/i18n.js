@@ -498,6 +498,7 @@ const messages = {
     menu: {
       server: 'Sunucu',
       backups: 'Yedekler',
+      cloudflare: 'Cloudflare',
       cluster: 'Küme Yönetimi',
       cluster_dashboard: 'Küme Panosu',
       cron: 'Cron Yönetimi',
@@ -1438,6 +1439,7 @@ const messages = {
     menu: {
       server: 'Server',
       backups: 'Backups',
+      cloudflare: 'Cloudflare',
       cluster: 'Cluster',
       cluster_dashboard: 'Cluster Dashboard',
       cron: 'Cron Jobs',

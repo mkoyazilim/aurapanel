@@ -13,6 +13,7 @@ const routes = [
   { path: '/security', component: () => import('./views/Security.vue') },
   { path: '/logs', component: () => import('./views/Logs.vue') },
   { path: '/backups', component: () => import('./views/Backups.vue') },
+  { path: '/cloudflare', component: () => import('./views/Cloudflare.vue') },
   { path: '/drift', component: () => import('./views/Drift.vue') },
   { path: '/settings', component: () => import('./views/Settings.vue') },
   { path: '/server/dashboard', component: () => import('./views/ServerDashboard.vue') },
