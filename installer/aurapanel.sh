@@ -40,8 +40,8 @@ done
 
 if [[ $EUID -ne 0 ]]; then echo "root olarak çalıştırın (sudo)." >&2; exit 1; fi
 
-if ! grep -q "Ubuntu" /etc/os-release 2>/dev/null; then
-  echo "UYARI: Ubuntu bekleniyor (hedef: 24.04 LTS)." >&2
+if ! grep -Eq "Ubuntu|Debian" /etc/os-release 2>/dev/null; then
+  echo "UYARI: Ubuntu veya Debian tabanlı bir işletim sistemi bekleniyor (Önerilen: Ubuntu 24.04 veya Debian 12)." >&2
 fi
 
 log() { echo "[aurapanel] $*"; }
