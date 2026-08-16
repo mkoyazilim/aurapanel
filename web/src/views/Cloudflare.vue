@@ -528,7 +528,7 @@ async function executeImport() {
         app_type: importModal.value.app_type,
         php_version: importModal.value.php_version,
         node_version: importModal.value.node_version,
-        limits: { disk_mb: 1024, bandwidth_gb: 100, inodes: 50000, process_limit: 50, memory_limit_mb: 256, cpu_cores: 1 }
+        limits: { disk_mb: 5120, inodes: 100000, pids_max: 100, memory_max: 1073741824, memory_high: 858993459, cpu_max: "max" }
       }
     })
     
