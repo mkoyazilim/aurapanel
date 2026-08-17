@@ -28,6 +28,10 @@
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" /></svg>
         </button>
         <div class="spacer"></div>
+        <a :href="`https://${hostname}:7080`" target="_blank" class="btn btn-sm" style="margin-right: 12px; display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.05); color: inherit; text-decoration: none; font-weight: 500;" title="OLS WebAdmin Paneline Git">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+          OLS Panel
+        </a>
         <select v-model="locale" @change="changeLang" class="lang-select">
           <option value="tr">🇹🇷 TR</option>
           <option value="en">🇬🇧 EN</option>
@@ -50,6 +54,7 @@ const auth = useAuth()
 const router = useRouter()
 const { locale, t } = useI18n()
 const hostAddress = window.location.host
+const hostname = window.location.hostname
 
 function changeLang(e) {
   localStorage.setItem('ap_lang', e.target.value)

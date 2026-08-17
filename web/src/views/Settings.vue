@@ -12,6 +12,21 @@
       <div class="settings-grid">
         <!-- Sol Sütun: Güvenlik & Hesap -->
         <div class="settings-col">
+          <!-- Kullanıcı Adı Değiştir -->
+          <div class="card">
+            <h2>👤 Kullanıcı Adı Değiştir</h2>
+            <p class="muted text-sm" style="margin-bottom: 12px">Mevcut kullanıcı adınız: <strong>{{ me.username }}</strong></p>
+            <div style="margin-top: 10px">
+              <label>{{ $t('settings.current_pw') }}</label>
+              <input v-model="unPw" type="password" placeholder="Mevcut Şifreniz" />
+            </div>
+            <div style="margin-top: 10px">
+              <label>Yeni Kullanıcı Adı</label>
+              <input v-model="newUsername" type="text" placeholder="Yeni Kullanıcı Adı" />
+            </div>
+            <button class="btn primary" style="margin-top: 14px" @click="changeUsername">{{ $t('settings.change') }}</button>
+          </div>
+
           <!-- Şifre Değiştir -->
           <div class="card">
             <h2>🔑 {{ $t('settings.change_password') }}</h2>
@@ -218,6 +233,8 @@ const auth = useAuth()
 const me = ref({})
 const oldPw = ref('')
 const newPw = ref('')
+const unPw = ref('')
+const newUsername = ref('')
 const mfaSecret = ref('')
 const mfaUrl = ref('')
 const mfaCode = ref('')
@@ -230,6 +247,24 @@ const notice = ref('')
 const captchaProvider = ref('')
 const captchaSiteKey = ref('')
 const captchaSecret = ref('')
+
+async function changeUsername() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await api('/auth/change-username', {
+      method: 'POST',
+      body: { password: unPw.value, new_username: newUsername.value },
+    })
+    notice.value = 'Kullanıcı adı başarıyla değiştirildi.'
+    unPw.value = ''
+    newUsername.value = ''
+    me.value = await api('/auth/me')
+    await auth.me()
+  } catch (e) {
+    error.value = e.message
+  }
+}
 
 async function changePw() {
   error.value = ''

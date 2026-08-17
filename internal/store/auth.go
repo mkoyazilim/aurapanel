@@ -139,6 +139,16 @@ func (s *Store) UpdateUserPassword(ctx context.Context, id int64, passwordHash s
 	return nil
 }
 
+// UpdateUserUsername, kullanıcının kullanıcı adını günceller.
+func (s *Store) UpdateUserUsername(ctx context.Context, id int64, username string) error {
+	if _, err := s.db.ExecContext(ctx, `UPDATE users SET username = ?,
+		updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`,
+		username, id); err != nil {
+		return fmt.Errorf("user username update: %w", err)
+	}
+	return nil
+}
+
 // SetUserTOTPSecret, TOTP sırrını (encrypted-at-rest) kaydeder.
 func (s *Store) SetUserTOTPSecret(ctx context.Context, id int64, secretEnc string) error {
 	if _, err := s.db.ExecContext(ctx, `UPDATE users SET totp_secret_enc = ?,

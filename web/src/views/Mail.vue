@@ -226,9 +226,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 import Layout from '../components/Layout.vue'
 import { api } from '../api'
+
+const { t } = useI18n()
 
 // ── Durum ──────────────────────────────────────────────────────────────────────
 const notice = ref('')
@@ -280,10 +281,7 @@ const passwordForm = ref({
 })
 
 // {{ $t('mail.tab_webmail') }}
-const webmailURL = computed(() => {
-  const host = window.location.hostname
-  return `https://${host}:8080/snappymail/`
-})
+const webmailURL = computed(() => '/snappymail/')
 
 // ── Yardımcılar ────────────────────────────────────────────────────────────────
 

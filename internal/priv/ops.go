@@ -58,6 +58,8 @@ var binPaths = map[string]string{
 	"postconf":  "/usr/sbin/postconf",
 	"dovecot":   "/usr/sbin/dovecot",
 	"opendkim":  "/usr/sbin/opendkim",
+	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
+	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
 }
 
 func bin(name string) (string, error) {

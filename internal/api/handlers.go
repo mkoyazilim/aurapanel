@@ -194,6 +194,51 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (s *Server) handleChangeUsername(w http.ResponseWriter, r *http.Request) {
+	u, ok := userFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "kimlik doğrulaması yok")
+		return
+	}
+	var req struct {
+		Password    string `json:"password"`
+		NewUsername string `json:"new_username"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.NewUsername == "" || len(req.NewUsername) > 32 {
+		writeErr(w, http.StatusBadRequest, "geçersiz yeni kullanıcı adı")
+		return
+	}
+	okOld, _ := auth.VerifyPassword(req.Password, u.PasswordHash)
+	if !okOld {
+		writeErr(w, http.StatusUnauthorized, "mevcut şifre hatalı")
+		return
+	}
+	if err := s.deps.Store.UpdateUserUsername(r.Context(), u.ID, req.NewUsername); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.deps.Audit.Write(r.Context(), audit.Event{Action: "auth.username_change", Target: req.NewUsername, Result: "success"})
+
+	// OLS WebAdmin'e yeni kullanıcı adı ve mevcut şifre ile senkronla
+	if s.deps.Priv != nil {
+		if _, err := s.deps.Priv.Call(r.Context(), "ols.webadmin_credentials", map[string]any{
+			"username": req.NewUsername,
+			"password": req.Password,
+		}); err != nil {
+			s.deps.Log.Warn("OLS WebAdmin senkronu başarısız", "error", err)
+			s.deps.Audit.Write(r.Context(), audit.Event{Action: "ols.webadmin_sync",
+				Target: req.NewUsername, Result: "failed", Extra: map[string]any{"error": err.Error()}})
+		} else {
+			s.deps.Audit.Write(r.Context(), audit.Event{Action: "ols.webadmin_sync",
+				Target: req.NewUsername, Result: "success"})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func (s *Server) handleMFAStart(w http.ResponseWriter, r *http.Request) {
 	u, ok := userFromCtx(r.Context())
 	if !ok {

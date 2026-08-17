@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"github.com/mkoyazilim/aurapanel/internal/audit"
@@ -119,11 +121,19 @@ func (s *Server) routes() {
 		m.Handle("GET /", s.deps.Web)
 	}
 
+	// SnappyMail OLS (8088) Proxy
+	if snappyURL, err := url.Parse("http://127.0.0.1:8088"); err == nil {
+		proxy := httputil.NewSingleHostReverseProxy(snappyURL)
+		m.Handle("GET /snappymail/", proxy)
+		m.Handle("POST /snappymail/", proxy)
+	}
+
 	// Auth (login public; diğerleri oturumlu).
 	m.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
 	m.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
 	m.HandleFunc("GET /api/v1/auth/me", s.handleMe)
 	m.HandleFunc("POST /api/v1/auth/change-password", s.handleChangePassword)
+	m.HandleFunc("POST /api/v1/auth/change-username", s.handleChangeUsername)
 	m.HandleFunc("GET /api/v1/auth/mfa/start", s.handleMFAStart)
 	m.HandleFunc("POST /api/v1/auth/mfa/enable", s.handleMFAEnable)
 	m.HandleFunc("POST /api/v1/auth/mfa/disable", s.handleMFADisable)

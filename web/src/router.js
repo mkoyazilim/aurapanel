@@ -23,6 +23,7 @@ const routes = [
   { path: '/sites/:id/staging', component: () => import('./views/Staging.vue') },
   { path: '/sites/:id/cloudflare', component: () => import('./views/Cloudflare.vue') },
   { path: '/sites/:id/mail', component: () => import('./views/Mail.vue') },
+  { path: '/mail', component: () => import('./views/Mail.vue') },
   { path: '/users', component: () => import('./views/Users.vue') },
   { path: '/cluster', component: () => import('./views/Servers.vue') },
   { path: '/cluster/dashboard', component: () => import('./views/ClusterDashboard.vue') },
