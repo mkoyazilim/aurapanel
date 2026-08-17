@@ -135,9 +135,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFromCtx(r.Context())
 	role, _ := s.deps.Store.GetRoleName(r.Context(), u.RoleID)
+	olsURL, _, _ := s.deps.Store.GetSetting(r.Context(), "ols_url")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": u.ID, "username": u.Username, "role": role,
 		"must_change_password": u.MustChangePassword, "totp_enabled": u.TOTPEnabled,
+		"ols_url": olsURL,
 	})
 }
 
@@ -1231,6 +1233,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		"backup_global_time":      get("backup_global_time"),
 		"backup_global_frequency": get("backup_global_frequency"),
 		"backup_global_kind":      get("backup_global_kind"),
+		"ols_url":                 get("ols_url"),
 	})
 }
 

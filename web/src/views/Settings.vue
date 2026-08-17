@@ -92,6 +92,18 @@
             </template>
             <button class="btn primary" style="margin-top: 14px" @click="saveCaptchaSettings">{{ $t('settings.save_settings') }}</button>
           </div>
+
+          <!-- OLS / Diğer Ayarlar -->
+          <div class="card">
+            <h2>⚡ OLS Panel Ayarları</h2>
+            <p class="muted text-sm" style="margin-bottom: 12px">Sağ üstteki butonun OLS WebAdmin'i açacağı adresi özelleştirin.</p>
+            <div style="margin-top: 10px">
+              <label>Özel OLS URL (Port dahil)</label>
+              <input v-model="olsUrl" placeholder="Örn: https://127.0.0.1:17080" />
+              <small class="muted" style="display: block; margin-top: 2px">Boş bırakılırsa varsayılan port (7080) kullanılır.</small>
+            </div>
+            <button class="btn primary" style="margin-top: 14px" @click="saveOlsSettings">Kaydet</button>
+          </div>
         </div>
 
         <!-- Sağ Sütun: Uzak Depolama & API -->
@@ -246,6 +258,25 @@ const notice = ref('')
 
 const captchaProvider = ref('')
 const captchaSiteKey = ref('')
+const olsUrl = ref('')
+
+async function saveOlsSettings() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await api('/settings', {
+      method: 'POST',
+      body: {
+        ols_url: olsUrl.value,
+      },
+    })
+    notice.value = 'OLS ayarları kaydedildi.'
+    await auth.me()
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
 const captchaSecret = ref('')
 
 async function changeUsername() {
@@ -472,6 +503,7 @@ onMounted(async () => {
     const s = await api('/settings')
     captchaProvider.value = s.captcha_provider || ''
     captchaSiteKey.value = s.captcha_sitekey || ''
+    olsUrl.value = s.ols_url || ''
     captchaSecret.value = s.captcha_secret || ''
   } catch (e) {
     console.error('Settings read error', e)
