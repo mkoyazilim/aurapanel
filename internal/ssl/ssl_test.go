@@ -219,12 +219,15 @@ func TestEnableLetsEncryptHappy(t *testing.T) {
 	if rec == nil || rec.Issuer != "letsencrypt" {
 		t.Fatalf("cert kaydı hatalı: %+v", rec)
 	}
-	// Vhost SSL bloğu ile uygulandı.
+	// Vhost SSL bloğu + http→https yönlendirmesiyle uygulandı.
 	if len(fv.applied) != 1 || fv.applied[0].SSL == nil {
 		t.Fatalf("vhost SSL'siz uygulandı: %+v", fv.applied)
 	}
 	if fv.applied[0].SSL.CertPath != certsRoot+"/example.com/fullchain.pem" {
 		t.Fatalf("cert yolu hatalı: %s", fv.applied[0].SSL.CertPath)
+	}
+	if !fv.applied[0].TLSRedirect {
+		t.Fatal("SSL açıkken TLSRedirect kapalı — http→https yönlendirmesi üretilmez")
 	}
 }
 

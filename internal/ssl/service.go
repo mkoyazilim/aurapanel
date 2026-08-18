@@ -342,6 +342,9 @@ func (s *Service) buildVhost(ctx context.Context, st *store.Site) (ols.Vhost, er
 			CertPath: certPath(s.certsRoot, mainDomain),
 			KeyPath:  keyPath(s.certsRoot, mainDomain),
 		}
+		// SSL açıkken http→https yönlendirmesi zorunlu (şablon, ACME
+		// challenge yolunu muaf tutar — yenileme kesilmez).
+		v.TLSRedirect = true
 	}
 	return v, nil
 }
@@ -374,5 +377,5 @@ func (s *Service) requireSite(ctx context.Context, siteID string) (*store.Site, 
 func certPath(certsRoot, domain string) string { return certsRoot + "/" + domain + "/fullchain.pem" }
 func keyPath(certsRoot, domain string) string  { return certsRoot + "/" + domain + "/privkey.pem" }
 
-func nullInt64(v int64) sql.NullInt64     { return sql.NullInt64{Int64: v, Valid: true} }
-func nullString(v string) sql.NullString  { return sql.NullString{String: v, Valid: true} }
+func nullInt64(v int64) sql.NullInt64    { return sql.NullInt64{Int64: v, Valid: true} }
+func nullString(v string) sql.NullString { return sql.NullString{String: v, Valid: true} }
