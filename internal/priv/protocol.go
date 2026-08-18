@@ -8,8 +8,9 @@ import (
 	"io"
 )
 
-// maxRequestSize, tek isteğin üst sınırı (64 KiB). Daha büyük girdiler reddedilir.
-const maxRequestSize = 64 << 10
+// maxRequestSize, tek isteğin üst sınırı: en büyük file.op write isteğini
+// (16 MiB içerik, base64 ≈ 22.4 MB) karşılayacak kadar geniş.
+const maxRequestSize = 24 << 20
 
 // Request, helper'a gönderilen tek satırlık JSON istek.
 type Request struct {

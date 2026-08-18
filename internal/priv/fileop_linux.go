@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -42,8 +43,15 @@ func runFileOp(ctx context.Context, raw json.RawMessage) (map[string]any, error)
 	if err != nil {
 		return nil, err
 	}
-	// Worker modu ENV ile tetiklenir — argv[0] fiildir.
+	// Worker modu ENV ile tetiklenir — argv[0] fiildir. read parçalı akış
+	// için offset/limit'i, write ekleme için offset'i konum argümanı taşır.
 	argv := append([]string{args.Verb, args.Site}, args.Paths...)
+	if args.Verb == "read" || args.Verb == "write" {
+		argv = append(argv, strconv.FormatInt(args.Offset, 10))
+	}
+	if args.Verb == "read" {
+		argv = append(argv, strconv.FormatInt(args.Limit, 10))
+	}
 	cmd := exec.CommandContext(ctx, self, argv...)
 	cmd.Env = append(os.Environ(), "AURAPANEL_FILE_WORKER=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -112,9 +120,20 @@ func fileWorkerMain(argv []string) int {
 	case "list":
 		data, err = worker.doList(siteID, paths[0])
 	case "read":
-		data, err = worker.doRead(siteID, paths[0])
+		var off, lim int64
+		if len(paths) > 1 {
+			off, _ = strconv.ParseInt(paths[1], 10, 64)
+		}
+		if len(paths) > 2 {
+			lim, _ = strconv.ParseInt(paths[2], 10, 64)
+		}
+		data, err = worker.doRead(siteID, paths[0], off, lim)
 	case "write":
-		data, err = worker.doWrite(siteID, paths[0])
+		var off int64
+		if len(paths) > 1 {
+			off, _ = strconv.ParseInt(paths[1], 10, 64)
+		}
+		data, err = worker.doWrite(siteID, paths[0], off)
 	case "mkdir":
 		data, err = worker.doMkdir(siteID, paths[0])
 	case "rename":
@@ -239,22 +258,33 @@ func (w *fileWorker) doList(siteID, rel string) (map[string]any, error) {
 	return map[string]any{"entries": out}, nil
 }
 
-func (w *fileWorker) doRead(siteID, rel string) (map[string]any, error) {
+func (w *fileWorker) doRead(siteID, rel string, offset, limit int64) (map[string]any, error) {
 	abs, err := w.resolveRel(siteID, rel)
 	if err != nil {
 		return nil, err
 	}
-	b, err := os.ReadFile(abs)
+	f, err := os.Open(abs)
 	if err != nil {
 		return nil, err
 	}
-	if len(b) > fileOpContentLimit {
-		return nil, fmt.Errorf("dosya sınırı aşıldı (%d bayt)", fileOpContentLimit)
+	defer f.Close()
+	if offset > 0 {
+		if _, err := f.Seek(offset, io.SeekStart); err != nil {
+			return nil, err
+		}
 	}
+	if limit <= 0 || limit > fileOpContentLimit {
+		limit = fileOpContentLimit
+	}
+	b, err := io.ReadAll(io.LimitReader(f, limit))
+	if err != nil {
+		return nil, err
+	}
+	// Boş parça = dosya sonu (akış okuyucusu EOF olarak yorumlar).
 	return map[string]any{"content_b64": b64Encode(b)}, nil
 }
 
-func (w *fileWorker) doWrite(siteID, rel string) (map[string]any, error) {
+func (w *fileWorker) doWrite(siteID, rel string, offset int64) (map[string]any, error) {
 	abs, err := w.resolveRel(siteID, rel)
 	if err != nil {
 		return nil, err
@@ -262,6 +292,21 @@ func (w *fileWorker) doWrite(siteID, rel string) (map[string]any, error) {
 	b, err := ioReadAllLimit(os.Stdin, fileOpContentLimit)
 	if err != nil {
 		return nil, err
+	}
+	if offset > 0 {
+		// Ekleme modu (parçalı yükleme): mevcut dosyaya offset'ten yaz.
+		f, err := os.OpenFile(abs, os.O_WRONLY, 0)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		if _, err := f.Seek(offset, io.SeekStart); err != nil {
+			return nil, err
+		}
+		if _, err := f.Write(b); err != nil {
+			return nil, err
+		}
+		return map[string]any{"size": len(b)}, nil
 	}
 	if err := atomicWrite(abs, b, 0o644); err != nil {
 		return nil, err

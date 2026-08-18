@@ -61,6 +61,7 @@
               <td class="mono">{{ s.linux_user }}</td>
               <td><span class="badge" :class="s.status === 'active' ? 'ok' : 'warn'">{{ s.status }}</span></td>
               <td style="text-align: right; position: relative; display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-sm" @click="openBackupModal(s)">🗄️ {{ $t('sites.dropdown_backup') }}</button>
                 <router-link :to="'/sites/' + s.id + '/dashboard'" class="btn btn-sm primary">Yönet ➡</router-link>
                 <div class="action-dropdown" @click.stop>
                   <button class="btn btn-sm action-btn" @click="toggleDropdown(s.id)">
@@ -69,6 +70,9 @@
                   <div class="dropdown-menu" v-if="activeDropdown === s.id">
                     <button class="dropdown-item" @click="openWpModal(s); activeDropdown = null">
                       <span>⚡</span> {{ $t('sites.install_wp') }}
+                    </button>
+                    <button class="dropdown-item" @click="openBackupModal(s); activeDropdown = null">
+                      <span>🗄️</span> {{ $t('sites.dropdown_backup') }}
                     </button>
                     <router-link :to="'/sites/' + s.id + '/git'" class="dropdown-item">
                       <span>🐙</span> {{ $t('sites.dropdown_git') }}
@@ -155,6 +159,13 @@
           </template>
         </div>
       </div>
+
+      <!-- Site Yedekleme Modal -->
+      <BackupModal
+        v-if="backupModal.open"
+        :site="backupModal.site"
+        @close="backupModal.open = false"
+      />
     </div>
   </Layout>
 </template>
@@ -162,6 +173,7 @@
 <script setup>
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import Layout from '../components/Layout.vue'
+import BackupModal from '../components/BackupModal.vue'
 import { api } from '../api'
 import { useI18n } from 'vue-i18n'
 
@@ -186,6 +198,13 @@ function toggleDropdown(id) {
 
 function closeDropdown() {
   activeDropdown.value = null
+}
+
+const backupModal = reactive({ open: false, site: null })
+
+function openBackupModal(site) {
+  backupModal.site = site
+  backupModal.open = true
 }
 
 const wpModal = reactive({

@@ -112,6 +112,8 @@ import Layout from '../components/Layout.vue'
 import { api, b64decode, b64encode } from '../api'
 import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
+
 const selected = ref([])
 
 const allSelected = computed({

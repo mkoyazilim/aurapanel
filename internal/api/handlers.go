@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/mkoyazilim/aurapanel/internal/audit"
 	"github.com/mkoyazilim/aurapanel/internal/auth"
+	"github.com/mkoyazilim/aurapanel/internal/backup"
 	"github.com/mkoyazilim/aurapanel/internal/fm"
 	"github.com/mkoyazilim/aurapanel/internal/site"
 	"github.com/mkoyazilim/aurapanel/internal/store"
@@ -418,13 +420,13 @@ func (s *Server) handleSiteCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	creq := site.CreateRequest{
-		Domain:       req.Domain,
-		Aliases:      req.Aliases,
-		AppType:      req.AppType,
-		PHPVersion:   req.PHPVersion,
-		NodeVersion:  req.NodeVersion,
-		NodePort:     req.NodePort,
-		Limits:       req.Limits,
+		Domain:      req.Domain,
+		Aliases:     req.Aliases,
+		AppType:     req.AppType,
+		PHPVersion:  req.PHPVersion,
+		NodeVersion: req.NodeVersion,
+		NodePort:    req.NodePort,
+		Limits:      req.Limits,
 	}
 
 	if role != "admin" {
@@ -852,7 +854,7 @@ func (s *Server) handleDBCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("id")
-	
+
 	// Yetki kontrolü (admin değilse, sitenin sahibi olmalı)
 	if role != "admin" {
 		st, err := s.deps.Store.GetSite(r.Context(), siteID)
@@ -861,7 +863,7 @@ func (s *Server) handleDBCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Faz 3: Reseller DB kota kontrolü
 	if role == "reseller" {
 		if err := s.deps.Reseller.CheckDatabaseQuota(r.Context(), u.ID); err != nil {
@@ -1053,6 +1055,7 @@ func (s *Server) handleBackupRun(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Kind    string `json:"kind"`
 		Storage string `json:"storage"`
+		Async   bool   `json:"async"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
@@ -1060,14 +1063,31 @@ func (s *Server) handleBackupRun(w http.ResponseWriter, r *http.Request) {
 	if req.Storage == "" {
 		req.Storage = "local"
 	}
+	// Async: anlık yedekleme ekranı ilerlemeyi kayıt üzerinden izler.
+	if req.Async {
+		id, name, err := s.deps.Backups.RunAsync(r.Context(), r.PathValue("id"), req.Kind, req.Storage)
+		if err != nil {
+			writeErr(w, errStatus(err), err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"id": id, "name": name, "status": "running"})
+		return
+	}
 	name, err := s.deps.Backups.RunWithStorage(r.Context(), r.PathValue("id"), req.Kind, req.Storage)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		writeErr(w, errStatus(err), err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"name": name})
 }
 
+// errStatus, çakışan (devam eden) yedek isteğini 409 olarak işaretler.
+func errStatus(err error) int {
+	if errors.Is(err, backup.ErrBackupRunning) {
+		return http.StatusConflict
+	}
+	return http.StatusBadRequest
+}
 func (s *Server) handleBackupList(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return

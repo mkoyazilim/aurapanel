@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -107,42 +108,22 @@ func (s *Service) SetS3Storage(s3 Storage) {
 	s.s3Storage = s3
 }
 
+// ErrBackupRunning, aynı site için zaten devam eden bir yedek olduğunda döner.
+var ErrBackupRunning = errors.New("bu site için zaten devam eden bir yedek var")
+
 // Run, site yedeği alır (kind: full | files | db, storageType: local | s3). Akış:
 // yedek → şifrele → depola → DB kaydı → retention budaması.
 func (s *Service) Run(ctx context.Context, siteID, kind string) (string, error) {
 	return s.RunWithStorage(ctx, siteID, kind, "local")
 }
 
-// RunWithStorage, belirtilen depoya site yedeği alır.
+// RunWithStorage, belirtilen depoya site yedeği alır ve bitene kadar bekler.
 func (s *Service) RunWithStorage(ctx context.Context, siteID, kind, storageType string) (string, error) {
-	st, err := s.store.GetSite(ctx, siteID)
+	st, targetStorage, storageType, err := s.prepare(ctx, siteID, kind, storageType)
 	if err != nil {
 		return "", err
 	}
-	if st == nil {
-		return "", fmt.Errorf("site yok: %s", siteID)
-	}
-	if kind != "full" && kind != "files" && kind != "db" {
-		return "", fmt.Errorf("geçersiz yedek türü: %q", kind)
-	}
-	if (kind == "full" || kind == "db") && s.dumps == nil {
-		return "", fmt.Errorf("db döküm motoru bağlı değil")
-	}
-
-	targetStorage := s.storage
-	if storageType == "s3" {
-		if s.s3Storage == nil {
-			return "", fmt.Errorf("S3 / R2 uzak depolama yapılandırılmamış")
-		}
-		targetStorage = s.s3Storage
-	} else {
-		storageType = "local"
-	}
-
-	// Nanosaniye hassasiyeti: aynı saniyedeki ardışık yedekler çakışmaz.
-	name := fmt.Sprintf("%s-%s-%s.apbk", siteID, kind, time.Now().UTC().Format("20060102T150405.000000000Z"))
-
-	// Kayıt: pending.
+	name := backupName(siteID, kind)
 	recID, err := s.store.InsertBackup(ctx, store.Backup{
 		SiteID: siteID, Kind: kind, Storage: storageType, Location: name,
 		Encrypted: 1, Status: "running",
@@ -150,31 +131,107 @@ func (s *Service) RunWithStorage(ctx context.Context, siteID, kind, storageType 
 	if err != nil {
 		return "", err
 	}
+	if err := s.execute(ctx, st, siteID, kind, storageType, name, targetStorage, recID); err != nil {
+		return "", err
+	}
+	return name, nil
+}
 
-	// Encrypt-then-upload: geçici dosyaya yaz → şifreli akıta → depola.
-	if err := s.runPipelineWithStorage(ctx, st, kind, name, targetStorage); err != nil {
+// RunAsync, yedeği arka planda başlatır ve hemen döner; ilerleme DB kaydı
+// (status: running → success/failed) üzerinden izlenir.
+func (s *Service) RunAsync(ctx context.Context, siteID, kind, storageType string) (int64, string, error) {
+	st, targetStorage, storageType, err := s.prepare(ctx, siteID, kind, storageType)
+	if err != nil {
+		return 0, "", err
+	}
+	name := backupName(siteID, kind)
+	recID, err := s.store.InsertBackup(ctx, store.Backup{
+		SiteID: siteID, Kind: kind, Storage: storageType, Location: name,
+		Encrypted: 1, Status: "running",
+	})
+	if err != nil {
+		return 0, "", err
+	}
+	// HTTP isteği bitse de çalışır; çok büyük siteler için 24 saat tavan.
+	go func() {
+		bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), 24*time.Hour)
+		defer cancel()
+		// Hata zaten execute içinde kayda + audit'e işlenir.
+		_ = s.execute(bg, st, siteID, kind, storageType, name, targetStorage, recID)
+	}()
+	return recID, name, nil
+}
+
+// prepare, hedef siteyi doğrular, depoyu çözer ve eşzamanlı yedek
+// çakışmasını (aynı site için ikinci running kayıt) engeller.
+func (s *Service) prepare(ctx context.Context, siteID, kind, storageType string) (*store.Site, Storage, string, error) {
+	st, err := s.store.GetSite(ctx, siteID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if st == nil {
+		return nil, nil, "", fmt.Errorf("site yok: %s", siteID)
+	}
+	if kind != "full" && kind != "files" && kind != "db" {
+		return nil, nil, "", fmt.Errorf("geçersiz yedek türü: %q", kind)
+	}
+	if (kind == "full" || kind == "db") && s.dumps == nil {
+		return nil, nil, "", fmt.Errorf("db döküm motoru bağlı değil")
+	}
+	if (kind == "full" || kind == "files") && s.files == nil {
+		return nil, nil, "", fmt.Errorf("dosya akış motoru bağlı değil")
+	}
+	running, err := s.store.HasRunningBackup(ctx, siteID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if running {
+		return nil, nil, "", ErrBackupRunning
+	}
+	targetStorage := s.storage
+	if storageType == "s3" {
+		if s.s3Storage == nil {
+			return nil, nil, "", fmt.Errorf("S3 / R2 uzak depolama yapılandırılmamış")
+		}
+		targetStorage = s.s3Storage
+	} else {
+		storageType = "local"
+	}
+	return st, targetStorage, storageType, nil
+}
+
+// backupName, aynı saniyedeki ardışık yedekler çakışmasın diye nanosaniye
+// hassasiyetli benzersiz ad üretir.
+func backupName(siteID, kind string) string {
+	return fmt.Sprintf("%s-%s-%s.apbk", siteID, kind, time.Now().UTC().Format("20060102T150405.000000000Z"))
+}
+
+// execute, şifrele-ve-depola hattını çalıştırır; sonucu DB kaydına ve audit'e işler.
+func (s *Service) execute(ctx context.Context, st *store.Site, siteID, kind, storageType, name string, targetStorage Storage, recID int64) error {
+	size, err := s.runPipelineWithStorage(ctx, st, kind, name, targetStorage)
+	if err != nil {
 		s.store.MarkBackupFailed(ctx, recID)
 		s.audit.Write(ctx, audit.Event{Action: "backup.run", Target: siteID, Result: "failed",
 			Extra: map[string]any{"kind": kind, "storage": storageType, "error": err.Error()}})
-		return "", err
+		return err
 	}
-
-	if err := s.store.MarkBackupDone(ctx, recID, 0); err != nil {
-		return "", err
+	if err := s.store.MarkBackupDone(ctx, recID, size); err != nil {
+		return err
 	}
 	s.audit.Write(ctx, audit.Event{Action: "backup.run", Target: siteID, Result: "success",
 		Extra: map[string]any{"kind": kind, "storage": storageType, "name": name}})
 
 	// Retention: en eski fazlalıkları buda.
 	s.prune(ctx, siteID)
-	return name, nil
+	return nil
 }
 
-// runPipelineWithStorage, yedek içeriğini şifreli akıtır ve hedef depoya kaydeder.
-func (s *Service) runPipelineWithStorage(ctx context.Context, st *store.Site, kind, name string, storage Storage) error {
+// runPipelineWithStorage, yedek içeriğini şifreli akıtır, hedef depoya
+// kaydeder ve şifreli dosyanın gerçek boyutunu döndürür.
+func (s *Service) runPipelineWithStorage(ctx context.Context, st *store.Site, kind, name string, storage Storage) (int64, error) {
 	tmp, err := os.CreateTemp("", "apbackup-*")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
@@ -182,35 +239,45 @@ func (s *Service) runPipelineWithStorage(ctx context.Context, st *store.Site, ki
 
 	ew, err := EncryptWriter(s.key, tmp)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	switch kind {
 	case "files", "full":
-		if err := s.files.StreamTarGz(ctx, st.ID, []string{"."}, []string{path.Dir(st.HomeDir) + "/."}, ew); err != nil {
-			return fmt.Errorf("dosya akışı: %w", err)
+		// Worker tüm yolları site HOME'una göre çözer (file.op sözleşmesi);
+		// bu yüzden tar kökü home'dur — site kökü (logs/tmp dahil) değil.
+		if err := s.files.StreamTarGz(ctx, st.ID, []string{"."}, []string{st.HomeDir + "/."}, ew); err != nil {
+			return 0, fmt.Errorf("dosya akışı: %w", err)
 		}
 	}
 	if kind == "full" || kind == "db" {
 		dbs, err := s.store.ListDatabasesBySite(ctx, st.ID)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		for _, d := range dbs {
 			if err := s.dumps.DumpDatabase(ctx, d.Name, ew); err != nil {
-				return fmt.Errorf("db dökümü %s: %w", d.Name, err)
+				return 0, fmt.Errorf("db dökümü %s: %w", d.Name, err)
 			}
 		}
 	}
 	if err := tmp.Close(); err != nil {
-		return err
+		return 0, err
 	}
 
+	// Gerçek depo boyutu (şifreli) kayda işlenmek üzere ölçülür.
+	fi, err := os.Stat(tmpName)
+	if err != nil {
+		return 0, err
+	}
 	f, err := os.Open(tmpName)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer f.Close()
-	return storage.Save(ctx, name, f)
+	if err := storage.Save(ctx, name, f); err != nil {
+		return 0, err
+	}
+	return fi.Size(), nil
 }
 
 // Restore, yedeği çözer ve site dosyalarına geri yazar (audit'li).

@@ -80,6 +80,7 @@
                   <td>{{ formatDate(acc.created_at) }}</td>
                   <td style="text-align: right">
                     <button class="btn btn-sm" @click="openPasswordModal(acc.email)">{{ $t('mail.btn_change_pw') }}</button>
+                    <button class="btn btn-sm" style="margin-left: 6px" @click="openWebmail(acc.email)">{{ $t('mail.btn_webmail') }}</button>
                     <button class="btn danger btn-sm" style="margin-left: 6px" @click="deleteAccount(acc.email)">{{ $t('mail.btn_delete') }}</button>
                   </td>
                 </tr>
@@ -438,6 +439,15 @@ function openPasswordModal(email) {
   selectedEmail.value = email
   passwordForm.value = { password: '', password_confirm: '' }
   showPasswordModal.value = true
+}
+
+function openWebmail(email) {
+  const domain = (email.split('@')[1] || '').toLowerCase()
+  if (!domain) return
+  // Sorgu parametresi eklenmez: SnappyMail sorguyu "path" sayar ve
+  // Sec-Fetch koruması (secfetch_allow varsayılanı) cross-site
+  // gezinmeleri "Access Denied." ile reddeder.
+  window.open(`https://webmail.${domain}/`, '_blank', 'noopener')
 }
 
 async function changePassword() {

@@ -1376,8 +1376,8 @@ virtual_uid_maps = static:5000
 virtual_gid_maps = static:5000
 milter_protocol = 6
 milter_default_action = accept
-smtpd_milters = unix:/run/opendkim/opendkim.sock
-non_smtpd_milters = unix:/run/opendkim/opendkim.sock
+smtpd_milters = unix:opendkim/opendkim.sock
+non_smtpd_milters = unix:opendkim/opendkim.sock
 myhostname = ` + hostname + "\n"
 
 	p.write(fileWrite{path: "/etc/postfix/main.cf", content: postfixMainCf, mode: 0o644})
@@ -1392,6 +1392,11 @@ mail_gid = 5000
 mail_privileged_group = mail
 first_valid_uid = 5000
 last_valid_uid = 5000
+
+namespace inbox {
+  inbox = yes
+  separator = /
+}
 `
 	dovecotAuthConf := `# AuraPanel managed
 disable_plaintext_auth = yes
@@ -1440,7 +1445,7 @@ service lmtp {
 	p.write(fileWrite{path: "/etc/dovecot/conf.d/10-auth.conf", content: dovecotAuthConf, mode: 0o644})
 	p.write(fileWrite{path: "/etc/dovecot/conf.d/10-ssl.conf", content: dovecotSSLConf, mode: 0o644})
 	p.write(fileWrite{path: "/etc/dovecot/conf.d/20-lmtp.conf", content: dovecotLMTPConf, mode: 0o644})
-	p.write(fileWrite{path: "/etc/dovecot/users", content: "", mode: 0o640})
+	p.write(fileWrite{path: "/etc/dovecot/users", content: "", mode: 0o644})
 
 	// --- OpenDKIM ---
 	opendkimConf := `# AuraPanel managed
@@ -1462,7 +1467,7 @@ ExternalIgnoreList /etc/opendkim/TrustedHosts
 InternalHosts   /etc/opendkim/TrustedHosts
 
 OversignHeaders From
-Socket          local:/run/opendkim/opendkim.sock
+Socket          local:/var/spool/postfix/opendkim/opendkim.sock
 PidFile         /run/opendkim/opendkim.pid
 UMask           007
 UserID          opendkim
@@ -1471,10 +1476,22 @@ UserID          opendkim
 	p.mkdir("/etc/opendkim")
 	p.mkdir("/etc/opendkim/keys")
 	p.write(fileWrite{path: "/etc/opendkim.conf", content: opendkimConf, mode: 0o644})
-	p.write(fileWrite{path: "/etc/opendkim/KeyTable", content: "", mode: 0o644})
-	p.write(fileWrite{path: "/etc/opendkim/SigningTable", content: "", mode: 0o644})
-	p.write(fileWrite{path: "/etc/opendkim/TrustedHosts", content: "127.0.0.1\nlocalhost\n", mode: 0o644})
-
+	// smtpd chroot içinde çalışır (Debian varsayılanı): milter soketi
+	// /var/spool/postfix/opendkim/ altında olmalı, yoksa postfix
+	// "No such file or directory" ile imzalayamaz.
+	p.mkdirMode("/var/spool/postfix/opendkim", 0o750)
+	p.exec(chown, "opendkim:opendkim", "/var/spool/postfix/opendkim")
+	// Tablolar yalnızca yoksa oluşturulur: setup'ın mevcut DKIM anahtar
+	// tablolarını sıfırlayıp imzalamayı kırması engellenir.
+	if _, statErr := os.Stat("/etc/opendkim/KeyTable"); os.IsNotExist(statErr) {
+		p.write(fileWrite{path: "/etc/opendkim/KeyTable", content: "", mode: 0o644})
+	}
+	if _, statErr := os.Stat("/etc/opendkim/SigningTable"); os.IsNotExist(statErr) {
+		p.write(fileWrite{path: "/etc/opendkim/SigningTable", content: "", mode: 0o644})
+	}
+	if _, statErr := os.Stat("/etc/opendkim/TrustedHosts"); os.IsNotExist(statErr) {
+		p.write(fileWrite{path: "/etc/opendkim/TrustedHosts", content: "127.0.0.1\nlocalhost\n", mode: 0o644})
+	}
 	// --- Servisleri etkinleştir ---
 	p.exec(systemctl, "enable", "--now", "postfix")
 	p.exec(systemctl, "enable", "--now", "dovecot")
@@ -1574,7 +1591,7 @@ func opMailProvision(_ *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 		fmt.Fprintf(&usersBuf, "%s:{BLF-CRYPT}%s:5000:5000::/var/vmail/%s/%s::%s\n",
 			acc.Email, acc.PasswordHash, domain, local, quotaRule)
 	}
-	p.write(fileWrite{path: "/etc/dovecot/users", content: usersBuf.String(), mode: 0o640})
+	p.write(fileWrite{path: "/etc/dovecot/users", content: usersBuf.String(), mode: 0o644})
 
 	// 5. maildir dizinlerini oluştur
 	for _, acc := range a.Accounts {
@@ -1665,5 +1682,5 @@ func opMailDKIMGenerate(_ *runtimeCfg, raw json.RawMessage) (*plan, any, error) 
 	// opendkim yeniden yükle
 	p.exec(systemctl, "restart", "opendkim")
 
-	return p, map[string]any{"public_key": pubB64, "domain": a.Domain}, nil
+	return p, map[string]any{"public_key": pubB64, "private_key": string(privPEM), "domain": a.Domain}, nil
 }

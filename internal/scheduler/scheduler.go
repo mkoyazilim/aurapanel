@@ -124,7 +124,12 @@ func (s *Service) runGlobalBackup() {
 
 func (s *Service) runSiteBackup(siteID string) {
 	ctx := context.Background()
-	if _, err := s.backups.Run(ctx, siteID, "full"); err != nil {
+	// Zamanlamada seçilen yedek türü (full/files/db) kullanılır; boşsa tam yedek.
+	kind, _, _ := s.st.GetSetting(ctx, fmt.Sprintf("site_backup_kind_%s", siteID))
+	if kind == "" {
+		kind = "full"
+	}
+	if _, err := s.backups.Run(ctx, siteID, kind); err != nil {
 		s.log.Error("site oto-yedek: hata", "site", siteID, "error", err)
 	}
 }

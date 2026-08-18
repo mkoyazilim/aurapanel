@@ -40,7 +40,7 @@ const router = createRouter({ history: createWebHistory(), routes })
 router.beforeEach(async (to) => {
   const auth = useAuth()
   if (to.meta.public) return true
-  if (!auth.user) {
+  if (!auth.user || !auth.user.role) {
     try {
       await auth.me()
     } catch {

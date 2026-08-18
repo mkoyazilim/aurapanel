@@ -72,6 +72,16 @@ func (s *Store) ListBackupsBySite(ctx context.Context, siteID string) ([]Backup,
 	return out, rows.Err()
 }
 
+// HasRunningBackup, site için devam eden (running) bir yedek olup olmadığını döndürür.
+func (s *Store) HasRunningBackup(ctx context.Context, siteID string) (bool, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM backups WHERE site_id = ? AND status = 'running'`, siteID).Scan(&n); err != nil {
+		return false, fmt.Errorf("backup running check: %w", err)
+	}
+	return n > 0, nil
+}
+
 // DeleteBackup, yedek kaydını siler.
 func (s *Store) DeleteBackup(ctx context.Context, id int64) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM backups WHERE id = ?`, id); err != nil {

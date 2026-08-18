@@ -15,10 +15,10 @@ import (
 
 // ArchiveLimits, archive bomb korumaları (FILE_MANAGER §12).
 type ArchiveLimits struct {
-	MaxTotalSize   int64 // açılan toplam bayt
-	MaxFiles       int   // dosya sayısı
-	MaxRatio       int   // sıkıştırma oranı (arşiv:çıktı)
-	MaxEntryPath   int   // tek girdi yol uzunluğu
+	MaxTotalSize int64 // açılan toplam bayt
+	MaxFiles     int   // dosya sayısı
+	MaxRatio     int   // sıkıştırma oranı (arşiv:çıktı)
+	MaxEntryPath int   // tek girdi yol uzunluğu
 }
 
 // DefaultArchiveLimits: 10 GiB çıktı, 100 bin dosya, 200:1 oran.
@@ -108,7 +108,7 @@ func (a *ArchiveService) createZip(ctx context.Context, siteID, out string, rels
 			if err != nil {
 				return err
 			}
-			return streamFile(w, full)
+			return streamFile(ctx, a.fs.backend, w, full)
 		}); err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (a *ArchiveService) StreamTarGz(ctx context.Context, siteID string, rels, a
 			if info.IsDir() {
 				return nil
 			}
-			return streamFile(tw, full)
+			return streamFile(ctx, a.fs.backend, tw, full)
 		}); err != nil {
 			return err
 		}
@@ -373,12 +373,15 @@ func archiveFileSize(p string) int64 {
 	return st.Size()
 }
 
-func streamFile(w io.Writer, full string) error {
-	f, err := os.Open(full)
+// streamFile, dosya içeriğini Backend üzerinden w'ye akıtır: Tier-1'de
+// içerik site UID'siyle (file.op) okunur, panel süreci site dosyalarına
+// dokunmaz; LocalBackend'te doğrudan os.Open kullanılır.
+func streamFile(ctx context.Context, be Backend, w io.Writer, full string) error {
+	rc, err := be.OpenFile(ctx, full)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = io.Copy(w, f)
+	defer rc.Close()
+	_, err = io.Copy(w, rc)
 	return err
 }

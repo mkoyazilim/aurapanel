@@ -156,6 +156,11 @@ func (s *Service) SetupMailServer(ctx context.Context) error {
 		return fmt.Errorf("mail server setup: %w", err)
 	}
 
+	// setup, haritaları sıfır yazar; desired state'i geri uygula.
+	if err := s.provision(ctx); err != nil {
+		return fmt.Errorf("provisioning after setup: %w", err)
+	}
+
 	s.deps.Audit.Write(ctx, audit.Event{
 		Action: "mail.setup",
 		Target: "server",
@@ -188,7 +193,42 @@ func (s *Service) ChangePassword(ctx context.Context, email, newPassword string)
 
 // provision regenerates Postfix/Dovecot config files from the DB and reloads services.
 func (s *Service) provision(ctx context.Context) error {
-	_, err := s.deps.Priv.Call(ctx, "mail.provision", nil)
+	domains, err := s.deps.Store.GetMailDomains(ctx)
+	if err != nil {
+		return err
+	}
+	accounts, err := s.deps.Store.GetAllMailAccounts(ctx)
+	if err != nil {
+		return err
+	}
+
+	// MailAccount.PasswordHash json:"-" ile gizli; priv op'unun beklediği
+	// alan adlarıyla eşleşen yerel bir DTO ile gönderiyoruz.
+	type provisionAccount struct {
+		Email        string `json:"email"`
+		PasswordHash string `json:"password_hash"`
+		QuotaMB      int    `json:"quota_mb"`
+		Domain       string `json:"domain"`
+	}
+
+	doms := make([]string, 0, len(domains))
+	for _, d := range domains {
+		doms = append(doms, d.Domain)
+	}
+	accs := make([]provisionAccount, 0, len(accounts))
+	for _, a := range accounts {
+		accs = append(accs, provisionAccount{
+			Email:        a.Email,
+			PasswordHash: a.PasswordHash,
+			QuotaMB:      a.QuotaMB,
+			Domain:       a.Domain,
+		})
+	}
+
+	_, err = s.deps.Priv.Call(ctx, "mail.provision", map[string]any{
+		"domains":  doms,
+		"accounts": accs,
+	})
 	return err
 }
 

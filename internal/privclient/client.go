@@ -16,8 +16,9 @@ import (
 	"github.com/mkoyazilim/aurapanel/internal/priv"
 )
 
-// maxResponseSize, yanıt okuma sınırı.
-const maxResponseSize = 1 << 20
+// maxResponseSize, yanıt okuma sınırı: en büyük file.op read yanıtını
+// (16 MiB içerik, base64 ≈ 22.4 MB) karşılayacak kadar geniş.
+const maxResponseSize = 24 << 20
 
 // Client, helper'a tek op'luk çağrılar yapan istemci.
 type Client struct {

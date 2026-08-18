@@ -27,13 +27,17 @@ func TestRegistryAllowlist(t *testing.T) {
 	reg := newRegistry(testCfg())
 	want := []string{
 		"priv.ping", "user.create", "user.delete", "user.exists",
-		"cgroup.bootstrap", "cgroup.limits", "quota.set",
-		"firewall.apply", "sshd.install_config", "logrotate.install_config",
+		"cgroup.bootstrap", "server.services", "server.action", "cgroup.limits",
+		"quota.set", "firewall.apply", "sshd.install_config", "logrotate.install_config",
 		"ols.test", "ols.read_bundle", "ols.install_bundle", "ols.remove_bundle", "ols.reload",
 		"site.prepare", "site.teardown", "cgroup.cleanup",
 		"cgroup.read", "site.status", "quota.get",
 		"php.detect", "php.install_ini", "php.read_ini",
 		"ols.webadmin_credentials",
+		"cron.apply", "node.apply", "node.remove", "site.clone_files",
+		"firewall.list", "firewall.rule_add", "firewall.rule_delete",
+		"firewall.ssh_port", "firewall.panel_port",
+		"mail.setup", "mail.provision", "mail.dkim_generate",
 	}
 	if len(reg) != len(want) {
 		t.Fatalf("op sayısı beklenmiyor: %d (beklenen %d)", len(reg), len(want))

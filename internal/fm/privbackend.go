@@ -203,15 +203,132 @@ func (p *PrivBackend) EvalSymlinks(ctx context.Context, absPath string) (string,
 	return out, nil
 }
 
-// OpenFile/CreateFile: JSON protokolü akış desteklemez — büyük yükleme
-// akışı sunucu fazında (Tier-1 stream) eklenecek; şimdilik açık hata.
+// streamChunkSize, siteFileReader'ın file.op üzerinden okuduğu parça boyutu
+// (JSON base64 taşıması içinde güvenli kalır).
+const streamChunkSize = 4 << 20
+
+// OpenFile, site dosyasını PrivBackend üzerinden parça parça okuyan bir
+// akış döndürür — panel süreci site dosyalarına ASLA dokunmaz; her parça
+// file.op read (offset + limit) ile SİTE UID'siyle okunur.
 func (p *PrivBackend) OpenFile(ctx context.Context, absPath string) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("Tier-1 akış okuma sunucu fazında")
+	siteID, rel, err := p.split(absPath)
+	if err != nil {
+		return nil, err
+	}
+	return &siteFileReader{p: p, ctx: ctx, siteID: siteID, rel: rel}, nil
 }
 
+// uploadChunkSize, siteFileWriter'ın file.op write parça boyutu.
+const uploadChunkSize = 4 << 20
+
+// CreateFile, site dosyasına parçalı yazan bir akış döndürür — panel
+// süreci site dosyalarına ASLA dokunmaz; her parça file.op write
+// (content_b64 + offset) ile SİTE UID'siyle yazılır.
 func (p *PrivBackend) CreateFile(ctx context.Context, absPath string, mode os.FileMode) (io.WriteCloser, error) {
-	return nil, fmt.Errorf("Tier-1 akış yazma sunucu fazında")
+	siteID, rel, err := p.split(absPath)
+	if err != nil {
+		return nil, err
+	}
+	return &siteFileWriter{p: p, ctx: ctx, siteID: siteID, rel: rel}, nil
 }
+
+// siteFileWriter, parçalı site dosyası yazıcısı (io.WriteCloser).
+type siteFileWriter struct {
+	p      *PrivBackend
+	ctx    context.Context
+	siteID string
+	rel    string
+	offset int64
+	buf    []byte
+	closed bool
+}
+
+func (w *siteFileWriter) Write(p []byte) (int, error) {
+	w.buf = append(w.buf, p...)
+	for len(w.buf) >= uploadChunkSize {
+		if err := w.flush(); err != nil {
+			return 0, err
+		}
+	}
+	return len(p), nil
+}
+
+func (w *siteFileWriter) flush() error {
+	chunk := w.buf
+	_, err := w.p.client.Call(w.ctx, "file.op", map[string]any{
+		"site": w.siteID, "verb": "write", "paths": []string{w.rel},
+		"content_b64": base64.StdEncoding.EncodeToString(chunk),
+		"offset":      w.offset,
+	})
+	if err != nil {
+		return err
+	}
+	w.offset += int64(len(chunk))
+	w.buf = nil
+	return nil
+}
+
+func (w *siteFileWriter) Close() error {
+	if w.closed {
+		return nil
+	}
+	w.closed = true
+	// Kalan parça varsa yaz; hiç veri yazılmadıysa boş dosya oluştur (touch).
+	if len(w.buf) > 0 || w.offset == 0 {
+		return w.flush()
+	}
+	return nil
+}
+
+// siteFileReader, parçalı site dosyası okuyucusu (io.ReadCloser).
+type siteFileReader struct {
+	p      *PrivBackend
+	ctx    context.Context
+	siteID string
+	rel    string
+	offset int64
+	buf    []byte
+	done   bool
+}
+
+func (r *siteFileReader) Read(dst []byte) (int, error) {
+	for len(r.buf) == 0 && !r.done {
+		b, err := r.readChunk()
+		if err != nil {
+			return 0, err
+		}
+		if len(b) == 0 {
+			r.done = true
+			break
+		}
+		r.buf = b
+	}
+	if len(r.buf) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(dst, r.buf)
+	r.buf = r.buf[n:]
+	return n, nil
+}
+
+func (r *siteFileReader) readChunk() ([]byte, error) {
+	data, err := r.p.client.Call(r.ctx, "file.op", map[string]any{
+		"site": r.siteID, "verb": "read", "paths": []string{r.rel},
+		"offset": r.offset, "limit": int64(streamChunkSize),
+	})
+	if err != nil {
+		return nil, err
+	}
+	b64, _ := data["content_b64"].(string)
+	b, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, err
+	}
+	r.offset += int64(len(b))
+	return b, nil
+}
+
+func (r *siteFileReader) Close() error { return nil }
 
 // --- worker yanıt yardımcıları ---
 
