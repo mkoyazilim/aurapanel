@@ -60,6 +60,7 @@ var binPaths = map[string]string{
 	"opendkim":  "/usr/sbin/opendkim",
 	"lswsctrl":  "/usr/local/lsws/bin/lswsctrl",
 	"lshttpd":   "/usr/local/lsws/bin/lshttpd",
+	"gpasswd":   "/usr/bin/gpasswd",
 }
 
 func bin(name string) (string, error) {
@@ -86,12 +87,12 @@ var allowedShells = map[string]struct{}{
 
 // Sınır sabitleri (titiz aralık kontrolleri).
 const (
-	minMemoryBytes = 8 << 20       // 8 MiB
-	maxMemoryBytes = 1 << 40       // 1 TiB
+	minMemoryBytes = 8 << 20 // 8 MiB
+	maxMemoryBytes = 1 << 40 // 1 TiB
 	minPIDs        = 16
-	maxPIDs        = 1 << 22       // ~4.2M
+	maxPIDs        = 1 << 22 // ~4.2M
 	minDiskMB      = 1
-	maxDiskMB      = 10_000_000    // ~10 TiB
+	maxDiskMB      = 10_000_000 // ~10 TiB
 	minInodes      = 100
 	maxInodes      = 1_000_000_000
 )
@@ -170,14 +171,18 @@ type plan struct {
 	actions []action
 }
 
-func (p *plan) mkdir(path string)      { p.mkdirMode(path, 0o755) }
+func (p *plan) mkdir(path string) { p.mkdirMode(path, 0o755) }
 func (p *plan) mkdirMode(path string, mode os.FileMode) {
 	p.actions = append(p.actions, action{kind: actMkdir, mkdir: path, mkdirMode: mode})
 }
-func (p *plan) write(f fileWrite)      { p.actions = append(p.actions, action{kind: actWrite, write: f}) }
-func (p *plan) copy(c fileCopy)        { p.actions = append(p.actions, action{kind: actCopy, copy: c}) }
-func (p *plan) remove(path string)     { p.actions = append(p.actions, action{kind: actRemove, remove: path}) }
-func (p *plan) removeAll(path string)  { p.actions = append(p.actions, action{kind: actRemoveAll, removeAll: path}) }
+func (p *plan) write(f fileWrite) { p.actions = append(p.actions, action{kind: actWrite, write: f}) }
+func (p *plan) copy(c fileCopy)   { p.actions = append(p.actions, action{kind: actCopy, copy: c}) }
+func (p *plan) remove(path string) {
+	p.actions = append(p.actions, action{kind: actRemove, remove: path})
+}
+func (p *plan) removeAll(path string) {
+	p.actions = append(p.actions, action{kind: actRemoveAll, removeAll: path})
+}
 func (p *plan) exec(bin string, args ...string) {
 	p.actions = append(p.actions, action{kind: actExec, exec: execSpec{bin: bin, args: args}})
 }
@@ -189,45 +194,45 @@ type opFunc func(cfg *runtimeCfg, args json.RawMessage) (*plan, any, error)
 // Bu liste dışında hiçbir op YOKTUR.
 func newRegistry(cfg *runtimeCfg) map[string]opFunc {
 	return map[string]opFunc{
-		"priv.ping":                 opPing,
-		"user.create":               opUserCreate,
-		"user.delete":               opUserDelete,
-		"user.exists":               opUserExists,
-		"cgroup.bootstrap":          opCgroupBootstrap,
-		"server.services":           opServerServices,
-		"server.action":             opServerAction,
-		"cgroup.limits":             opCgroupLimits,
-		"quota.set":                 opQuotaSet,
-		"firewall.apply":            opFirewallApply,
-		"sshd.install_config":       opSshdInstall,
-		"logrotate.install_config":  opLogrotateInstall,
-		"ols.test":                  opOlsTest,
-		"ols.read_bundle":           opOlsReadBundle,
-		"ols.install_bundle":        opOlsInstallBundle,
-		"ols.remove_bundle":         opOlsRemoveBundle,
-		"ols.reload":                opOlsReload,
-		"site.prepare":              opSitePrepare,
-		"site.teardown":             opSiteTeardown,
-		"cgroup.cleanup":            opCgroupCleanup,
-		"cgroup.read":               opCgroupRead,
-		"site.status":               opSiteStatus,
-		"quota.get":                 opQuotaGet,
-		"php.detect":                opPHPDetect,
-		"php.install_ini":           opPHPInstallIni,
-		"php.read_ini":              opPHPReadIni,
-		"ols.webadmin_credentials":  opOlsWebadminCredentials,
-		"cron.apply":                opCronApply,
-		"node.apply":                opNodeApply,
-		"node.remove":               opNodeRemove,
-		"site.clone_files":          opSiteCloneFiles,
-		"firewall.list":             opFirewallList,
-		"firewall.rule_add":         opFirewallRuleAdd,
-		"firewall.rule_delete":      opFirewallRuleDelete,
-		"firewall.ssh_port":         opSSHPortChange,
-		"firewall.panel_port":       opPanelPortChange,
-		"mail.setup":                opMailSetup,
-		"mail.provision":            opMailProvision,
-		"mail.dkim_generate":        opMailDKIMGenerate,
+		"priv.ping":                opPing,
+		"user.create":              opUserCreate,
+		"user.delete":              opUserDelete,
+		"user.exists":              opUserExists,
+		"cgroup.bootstrap":         opCgroupBootstrap,
+		"server.services":          opServerServices,
+		"server.action":            opServerAction,
+		"cgroup.limits":            opCgroupLimits,
+		"quota.set":                opQuotaSet,
+		"firewall.apply":           opFirewallApply,
+		"sshd.install_config":      opSshdInstall,
+		"logrotate.install_config": opLogrotateInstall,
+		"ols.test":                 opOlsTest,
+		"ols.read_bundle":          opOlsReadBundle,
+		"ols.install_bundle":       opOlsInstallBundle,
+		"ols.remove_bundle":        opOlsRemoveBundle,
+		"ols.reload":               opOlsReload,
+		"site.prepare":             opSitePrepare,
+		"site.teardown":            opSiteTeardown,
+		"cgroup.cleanup":           opCgroupCleanup,
+		"cgroup.read":              opCgroupRead,
+		"site.status":              opSiteStatus,
+		"quota.get":                opQuotaGet,
+		"php.detect":               opPHPDetect,
+		"php.install_ini":          opPHPInstallIni,
+		"php.read_ini":             opPHPReadIni,
+		"ols.webadmin_credentials": opOlsWebadminCredentials,
+		"cron.apply":               opCronApply,
+		"node.apply":               opNodeApply,
+		"node.remove":              opNodeRemove,
+		"site.clone_files":         opSiteCloneFiles,
+		"firewall.list":            opFirewallList,
+		"firewall.rule_add":        opFirewallRuleAdd,
+		"firewall.rule_delete":     opFirewallRuleDelete,
+		"firewall.ssh_port":        opSSHPortChange,
+		"firewall.panel_port":      opPanelPortChange,
+		"mail.setup":               opMailSetup,
+		"mail.provision":           opMailProvision,
+		"mail.dkim_generate":       opMailDKIMGenerate,
 	}
 }
 
@@ -247,10 +252,10 @@ func opNodeApply(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	if !reSiteID.MatchString(a.AppID) {
 		return nil, nil, errors.New("node.apply: app kimliği geçersiz")
 	}
-	
+
 	serviceName := fmt.Sprintf("ap-node-%s-%s.service", a.Site, a.AppID)
 	servicePath := "/etc/systemd/system/" + serviceName
-	
+
 	systemctl, _ := bin("systemctl")
 	p := &plan{}
 	p.write(fileWrite{path: servicePath, content: a.Content, mode: 0o644})
@@ -275,10 +280,10 @@ func opNodeRemove(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	if !reSiteID.MatchString(a.AppID) {
 		return nil, nil, errors.New("node.remove: app kimliği geçersiz")
 	}
-	
+
 	serviceName := fmt.Sprintf("ap-node-%s-%s.service", a.Site, a.AppID)
 	servicePath := "/etc/systemd/system/" + serviceName
-	
+
 	systemctl, _ := bin("systemctl")
 	p := &plan{}
 	p.exec(systemctl, "stop", serviceName)
@@ -450,11 +455,11 @@ func opCgroupBootstrap(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error)
 	p.mkdir(base)
 	// Enable controllers in root before creating child (sites)
 	p.write(fileWrite{path: path.Join(base, "cgroup.subtree_control"), content: "+cpu +memory +pids\n", mode: 0o644})
-	
+
 	p.mkdir(sites)
 	// Enable controllers in sites so that site001, site002 etc. get them
 	p.write(fileWrite{path: path.Join(sites, "cgroup.subtree_control"), content: "+cpu +memory +pids\n", mode: 0o644})
-	
+
 	// Delegation: alt ağacın sahipliğini panel kullanıcısına devret
 	// (panel, site cgroup'larını root olmadan yönetebilsin — §3).
 	p.exec(chown, "-R", cfg.panelUser+":"+cfg.panelUser, base)
@@ -816,10 +821,14 @@ func opSitePrepare(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	}
 	root := path.Join(cfg.sitesRoot, a.Site)
 	chown, _ := bin("chown")
+	gpasswd, _ := bin("gpasswd")
 	p := &plan{}
 	p.mkdirMode(path.Join(root, "logs"), 0o750)
 	p.mkdirMode(path.Join(root, "tmp"), 0o700)
 	p.exec(chown, "-R", a.User+":"+a.User, root)
+	// OLS worker'ları "nobody" olarak çalışır: statik dosya servisi için
+	// site grubuna nobody eklenir (750 dizinler grup r-x ile okunur).
+	p.exec(gpasswd, "-a", "nobody", a.User)
 	return p, map[string]any{"site": a.Site, "root": root}, nil
 }
 
@@ -857,25 +866,25 @@ func opSiteCloneFiles(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) 
 	if !reSiteID.MatchString(a.SrcSite) || !reSiteID.MatchString(a.DstSite) {
 		return nil, nil, errors.New("site.clone_files: site kimliği geçersiz")
 	}
-	
+
 	srcHome := path.Join(cfg.sitesRoot, a.SrcSite, "home") + "/" // Trailing slash is important for rsync
 	dstHome := path.Join(cfg.sitesRoot, a.DstSite, "home") + "/"
-	
+
 	dstUser := "www-" + a.DstSite
-	
+
 	// Ensure we only copy from valid sites
 	// Since we execute this as root, we can use rsync and then chown the dst
 	// Actually, instead of rsync, we can just use cp -a and chown, but rsync is better
 	rsyncPath, _ := bin("rsync")
 	chownPath, _ := bin("chown")
-	
+
 	p := &plan{}
 	// -a: archive mode (recursive, preserve perms, owner, times)
 	// --delete: delete extraneous files from destination
 	p.exec(rsyncPath, "-a", "--delete", srcHome, dstHome)
 	// chown -R the destination to the new user
 	p.exec(chownPath, "-R", dstUser+":"+dstUser, dstHome)
-	
+
 	return p, map[string]any{"src": srcHome, "dst": dstHome}, nil
 }
 
@@ -1007,7 +1016,7 @@ func opPHPDetect(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 				continue
 			}
 			if _, err := os.Stat(path.Join("/usr/local/lsws", e.Name(), "bin", "lsphp")); err == nil {
-				versions[e.Name()[5:6] + "." + e.Name()[6:]] = true
+				versions[e.Name()[5:6]+"."+e.Name()[6:]] = true
 			}
 		}
 	}
@@ -1015,7 +1024,9 @@ func opPHPDetect(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 }
 
 // reIniLine, php.ini satırlarının izin verilen biçimi:
-//   yönerge[boşluk]=[boşluk]değer
+//
+//	yönerge[boşluk]=[boşluk]değer
+//
 // Değer karakter kümesi DAR tutulur (harf/rakam/./ /:+_- ve boşluk):
 // allowlist anahtarlarımızın (boyutlar, tam sayılar, On/Off, zaman dilimi)
 // ihtiyaç duyduğu küme budur; `;`, tırnak, parantez vb. YASAKTIR.
@@ -1122,6 +1133,7 @@ func opServerAction(cfg *runtimeCfg, raw json.RawMessage) (*plan, any, error) {
 	}
 	return p, map[string]string{"status": "ok"}, nil
 }
+
 // --- Güvenlik Duvarı Yönetimi (firewall.list / firewall.rule_add / firewall.rule_delete / firewall.ssh_port / firewall.panel_port) ---
 
 // fwPortRange: 1-65535, rezerve portlar (0, 1024'ün altı sistem portlarına dikkat)
